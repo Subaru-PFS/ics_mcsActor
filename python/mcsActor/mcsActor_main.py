@@ -5,7 +5,7 @@ import opscore.utility.sdss3logging
 import opscore.actor.model
 import actorcore.Actor
 
-class Toy(actorcore.Actor.Actor):
+class Mcs(actorcore.Actor.Actor):
     def __init__(self, name, productName=None, configFile=None, debugLevel=30):
         # This sets up the connections to/from the hub, the logger, and the twisted reactor.
         #
@@ -22,6 +22,6 @@ class Toy(actorcore.Actor.Actor):
 # To work
 
 if __name__ == '__main__':
-    toy = Toy('toy', 'toyActor')
-    toy.run()
+    mcs = Mcs('mcs', 'mcsActor')
+    mcs.run()
     
