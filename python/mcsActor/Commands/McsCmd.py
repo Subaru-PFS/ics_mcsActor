@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import base64
+import numpy
 import time
 
 import opscore.protocols.keys as keys
@@ -22,6 +24,7 @@ class McsCmd(object):
             ('ping', '', self.ping),
             ('status', '', self.status),
             ('expose', '<expTime>', self.expose),
+            ('centroid', '<expTime>', self.centroid),
         ]
 
         # Define typed command arguments for the above commands.
@@ -47,19 +50,45 @@ class McsCmd(object):
         cmd.diag('text="still nothing to say"')
         cmd.finish()
 
-    def expose(self, cmd):
-        """ Do something pointless. """
-
+    def _doExpose(self, cmd):
+        """ Take an exposure. """
+        
         expTime = cmd.cmd.keywords["expTime"].values[0]
 
         cmd.inform('state="exposing"')
         if expTime > 0:
             time.sleep(expTime + 0.5)
+        image = None
+        
+        filename = "fakeFilename.fits"
+        cmd.inform("filename=%s" % (filename))
 
-        cmd.inform('state="measuring"')
-        centroids = ["%4.4f,%4.4f" % (0.5*x,0.5*x+0.25) for x in range(2400)]
-        cmd.inform('state="measured"')
-        cmd.inform("centroids=%s" % ", ".join(centroids))
-       
+        return filename, image
+            
+    def expose(self, cmd):
+        """ Take an exposure. Does not centroid. """
+
+        filename, image = self._doExpose(cmd)
         cmd.finish('state="done"')
+
+    def _encodeArray(self, array):
+        """ Temporarily wrap a binary array transfer encoding. """
+
+        # Actually, we want dtype,naxis,axNlen,base64(array)
+        return base64.b64encode(array.tostring())
+        
+    def centroid(self, cmd):
+        """ Take an exposure and measure centroids. """
+
+        filename, image = self._doExpose(cmd)
+
+        # The encoding scheme is temporary, and will be replaced with 
+        cmd.inform('state="measuring"')
+        centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
+
+        centroidsStr = self._encodeArray(centroids)
+        cmd.inform('state="measured"; centroids=%s' % (centroidsStr))
+
+        cmd.finish('state="done"')
+       
 
