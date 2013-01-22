@@ -82,12 +82,12 @@ class McsCmd(object):
 
         filename, image = self._doExpose(cmd)
 
-        # The encoding scheme is temporary, and will be replaced with 
+        # The encoding scheme is temporary, and will become encapsulated.
         cmd.inform('state="measuring"')
         centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
 
         centroidsStr = self._encodeArray(centroids)
-        cmd.inform('state="measured"; centroids=%s' % (centroidsStr))
+        cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
 
         cmd.finish('state="done"')
        
