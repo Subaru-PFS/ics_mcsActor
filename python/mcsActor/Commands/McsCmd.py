@@ -3,6 +3,7 @@
 import base64
 import numpy
 import time
+import pyfits
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
@@ -25,6 +26,7 @@ class McsCmd(object):
             ('status', '', self.status),
             ('expose', '<expTime>', self.expose),
             ('centroid', '<expTime>', self.centroid),
+            ('reconnect', '', self.reconnect),
         ]
 
         # Define typed command arguments for the above commands.
@@ -37,6 +39,9 @@ class McsCmd(object):
         """Query the actor for liveness/happiness."""
 
         cmd.finish("text='Present and (probably) well'")
+
+    def reconnect(self, cmd):
+        self.actor.connectCamera()
 
     def status(self, cmd):
         """Report status and version; obtain and send current data"""
@@ -55,11 +60,7 @@ class McsCmd(object):
         
         expTime = cmd.cmd.keywords["expTime"].values[0]
 
-        cmd.inform('state="exposing"')
-        if expTime > 0:
-            time.sleep(expTime + 0.5)
-        image = None
-        
+        image = self._pretendToBeACamera(cmd, expTime)
         filename = "fakeFilename.fits"
         cmd.inform("filename=%s" % (filename))
 
