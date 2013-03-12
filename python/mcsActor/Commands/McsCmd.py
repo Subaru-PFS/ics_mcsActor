@@ -2,7 +2,6 @@
 
 import base64
 import numpy
-import time
 import pyfits
 
 import opscore.protocols.keys as keys
@@ -24,14 +23,15 @@ class McsCmd(object):
         self.vocab = [
             ('ping', '', self.ping),
             ('status', '', self.status),
-            ('expose', '<expTime>', self.expose),
-            ('centroid', '<expTime>', self.centroid),
+            ('expose', '<expTime> <expType>', self.expose),
+            ('centroid', '<expTime> [<expType>]', self.centroid),
             ('reconnect', '', self.reconnect),
         ]
 
         # Define typed command arguments for the above commands.
         self.keys = keys.KeysDictionary("mcs_mcs", (1, 1),
                                         keys.Key("expTime", types.Float(), help="The exposure time"),
+                                        keys.Key("expType", types.String(), help="The exposure type"),
                                         )
 
 
@@ -41,36 +41,40 @@ class McsCmd(object):
         cmd.finish("text='Present and (probably) well'")
 
     def reconnect(self, cmd):
-        self.actor.connectCamera()
-
+        self.actor.connectCamera(cmd)
+        cmd.finish('text="camera connected!"')
+        
     def status(self, cmd):
         """Report status and version; obtain and send current data"""
 
         self.actor.sendVersionKey(cmd)
-
-        keyStrings = ['text="nothing to say, really"']
-        keyMsg = '; '.join(keyStrings)
-
-        cmd.inform(keyMsg)
-        cmd.diag('text="still nothing to say"')
+        self.actor.camera.sendStatusKeys(cmd)
+        
+        cmd.inform('text="Present!"')
         cmd.finish()
 
-    def _doExpose(self, cmd):
+    def getFilename(self, cmd):
+        self.actor.exposureID += 1
+        return "/data/mcs/MCSA%010d.fits" % (self.actor.exposureID)
+
+    def _doExpose(self, cmd, expTime, expType):
         """ Take an exposure. """
         
-        expTime = cmd.cmd.keywords["expTime"].values[0]
-
-        image = self._pretendToBeACamera(cmd, expTime)
-        filename = "fakeFilename.fits"
+        image = self.actor.camera.expose(cmd, expTime, expType)
+        filename = self.getFilename(cmd)
+        pyfits.writeto(filename, image, checksum=True, clobber=False)
         cmd.inform("filename=%s" % (filename))
-
+        
         return filename, image
             
     def expose(self, cmd):
         """ Take an exposure. Does not centroid. """
 
-        filename, image = self._doExpose(cmd)
-        cmd.finish('state="done"')
+        expTime = cmd.cmd.keywords["expTime"].values[0]
+        expType = cmd.cmd.keywords["expType"].values[0]
+
+        filename, image = self._doExpose(cmd, expTime, expType)
+        cmd.finish('exposureState=done')
 
     def _encodeArray(self, array):
         """ Temporarily wrap a binary array transfer encoding. """
@@ -81,7 +85,10 @@ class McsCmd(object):
     def centroid(self, cmd):
         """ Take an exposure and measure centroids. """
 
-        filename, image = self._doExpose(cmd)
+        expTime = cmd.cmd.keywords["expTime"].values[0]
+        expType = cmd.cmd.keywords["expType"].values[0] if 'expType' in cmd.cmd.keywords else 'object'
+
+        filename, image = self._doExpose(cmd, expTime, expType)
 
         # The encoding scheme is temporary, and will become encapsulated.
         cmd.inform('state="measuring"')
@@ -90,6 +97,5 @@ class McsCmd(object):
         centroidsStr = self._encodeArray(centroids)
         cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
 
-        cmd.finish('state="done"')
-       
+        cmd.finish('exposureState=done')
 
