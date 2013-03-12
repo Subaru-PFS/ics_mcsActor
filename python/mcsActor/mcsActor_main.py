@@ -11,10 +11,16 @@ class Mcs(actorcore.Actor.Actor):
                                        productName=productName, 
                                        configFile=configFile)
 
-
-    def connectCamera(self):
+        # Actually use a allocator with global sequencing
+        self.exposureID = 0
         
-        self.camera = 
+        self.connectCamera(self.bcast)
+        
+    def connectCamera(self, cmd, doFinish=True):
+        reload(fakeCamera)
+        self.camera = fakeCamera.FakeCamera()
+        self.camera.sendStatusKeys(cmd)
+
 #
 # To work
 
