@@ -11,7 +11,7 @@ class Mcs(actorcore.Actor.Actor):
                                        productName=productName, 
                                        configFile=configFile)
 
-        # Actually use a allocator with global sequencing
+        # We will actually use a allocator with "global" sequencing
         self.exposureID = 0
         
         self.connectCamera(self.bcast)

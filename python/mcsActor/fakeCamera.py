@@ -40,10 +40,10 @@ class FakeCamera(Camera):
         """
 
         if not expType:
-            expType = 'bias'
+            expType = 'test'
         if cmd:
             cmd.inform('exposureState="exposing"')
-        if expType not in ('bias', 'dark', 'test') and expTime >= 0:
+        if expType not in ('bias', 'test') and expTime > 0:
             time.sleep(expTime + self._exposureOverheadTime())
 
         if cmd:
@@ -53,8 +53,8 @@ class FakeCamera(Camera):
         #                            scale=self.readNoise, 
         #                            size=self.imageSize).astype('u2')
 
-        #if expType != 'test':
-        #    time.sleep(self._readoutTime())
+        if expType != 'test':
+            time.sleep(self._readoutTime())
         return image
         
         
