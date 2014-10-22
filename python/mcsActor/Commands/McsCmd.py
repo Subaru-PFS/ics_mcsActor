@@ -3,7 +3,7 @@
 import os
 import base64
 import numpy
-import pyfits
+import astropy.io.fits as pyfits
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
