@@ -3,7 +3,7 @@
 from actorcore.Actor import Actor
 import fakeCamera
 
-class AActor(Actor):
+class TestaActor(Actor):
     def __init__(self, name, productName=None, configFile=None, debugLevel=30):
         # This sets up the connections to/from the hub, the logger, and the twisted reactor.
         #
@@ -25,7 +25,7 @@ class AActor(Actor):
 # To work
 
 def main():
-    actor = AActor('a', productName='aActor')
+    actor = TestaActor('testa', productName='testaActor')
     actor.run()
 
 if __name__ == '__main__':

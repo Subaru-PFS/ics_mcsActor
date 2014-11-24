@@ -10,7 +10,7 @@ import opscore.protocols.types as types
 
 from opscore.utility.qstr import qstr
 
-class McsCmd(object):
+class TestaCmd(object):
 
     def __init__(self, actor):
         # This lets us access the rest of the actor.
@@ -31,7 +31,7 @@ class McsCmd(object):
         ]
 
         # Define typed command arguments for the above commands.
-        self.keys = keys.KeysDictionary("mcs_mcs", (1, 1),
+        self.keys = keys.KeysDictionary("testa_testa", (1, 1),
                                         keys.Key("expTime", types.Float(), help="The exposure time"),
                                         )
 
@@ -62,13 +62,13 @@ class McsCmd(object):
         """
         
         self.actor.exposureID += 1
-        path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
+        path = os.path.join("$ICS_MHS_DATA_ROOT", 'testa')
         path = os.path.expandvars(os.path.expanduser(path))
 
         if not os.path.isdir(path):
             os.makedirs(path, 0o755)
             
-        return os.path.join(path, 'MCSA%010d.fits' % (self.actor.exposureID))
+        return os.path.join(path, 'TSTA%010d.fits' % (self.actor.exposureID))
 
     def _doExpose(self, cmd, expTime, expType):
         """ Take an exposure and save it to disk. """
