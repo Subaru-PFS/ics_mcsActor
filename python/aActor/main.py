@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 
-import actorcore.Actor
+from actorcore.Actor import Actor
 import fakeCamera
 
-class Mcs(actorcore.Actor.Actor):
+class AActor(Actor):
     def __init__(self, name, productName=None, configFile=None, debugLevel=30):
         # This sets up the connections to/from the hub, the logger, and the twisted reactor.
         #
-        actorcore.Actor.Actor.__init__(self, name, 
-                                       productName=productName, 
-                                       configFile=configFile)
+        Actor.__init__(self, name, 
+                       productName=productName, 
+                       configFile=configFile)
 
         # We will actually use a allocator with "global" sequencing
         self.exposureID = 0
@@ -25,8 +25,8 @@ class Mcs(actorcore.Actor.Actor):
 # To work
 
 def main():
-    mcs = Mcs('mcs', productName='mcsActor')
-    mcs.run()
+    actor = AActor('a', productName='aActor')
+    actor.run()
 
 if __name__ == '__main__':
     main()
