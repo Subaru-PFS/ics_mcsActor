@@ -11,10 +11,13 @@ import opscore.protocols.types as types
 from opscore.utility.qstr import qstr
 
 class McsCmd(object):
+    # Setting the default exposure time.
+    
 
     def __init__(self, actor):
         # This lets us access the rest of the actor.
         self.actor = actor
+        self.expTime = 800
 
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -24,6 +27,8 @@ class McsCmd(object):
         self.vocab = [
             ('ping', '', self.ping),
             ('status', '', self.status),
+            ('mockexpose', '@(bias|test)', self.mockexpose),
+            ('mockexpose', '@(dark|object) <expTime>', self.mockexpose),
             ('expose', '@(bias|test)', self.expose),
             ('expose', '@(dark|object) <expTime>', self.expose),
             ('centroid', '<expTime>', self.centroid),
@@ -38,11 +43,15 @@ class McsCmd(object):
 
     def ping(self, cmd):
         """Query the actor for liveness/happiness."""
+        self.actor.connectCamera(cmd)
+        self.actor.camera.setExposureTime(cmd,self.expTime)
 
         cmd.finish("text='Present and (probably) well'")
 
     def reconnect(self, cmd):
         self.actor.connectCamera(cmd)
+        self.actor.camera.setExposureTime(cmd,self.expTime)
+
         cmd.finish('text="camera connected!"')
         
     def status(self, cmd):
@@ -50,7 +59,9 @@ class McsCmd(object):
 
         self.actor.sendVersionKey(cmd)
         self.actor.camera.sendStatusKeys(cmd)
-        
+        self.actor.connectCamera(cmd)
+        self.actor.camera.setExposureTime(cmd,self.expTime)
+
         cmd.inform('text="Present!"')
         cmd.finish()
 
@@ -70,24 +81,82 @@ class McsCmd(object):
             
         return os.path.join(path, 'MCSA%010d.fits' % (self.actor.exposureID))
 
+    def getNextDummyFilename(self, cmd):
+        """ Fetch next image filename. 
+
+        In real life, we will instantiate a Subaru-compliant image pathname generating object.  
+
+        """
+        
+        #self.actor.exposureID += 1
+        path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
+        path = os.path.expandvars(os.path.expanduser(path))
+
+        if not os.path.isdir(path):
+            os.makedirs(path, 0o755)
+            
+        return os.path.join(path, 'dummy_MCSA%010d.fits' % (self.actor.exposureID))
+
+    def _doMockExpose(self, cmd, expTime, expType):
+        """ Take an exposure and save it to disk. """
+
+        filename = self.getNextFilename(cmd)
+        #dummy_filename = self.getNextDummyFilename(cmd)
+
+        f = pyfits.open('/home/chyan/mhs/data/mcs/schmidt_fiber_snr400_rmod71.fits')      
+        image = f[0].data
+        #image = self.actor.camera.expose(cmd, expTime, expType, filename)
+        pyfits.writeto(filename, image, checksum=False, clobber=True)
+        cmd.inform("filename=%s " % (filename))
+
+        return filename, image
+   
     def _doExpose(self, cmd, expTime, expType):
         """ Take an exposure and save it to disk. """
-        
-        image = self.actor.camera.expose(cmd, expTime, expType)
+
         filename = self.getNextFilename(cmd)
-        pyfits.writeto(filename, image, checksum=False, clobber=True)
-        cmd.inform("filename=%s" % (filename))
-        
+        dummy_filename = self.getNextDummyFilename(cmd)
+
+        image = self.actor.camera.expose(cmd, expTime, expType, filename)
+        pyfits.writeto(dummy_filename, image, checksum=False, clobber=True)
+        cmd.inform("filename=%s and dummy file=%s" % (filename, dummy_filename))
+
         return filename, image
-            
+     
+    def mockexpose(self, cmd):
+        """ Take an exposure and return mock image. Does not centroid. """
+
+        expType = cmd.cmd.keywords[0].name
+        if expType in ('bias', 'test'):
+            expTime = self.expTime
+        else:
+            expTime = cmd.cmd.keywords["expTime"].values[0]
+
+        #if (expTime != self.expTime):
+            #self.actor.camera.setExposureTime(cmd,expTime)
+    
+
+        cmd.diag('text="Exposure time now is %d ms." '% (expTime))    
+        
+
+        filename, image = self._doMockExpose(cmd, expTime, expType)
+        cmd.finish('exposureState=done')
+           
     def expose(self, cmd):
         """ Take an exposure. Does not centroid. """
 
         expType = cmd.cmd.keywords[0].name
         if expType in ('bias', 'test'):
-            expTime = 0.0
+            expTime = self.expTime
         else:
             expTime = cmd.cmd.keywords["expTime"].values[0]
+
+        if (expTime != self.expTime):
+            self.actor.camera.setExposureTime(cmd,expTime)
+    
+
+        cmd.diag('text="Exposure time now is %d ms." '% (expTime))    
+        
 
         filename, image = self._doExpose(cmd, expTime, expType)
         cmd.finish('exposureState=done')

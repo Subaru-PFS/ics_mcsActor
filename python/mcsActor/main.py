@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import actorcore.Actor
+import aitCamera
 import fakeCamera
 
 class Mcs(actorcore.Actor.Actor):
@@ -17,10 +18,11 @@ class Mcs(actorcore.Actor.Actor):
         self.connectCamera(self.bcast)
         
     def connectCamera(self, cmd, doFinish=True):
-        reload(fakeCamera)
+        reload(aitCamera)
+        #self.camera = aitCamera.aitCamera()
         self.camera = fakeCamera.FakeCamera()
         self.camera.sendStatusKeys(cmd)
-
+        #self.camera.initialCamera(cmd)
 #
 # To work
 
