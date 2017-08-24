@@ -48,7 +48,9 @@ class FakeCamera(Camera):
 
         if cmd:
             cmd.inform('exposureState="reading"')
-        image = numpy.ones(shape=self.imageSize).astype('u2')
+        
+        f = pyfits.open('/home/chyan/mhs/data/mcs/schmidt_fiber_snr400_rmod71.fits')      
+        image = f[0].data
         #image = numpy.random.normal(self.biasLevel, 
         #                            scale=self.readNoise, 
         #                            size=self.imageSize).astype('u2')
