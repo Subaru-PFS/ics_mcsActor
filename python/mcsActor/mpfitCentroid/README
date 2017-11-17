@@ -1,0 +1,26 @@
+
+3 python level functions defined in centroid_wrapper.pyx
+
+get_homes_call 
+
+  takes an image and returns the home positions
+
+centroid_coarse_call
+   
+   takes an image, an arc image, and the home positions from the above,
+   and returns centroids for a large move and returns the centroids
+   matched with the homes
+
+centroid_fine_call
+
+   takes an image, the home positions, and the centroids from
+   centroid_coarse_call as teh previous positions, and returns
+   the centroids matched with the homes
+
+The file test.py runs the above from home positions to large move to
+small move. 
+
+to compile the code
+
+> python setup.py build_ext --inplace
+
