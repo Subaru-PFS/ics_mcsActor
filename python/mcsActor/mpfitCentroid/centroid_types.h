@@ -57,19 +57,6 @@ typedef struct cand_point
 } cand_point;
 //--------------------------------------------------//
 
-//typedef struct centroids
-//{
-//  int npoints;
-//  double *x;
-//  double *y;
-//  double *fx;
-//  double *fy;
-//  double *back;
-//  double *peak;
-//  double *qual;
-//  int np;
-//} centroids;
-
 typedef struct centroids
 {
   //int npoints;
@@ -113,7 +100,7 @@ typedef struct ag_stars
   COORDINATES ETC. ANY 2D BEHAVIOUR IS HERE.  REMOVED X AND Y BECAUSE WE
   CAN GET THESE, ASSUMING IMAGE IS SQUARE */
 
-struct vars_struct {
+typedef struct vars_struct {
   int *flux;     //DATA
   int *ferr;     //ESTIMATE OF ERROR
 } vars_struct ;
