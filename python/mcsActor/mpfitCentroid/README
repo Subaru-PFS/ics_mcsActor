@@ -24,3 +24,15 @@ to compile the code
 
 > python setup.py build_ext --inplace
 
+
+to perform unit tests on the centroid routines
+
+make -f Makefile.centroidtest
+./test_centroid
+
+For the moment, the director TestData, used for running
+test.py and the unit tests is located at
+
+https://drive.google.com/open?id=1iJ2wqxSEAKhi91snNrgOO5uA9fxp6kEI
+
+

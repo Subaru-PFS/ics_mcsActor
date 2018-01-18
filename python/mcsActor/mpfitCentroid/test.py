@@ -16,8 +16,8 @@ homes=np.frombuffer(a,dtype='<f8')
 
 #get first positoin/arc
 
-image=pyfits.getdata('./pos1.fits').astype('<i4')
-arc_image=pyfits.getdata('./arc1.fits').astype('<i4')
+image=pyfits.getdata('./first_move.fits').astype('<i4')
+arc_image=pyfits.getdata('./first_move_arc.fits').astype('<i4')
 
 #call the routine
 b=centroid_coarse_call(image,arc_image,homes)
@@ -26,15 +26,15 @@ b=centroid_coarse_call(image,arc_image,homes)
 homepos=np.frombuffer(b,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
 
 #again for the secon dmove
-image=pyfits.getdata('./pos2.fits').astype('<i4')
-arc_image=pyfits.getdata('./arc2.fits').astype('<i4')
+image=pyfits.getdata('./second_move.fits').astype('<i4')
+arc_image=pyfits.getdata('./second_move.fits').astype('<i4')
 
 b=centroid_coarse_call(image,arc_image,homes)
 
 homepos=np.frombuffer(b,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
 
 #now the third position
-image=pyfits.getdata('./pos3.fits').astype('<i4')
+image=pyfits.getdata('./third_move.fits').astype('<i4')
 
 npos=homepos.shape[0]
 
