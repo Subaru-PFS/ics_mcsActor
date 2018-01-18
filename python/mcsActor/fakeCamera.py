@@ -1,5 +1,6 @@
 import numpy
 import time
+import pyfits
 
 class Camera(object):
     pass
@@ -22,7 +23,33 @@ class FakeCamera(Camera):
         """ Send our status keys to the given command. """ 
 
         cmd.inform('cameraName=%s; readNoise=%0.2f' % (self.name, self.readNoise))
+
+    def expose_fake(self, cmd, filename, get_arc):
+
+        """
+
+        Read an image file (and optionally an arc file) from disk, to mimic
+        a real exposure.
+
+        Args: 
+            cmd     - a Command object to report to. Ignored if None.
+            filename - FITS filename (minus FITS extension) of the file to read into
+            get_arc - flag for arc image. If get_arc=1, looks for filename_arc.fits
+
+        Returns 
+            the image
+            the arc image (optional)
+
+        """
         
+        image=pyfits.getdata(filename+".fits",1)
+
+        if(get_arc==1):
+            arc_image=pyfits.getdata(filename+"_arc.fits",1)
+            return image,arc_iamge
+        else:
+            return image
+     
     def expose(self, cmd, expTime, expType):
         """ Generate an 'exposure' image. We don't have an actual camera, so generate some 
         plausible image. 
