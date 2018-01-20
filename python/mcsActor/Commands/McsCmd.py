@@ -4,15 +4,22 @@ import os
 import base64
 import numpy
 import astropy.io.fits as pyfits
+import sys
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 
 from opscore.utility.qstr import qstr
 
+sys.path.append("/home/chyan/mhs/devel/ics_mcsActor/python/mcsActor/mpfitCentroid")
+from centroid import get_homes_call
+from centroid import centroid_coarse_call
+from centroid import centroid_fine_call
+
+
 class McsCmd(object):
     # Setting the default exposure time.
-    
+    dummy_filename = None
 
     def __init__(self, actor):
         # This lets us access the rest of the actor.
@@ -32,6 +39,7 @@ class McsCmd(object):
             ('expose', '@(bias|test)', self.expose),
             ('expose', '@(dark|object) <expTime>', self.expose),
             ('centroid', '<expTime>', self.centroid),
+            ('centroidOnDummy', '<expTime>', self.centroidOnDummy),
             ('reconnect', '', self.reconnect),
         ]
 
@@ -116,7 +124,8 @@ class McsCmd(object):
 
         filename = self.getNextFilename(cmd)
         dummy_filename = self.getNextDummyFilename(cmd)
-
+        self.dummy_filename = dummy_filename
+        
         image = self.actor.camera.expose(cmd, expTime, expType, filename)
         pyfits.writeto(dummy_filename, image, checksum=False, clobber=True)
         cmd.inform("filename=%s and dummy file=%s" % (filename, dummy_filename))
@@ -167,6 +176,33 @@ class McsCmd(object):
         # Actually, we want dtype,naxis,axNlen,base64(array)
         return base64.b64encode(array.tostring())
         
+    def centroidOnDummy(self, cmd):
+        """ Take an exposure and measure centroids. """
+
+        expTime = cmd.cmd.keywords["expTime"].values[0]
+        expType = 'object' if expTime > 0 else 'test'
+
+        filename, image = self._doExpose(cmd, expTime, expType)
+
+        # The encoding scheme is temporary, and will become encapsulated.
+        cmd.inform('state="measuring"')
+        
+        image=pyfits.getdata(self.dummy_filename).astype('<i4')
+
+        #get homes positions
+        a=get_homes_call(image)
+
+        #turn into numpy array
+        home_centroids=np.frombuffer(a,dtype='<f8')
+        
+        #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
+
+        centroidsStr = self._encodeArray(home_centroids)
+        cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
+
+        cmd.finish('exposureState=done')
+
+
     def centroid(self, cmd):
         """ Take an exposure and measure centroids. """
 
