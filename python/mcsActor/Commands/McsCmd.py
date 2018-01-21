@@ -175,13 +175,17 @@ class McsCmd(object):
 
     def _doFakeExpose(self, cmd, expTime, expType, filename, getArc):
         
-        """ Take an exposure and save it to disk. """
-            
+        """ Fake exposure, returns either image, or image + arc image. """
+
+        #read the image file
+        
         image=pyfits.getdata(filename+".fits",1)
 
-        if(get_arc==1):
+        #if needed, read the arc file
+        
+        if(getArc==1):
             arc_image=pyfits.getdata(filename+"_arc.fits",1)
-            return image,arc_image
+            return image, arc_image
         else:
             return image
         
@@ -275,7 +279,7 @@ class McsCmd(object):
         image=pyfits.getdata('./third_move.fits').astype('<i4')
 
         expTime=1.0
-        image, arc_image=_doFakeExpose(cmd, expTime, expType, "TestData/third_move",0)
+        image = _doFakeExpose(cmd, expTime, expType, "TestData/third_move",0)
 
         #we need to pass it the list of previous positions as well
         
