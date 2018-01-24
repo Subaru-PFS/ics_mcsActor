@@ -1,5 +1,8 @@
 #!/usr/bin/env python
-
+from __future__ import print_function
+from builtins import zip
+from builtins import range
+from builtins import object
 import os
 import base64
 import numpy
@@ -10,6 +13,10 @@ import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 
 from opscore.utility.qstr import qstr
+
+import psycopg2
+import psycopg2.extras
+from _elementtree import dump
 
 sys.path.append("/home/chyan/mhs/devel/ics_mcsActor/python/mcsActor/mpfitCentroid")
 from centroid import get_homes_call
@@ -104,7 +111,18 @@ class McsCmd(object):
             os.makedirs(path, 0o755)
             
         return os.path.join(path, 'dummy_MCSA%010d.fits' % (self.actor.exposureID))
-
+    
+    def dumpCentroidtoDB(self, cmd, array):
+        """Query MPA database and return json string to an attribute."""
+        try:
+            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
+            cmd.diag('text="Connected to FPS database."')
+        except:
+            cmd.diag('text="I am unable to connect to the database."')
+    #        print("I am unable to connect to the database.")
+        #pass        
+        cur = conn.cursor()
+    
     def _doMockExpose(self, cmd, expTime, expType):
         """ Take an exposure and save it to disk. """
 
@@ -193,13 +211,17 @@ class McsCmd(object):
         a=get_homes_call(image)
 
         #turn into numpy array
-        home_centroids=np.frombuffer(a,dtype='<f8')
+        home_centroids=numpy.frombuffer(a,dtype='<f8')
         
         #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
 
         centroidsStr = self._encodeArray(home_centroids)
         cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
-
+        
+        cmd.inform('state="archiving"')
+        self.dumpCentroidtoDB(cmd, home_centroids)
+        cmd.inform('state="archived"')
+        
         cmd.finish('exposureState=done')
 
 
@@ -214,6 +236,7 @@ class McsCmd(object):
         # The encoding scheme is temporary, and will become encapsulated.
         cmd.inform('state="measuring"')
         centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
+        self.dumpCentroidtoDB(cmd, centroids)
 
         centroidsStr = self._encodeArray(centroids)
         cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
