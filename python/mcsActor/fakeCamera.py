@@ -1,3 +1,4 @@
+from builtins import object
 import numpy
 import time
 import pyfits
@@ -113,3 +114,24 @@ class FakeCamera(Camera):
         return image
         
         
+    def sendStatusKeys(self, cmd):
+        """ Send our status keys to the given command. """ 
+
+        cmd.inform('cameraName=%s; readNoise=%0.2f' % (self.name, self.readNoise))
+
+    def sendStatusKeys(self, cmd):
+        """ Send our status keys to the given command. """ 
+
+        cmd.inform('cameraName=%s; readNoise=%0.2f' % (self.name, self.readNoise))
+
+    def initialCamera(self,cmd):
+        """ Initial the AIT camera. """
+
+        pass
+
+    def setExposureTime(self, cmd, expTime):
+        """ Initial the AIT camera. """
+
+        pass
+
+    

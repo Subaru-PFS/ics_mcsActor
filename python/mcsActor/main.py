@@ -2,8 +2,8 @@
 
 from __future__ import absolute_import
 import actorcore.Actor
-from . import aitCamera
-from . import fakeCamera
+import aitCamera
+import fakeCamera
 from past.builtins import reload
 
 class Mcs(actorcore.Actor.Actor):
@@ -21,8 +21,8 @@ class Mcs(actorcore.Actor.Actor):
         
     def connectCamera(self, cmd, doFinish=True):
         reload(aitCamera)
-        self.camera = aitCamera.aitCamera()
-        #self.camera = fakeCamera.FakeCamera()
+        #self.camera = aitCamera.aitCamera()
+        self.camera = fakeCamera.FakeCamera()
         self.camera.sendStatusKeys(cmd)
         self.camera.initialCamera(cmd)
 #
