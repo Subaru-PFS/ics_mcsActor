@@ -40,8 +40,8 @@ class McsCmd(object):
             ('mockexpose', '@(dark|object) <expTime>', self.mockexpose),
             ('expose', '@(bias|test)', self.expose),
             ('expose', '@(dark|object) <expTime>', self.expose),
-            ('expose_standard', self.expose),
-            ('expose_long', self.expose),
+            ('expose_standard', '', self.expose),
+            ('expose_long', '', self.expose),
             ('centroid', '<expTime>', self.centroid),
             ('test_centroid', '<expTime>', self.centroid),
             ('reconnect', '', self.reconnect),
@@ -289,8 +289,8 @@ class McsCmd(object):
         yp=np.zeros((npos))
 
         for i in range(npos):
-	    xp[i]=homepos[i][6]
-	    yp[i]=homepos[i][7]
+            xp[i]=homepos[i][6]
+            yp[i]=homepos[i][7]
 
         #and the call
         c=centroid_fine_call(image,homes,xp,yp)
@@ -312,12 +312,12 @@ class McsCmd(object):
         #print homepos[1]
         #
         #for i in range(npos):
-	#    xp[i]=homepos[i][0]
-	#    yp[i]=homepos[i][1]
-	#    xc[i]=homepos[i][4]
-	#    yc[i]=homepos[i][5]
-	#    xh[i]=homepos[i][6]
-	#    yh[i]=homepos[i][7]
+        #    xp[i]=homepos[i][0]
+        #    yp[i]=homepos[i][1]
+        #    xc[i]=homepos[i][4]
+        #    yc[i]=homepos[i][5]
+        #    xh[i]=homepos[i][6]
+        #    yh[i]=homepos[i][7]
         #
         #
         #py.clf()
@@ -328,10 +328,10 @@ class McsCmd(object):
         #
         #
         #for i in range(len(xc)):
-	#    circle=py.Circle((xh[i],yh[i]),55,color="black",fill=False)
-	#    ax.add_artist(circle)
+        #    circle=py.Circle((xh[i],yh[i]),55,color="black",fill=False)
+        #    ax.add_artist(circle)
         #
-	#    py.plot([xh[i],xc[i]],[yh[i],yc[i]])
+        #    py.plot([xh[i],xc[i]],[yh[i],yc[i]])
         #
         #
         #py.show()

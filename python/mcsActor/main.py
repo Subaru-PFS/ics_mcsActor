@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
+from __future__ import absolute_import
 import actorcore.Actor
-import aitCamera
-import fakeCamera
+from . import aitCamera
+from . import fakeCamera
+from past.builtins import reload
 
 class Mcs(actorcore.Actor.Actor):
     def __init__(self, name, productName=None, configFile=None, debugLevel=30):
