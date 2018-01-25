@@ -3,6 +3,7 @@
 import actorcore.Actor
 import aitCamera
 import fakeCamera
+from past.builtins import reload
 
 class Mcs(actorcore.Actor.Actor):
     def __init__(self, name, productName=None, configFile=None, debugLevel=30):

@@ -244,3 +244,86 @@ class McsCmd(object):
 
         cmd.finish('exposureState=done')
 
+def test_centroid(self, cmd):
+        
+        """ 
+        Demo Command to run a centroid sequence. 
+        This needs to be split into a series of commands, with input from FPS,
+        and appropriate handling of intput/output/configuration by either keywords
+        or database, as decided. 
+        """
+
+        #Read in Simulated Data
+
+        #First step: get the centroids in the home position, from a
+        #long exposure. This does not do fibre identification
+
+        #Fake camera image
+        #image=pyfits.getdata('TestData/home.fits').astype('<i4')
+
+        #get an image from a file, no arc image, long exposure time. 
+        expTime=1
+        expType='object'
+        
+        image=_doFakeExpose(cmd, expTime, expType, "TestData/home",0)
+
+        #centroid call
+        
+        a=get_homes_call(image)
+
+        #convert cython output into numpy array
+        
+        homes=np.frombuffer(a,dtype='<f8')
+
+        #second step: short exposure with arc image
+        #image=pyfits.getdata('TestData/first_move.fits').astype('<i4')
+        #arc_image=pyfits.getdata('TestData/first_move_arc.fits').astype('<i4')
+
+        expTime=0.5
+        image, arc_image=_doFakeExpose(cmd, expTime, expType, "TestData/first_move",1)
+        
+        #Call the centroiding/finding
+        
+        b=centroid_coarse_call(image,arc_image,homes)
+
+        #convert from cython output to numpy typed array
+        
+        homepos=np.frombuffer(b,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
+
+        #second move, same as the first
+
+        #image=pyfits.getdata('./second_move.fits').astype('<i4')
+        #arc_image=pyfits.getdata('./second_move.fits').astype('<i4')
+
+        expTime=0.5
+        image, arc_image=_doFakeExpose(cmd, expTime, expType, "TestData/second_move",1)
+
+        b=centroid_coarse_call(image,arc_image,homes)
+
+        homepos=np.frombuffer(b,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
+
+
+        #now for a fine move: long exposure, not arc image
+
+        image=pyfits.getdata('./third_move.fits').astype('<i4')
+
+        expTime=1.0
+        image = _doFakeExpose(cmd, expTime, expType, "TestData/third_move",0)
+
+        #we need to pass it the list of previous positions as well
+        
+        npos=homepos.shape[0]
+
+        xp=np.zeros((npos))
+        yp=np.zeros((npos))
+
+        for i in range(npos):
+	    xp[i]=homepos[i][6]
+	    yp[i]=homepos[i][7]
+
+        #and the call
+        c=centroid_fine_call(image,homes,xp,yp)
+
+        #cython to numpy
+        
+        homepos=np.frombuffer(c,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
