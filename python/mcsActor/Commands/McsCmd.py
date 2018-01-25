@@ -46,14 +46,17 @@ class McsCmd(object):
             ('expose_long', '', self.expose),
             ('centroid', '<expTime>', self.centroid),
             ('test_centroid', '', self.test_centroid),
+            ('fakeExpose','<expTime> <expType> <filename> <getArc>', self.fakeExpose),
             ('reconnect', '', self.reconnect),
         ]
 
         # Define typed command arguments for the above commands.
         self.keys = keys.KeysDictionary("mcs_mcs", (1, 1),
                                         keys.Key("expTime", types.Float(), help="The exposure time"),
+                                        keys.Key("expType", types.String(), help="The exposure type"),
+                                        keys.Key("filename", types.String(), help="Image filename"),
+                                        keys.Key("getArc", types.Int(), help="flag for arc image")
                                         )
-
 
     def ping(self, cmd):
         """Query the actor for liveness/happiness."""
@@ -136,7 +139,8 @@ class McsCmd(object):
         cmd.inform("filename=%s and dummy file=%s" % (filename, dummy_filename))
 
         return filename, image
-     
+
+
     def mockexpose(self, cmd):
         """ Take an exposure and return mock image. Does not centroid. """
 
@@ -167,15 +171,33 @@ class McsCmd(object):
 
         if (expTime != self.expTime):
             self.actor.camera.setExposureTime(cmd,expTime)
-    
-
+ 
         cmd.diag('text="Exposure time now is %d ms." '% (expTime))    
-        
-
+ 
         filename, image = self._doExpose(cmd, expTime, expType)
         cmd.finish('exposureState=done')
 
-    def _doFakeExpose(self, cmd, expTime, expType, filename, getArc):
+
+    def fakeExpose(self,cmd):
+        
+        cmdKeys = cmd.cmd.keywords
+
+        expTime = cmdKeys['expTime'].values[0]
+        expType = cmdKeys['expType'].values[0]
+        filename = cmdKeys['filename'].values[0]
+        getArc = cmdKeys['getArc'].values[0]
+
+        if(getArc==1):
+            image, arc_image=self._doFakeExpose(cmd,expTime,expType,filename,getArc)
+        else:
+            image = self._doFakeExpose(cmd,expTime,expType,filename,getArc)
+
+        self.actor.image = image
+
+        cmd.finish('exposureState=done')
+            
+    def _doFakeExpose(self, cmd,expTime,expType,filename,getArc):
+        
         
         """ Fake exposure, returns either image, or image + arc image. """
 
@@ -190,7 +212,7 @@ class McsCmd(object):
             return image, arc_image
         else:
             return image
-        
+ 
     def _encodeArray(self, array):
         """ Temporarily wrap a binary array transfer encoding. """
 
@@ -214,6 +236,9 @@ class McsCmd(object):
 
         cmd.finish('exposureState=done')
 
+
+
+        
     def test_centroid(self, cmd):
         
         """ 
@@ -253,11 +278,11 @@ class McsCmd(object):
         print(homes)
 
         #second step: short exposure with arc image
-        #image=pyfits.getdata('TestData/first_move.fits').astype('<i4')
-        #arc_image=pyfits.getdata('TestData/first_move_arc.fits').astype('<i4')
+        #image=pyfits.getdata('/Users/karr/GoogleDrive/first_move.fits').astype('<i4')
+        #arc_image=pyfits.getdata('/Users/karr/GoogleDrive/first_move_arc.fits').astype('<i4')
 
         expTime=0.5
-        image, arc_image=self._doFakeExpose(cmd, expTime, expType, "TestData/first_move",1)
+        image, arc_image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/first_move",1)
         
         #Call the centroiding/finding
         
@@ -273,7 +298,7 @@ class McsCmd(object):
         #arc_image=pyfits.getdata('./second_move.fits').astype('<i4')
 
         expTime=0.5
-        image, arc_image=self._doFakeExpose(cmd, expTime, expType, "TestData/second_move",1)
+        image, arc_image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/second_move",1)
 
         b=centroid_coarse_call(image,arc_image,homes)
 
@@ -285,7 +310,7 @@ class McsCmd(object):
         image=pyfits.getdata('./third_move.fits').astype('<i4')
 
         expTime=1.0
-        image = _doFakeExpose(cmd, expTime, expType, "TestData/third_move",0)
+        image = _doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/third_move",0)
 
         #we need to pass it the list of previous positions as well
         
