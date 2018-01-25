@@ -45,7 +45,7 @@ class McsCmd(object):
             ('expose_standard', '', self.expose),
             ('expose_long', '', self.expose),
             ('centroid', '<expTime>', self.centroid),
-            ('test_centroid', '<expTime>', self.centroid),
+            ('test_centroid', '', self.test_centroid),
             ('reconnect', '', self.reconnect),
         ]
 
@@ -131,8 +131,8 @@ class McsCmd(object):
         filename = self.getNextFilename(cmd)
         dummy_filename = self.getNextDummyFilename(cmd)
 
-        image = self.actor.camera.expose(cmd, expTime, expType, filename)
-        pyfits.writeto(dummy_filename, image, checksum=False, clobber=True)
+        #image = self.actor.camera.expose(cmd, expTime, expType, filename)
+        #pyfits.writeto(dummy_filename, image, checksum=False, clobber=True)
         cmd.inform("filename=%s and dummy file=%s" % (filename, dummy_filename))
 
         return filename, image
@@ -181,12 +181,12 @@ class McsCmd(object):
 
         #read the image file
         
-        image=pyfits.getdata(filename+".fits",1)
+        image=pyfits.getdata(filename+".fits",0).astype('<i4')
 
         #if needed, read the arc file
         
         if(getArc==1):
-            arc_image=pyfits.getdata(filename+"_arc.fits",1)
+            arc_image=pyfits.getdata(filename+"_arc.fits",0).astype('<i4')
             return image, arc_image
         else:
             return image
@@ -238,7 +238,9 @@ class McsCmd(object):
         expTime=1
         expType='object'
         
-        image=_doFakeExpose(cmd, expTime, expType, "TestData/home",0)
+        image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
+
+        print("Read Image\n");
 
         #centroid call
         
@@ -248,12 +250,14 @@ class McsCmd(object):
         
         homes=np.frombuffer(a,dtype='<f8')
 
+        print(homes)
+
         #second step: short exposure with arc image
         #image=pyfits.getdata('TestData/first_move.fits').astype('<i4')
         #arc_image=pyfits.getdata('TestData/first_move_arc.fits').astype('<i4')
 
         expTime=0.5
-        image, arc_image=_doFakeExpose(cmd, expTime, expType, "TestData/first_move",1)
+        image, arc_image=self._doFakeExpose(cmd, expTime, expType, "TestData/first_move",1)
         
         #Call the centroiding/finding
         
@@ -269,7 +273,7 @@ class McsCmd(object):
         #arc_image=pyfits.getdata('./second_move.fits').astype('<i4')
 
         expTime=0.5
-        image, arc_image=_doFakeExpose(cmd, expTime, expType, "TestData/second_move",1)
+        image, arc_image=self._doFakeExpose(cmd, expTime, expType, "TestData/second_move",1)
 
         b=centroid_coarse_call(image,arc_image,homes)
 

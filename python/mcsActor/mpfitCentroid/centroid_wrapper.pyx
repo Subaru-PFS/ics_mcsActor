@@ -86,7 +86,7 @@ def centroid_coarse_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[int,
     return cp[:sizeof(fibreid) * homes.shape[0]/2]
 
 
-def get_homes_call(np.ndarray[int, ndim=2, mode="c"] image):
+def get_homes_call(np.ndarray[dtype=np.int, ndim=2, mode="c"] image):
 
     cdef char *cp
     cdef int npoint[1]
