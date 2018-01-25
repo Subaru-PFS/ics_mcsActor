@@ -16,7 +16,8 @@ from opscore.utility.qstr import qstr
 
 import psycopg2
 import psycopg2.extras
-from _elementtree import dump
+from xml.etree.ElementTree import dump
+
 
 sys.path.append("/home/chyan/mhs/devel/ics_mcsActor/python/mcsActor/mpfitCentroid")
 from centroid import get_homes_call
