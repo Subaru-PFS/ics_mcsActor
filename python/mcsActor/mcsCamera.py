@@ -1,6 +1,9 @@
 from builtins import object
 import numpy
 import time
+import subprocess as sub
+import astropy.io.fits as pyfits
+
 
 class Camera(object):
     pass
@@ -8,10 +11,11 @@ class Camera(object):
 class mcsCamera(Camera):
     def __init__(self):
         # Should read from config file....
-        self.imageSize = (4096, 4096)
+        self.imageSize = (8960, 5778)
         self.biasLevel = 100
         self.readNoise = 5.0
-        self.name = 'numpy_fake'
+        self.name = 'Canon_50M'
+        self.expTime = 0
         
     def _readoutTime(self):
         return 0.5
@@ -23,8 +27,23 @@ class mcsCamera(Camera):
         """ Send our status keys to the given command. """ 
 
         cmd.inform('cameraName=%s; readNoise=%0.2f' % (self.name, self.readNoise))
+    
+    def initialCamera(self,cmd):
+        """ Initial the MCS camera. """
+
+        cmd.inform('text="Starting camera initialization."')
+        p = sub.Popen(['/opt/EDTpdv/initcam', '-f', '/home/chyan/Canon50M/canon-8960x5778.cfg'],stdout=sub.PIPE,stderr=sub.PIPE)
+        output, errors = p.communicate()
+        string=errors[23:-1]
+        if (string == 'done'):
+            cmd.inform('text="Camera initialization message: %s"' % (string))
+    
+    def setExposureTime(self, cmd, expTime):
+        """ Initial the MCS camera. """
+        self.expTime = expTime
+        cmd.inform('expTime=%f ms' % (expTime))
         
-    def expose(self, cmd, expTime, expType):
+    def expose(self, cmd, expTime, expType, filename):
         """ Generate an 'exposure' image. We don't have an actual camera, so generate some 
         plausible image. 
 
@@ -45,11 +64,21 @@ class mcsCamera(Camera):
         if cmd:
             cmd.inform('exposureState="exposing"')
         if expType not in ('bias', 'test') and expTime > 0:
-            time.sleep(expTime + self._exposureOverheadTime())
+            pass
+            # The expTime unit is ms.
+            #time.sleep((expTime/1000.0) + self._exposureOverheadTime())
+
+        # Command camera to do exposure sequence
+        p = sub.Popen(['canonexp', '-f', filename, '-t', str(expTime), '-c'],stdout=sub.PIPE,stderr=sub.PIPE)
+        output, errors = p.communicate()
+        if (output == 'done'):
+            cmd.inform('exposureState="done"')       
 
         if cmd:
             cmd.inform('exposureState="reading"')
-        image = numpy.ones(shape=self.imageSize).astype('u2')
+
+        f = pyfits.open('/home/chyan/mhs/data/mcs/schmidt_fiber_snr400_rmod71.fits')      
+        image = f[0].data
         #image = numpy.random.normal(self.biasLevel, 
         #                            scale=self.readNoise, 
         #                            size=self.imageSize).astype('u2')

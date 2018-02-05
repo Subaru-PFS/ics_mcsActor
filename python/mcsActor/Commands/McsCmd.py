@@ -1,34 +1,45 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+from builtins import zip
+
 from builtins import range
 from builtins import object
 import os
 import base64
 import numpy
 import astropy.io.fits as pyfits
+import sys
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
-#
+
 from opscore.utility.qstr import qstr
 
-#For Centroiding
+import psycopg2
+import psycopg2.extras
+from xml.etree.ElementTree import dump
+
+
+sys.path.append("/home/chyan/mhs/devel/ics_mcsActor/python/mcsActor/mpfitCentroid")
 from centroid import get_homes_call
 from centroid import centroid_coarse_call
 from centroid import centroid_fine_call
+
 import pyfits
 import numpy as np
 import pylab as py
 import centroid
 
+
 class McsCmd(object):
     # Setting the default exposure time.
-    
+    dummy_filename = None
 
     def __init__(self, actor):
         # This lets us access the rest of the actor.
         self.actor = actor
-        self.expTime = 800
+        self.expTime = 1000
 
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -71,7 +82,7 @@ class McsCmd(object):
         self.actor.connectCamera(cmd)
         self.actor.camera.setExposureTime(cmd,self.expTime)
 
-        cmd.finish('text="camera connected!"')
+        cmd.finish('text="Camera connected!"')
         
     def status(self, cmd):
         """Report status and version; obtain and send current data"""
@@ -81,7 +92,7 @@ class McsCmd(object):
         self.actor.connectCamera(cmd)
         self.actor.camera.setExposureTime(cmd,self.expTime)
 
-        cmd.inform('text="Present!"')
+        cmd.inform('text="MCS camera present!"')
         cmd.finish()
 
     def getNextFilename(self, cmd):
@@ -115,7 +126,18 @@ class McsCmd(object):
             os.makedirs(path, 0o755)
             
         return os.path.join(path, 'dummy_MCSA%010d.fits' % (self.actor.exposureID))
-
+    
+    def dumpCentroidtoDB(self, cmd, array):
+        """Query MPA database and return json string to an attribute."""
+        try:
+            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
+            cmd.diag('text="Connected to FPS database."')
+        except:
+            cmd.diag('text="I am unable to connect to the database."')
+    #        print("I am unable to connect to the database.")
+        #pass        
+        cur = conn.cursor()
+    
     def _doMockExpose(self, cmd, expTime, expType):
         """ Take an exposure and save it to disk. """
 
@@ -136,8 +158,12 @@ class McsCmd(object):
         filename = self.getNextFilename(cmd)
         dummy_filename = self.getNextDummyFilename(cmd)
 
-        #image = self.actor.camera.expose(cmd, expTime, expType, filename)
-        #pyfits.writeto(dummy_filename, image, checksum=False, clobber=True)
+        
+        self.dummy_filename = dummy_filename
+        
+        image = self.actor.camera.expose(cmd, expTime, expType, filename)
+        pyfits.writeto(dummy_filename, image, checksum=False, clobber=True)
+
         cmd.inform("filename=%s and dummy file=%s" % (filename, dummy_filename))
 
         return filename, image
@@ -213,8 +239,10 @@ class McsCmd(object):
         
         """ Fake exposure, returns either image, or image + arc image. """
 
-        #read the image file
+        # Actually, we want dtype,naxis,axNlen,base64(array)
+        return base64.b64encode(array.tostring())
         
+
         image=pyfits.getdata(filename+".fits",0).astype('<i4')
         
         #if needed, read the arc file
@@ -271,6 +299,9 @@ class McsCmd(object):
         # The encoding scheme is temporary, and will become encapsulated.
         cmd.inform('state="measuring"')
 
+        centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
+        self.dumpCentroidtoDB(cmd, centroids)
+        
         a=get_homes_call(image)
         homes=np.frombuffer(a,dtype='<f8')
 
@@ -285,15 +316,13 @@ class McsCmd(object):
         cmd.finish('exposureState=done')
         
     def test_centroid(self, cmd):
+
         
         """ 
-
         Demo Command to run a centroid sequence. 
-
         This needs to be split into a series of commands, with input from FPS,
         and appropriate handling of intput/output/configuration by either keywords
         or database, as decided. 
-
         """
 
         #Read in Simulated Data
@@ -374,40 +403,3 @@ class McsCmd(object):
         #cython to numpy
         
         homepos=np.frombuffer(c,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
-
-        #this section demonstrates a plot of the final positions, patrol regions and home
-        #positions, with a line connecting each home/fibre
-
-        #xc=np.zeros((npos))
-        #yc=np.zeros((npos))
-        #xh=np.zeros((npos))
-        #yh=np.zeros((npos))
-        #xp=np.zeros((npos))
-        #yp=np.zeros((npos))
-        #
-        #print homepos[1]
-        #
-        #for i in range(npos):
-        #    xp[i]=homepos[i][0]
-        #    yp[i]=homepos[i][1]
-        #    xc[i]=homepos[i][4]
-        #    yc[i]=homepos[i][5]
-        #    xh[i]=homepos[i][6]
-        #    yh[i]=homepos[i][7]
-        #
-        #
-        #py.clf()
-        #py.plot(xc,yc,'dg')
-        #py.plot(xh,yh,'ob')
-        #fig=py.gcf()
-        #ax=fig.gca()
-        #
-        #
-        #for i in range(len(xc)):
-        #    circle=py.Circle((xh[i],yh[i]),55,color="black",fill=False)
-        #    ax.add_artist(circle)
-        #
-        #    py.plot([xh[i],xc[i]],[yh[i],yc[i]])
-        #
-        #
-        #py.show()
