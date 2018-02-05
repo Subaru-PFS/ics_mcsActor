@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import absolute_import
 import actorcore.Actor
 import aitCamera
 import mcsCamera
@@ -20,6 +21,7 @@ class Mcs(actorcore.Actor.Actor):
         self.connectCamera(self.bcast)
         
     def connectCamera(self, cmd, doFinish=True):
+
         reload(mcsCamera)
         self.camera = mcsCamera.mcsCamera()
         #self.camera = fakeCamera.FakeCamera()

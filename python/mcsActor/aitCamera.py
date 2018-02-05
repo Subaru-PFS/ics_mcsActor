@@ -1,3 +1,6 @@
+from __future__ import division
+from builtins import str
+from builtins import object
 import subprocess as sub
 import numpy
 import time
@@ -65,7 +68,7 @@ class aitCamera(Camera):
             cmd.inform('exposureState="exposing"')
         if expType not in ('bias', 'test') and expTime > 0:
             # The expTime unit is ms.
-            time.sleep((expTime/1000.0) + self._exposureOverheadTime())
+            time.sleep((expTime / 1000.0) + self._exposureOverheadTime())
 
         # Command camera to do exposure sequence.
         p = sub.Popen(['rmodexposure', '-f', filename],stdout=sub.PIPE,stderr=sub.PIPE)

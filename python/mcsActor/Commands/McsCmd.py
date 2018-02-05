@@ -1,6 +1,8 @@
 #!/usr/bin/env python
+
 from __future__ import print_function
 from builtins import zip
+
 from builtins import range
 from builtins import object
 import os
@@ -24,6 +26,11 @@ from centroid import get_homes_call
 from centroid import centroid_coarse_call
 from centroid import centroid_fine_call
 
+import pyfits
+import numpy as np
+import pylab as py
+import centroid
+
 
 class McsCmd(object):
     # Setting the default exposure time.
@@ -46,16 +53,23 @@ class McsCmd(object):
             ('mockexpose', '@(dark|object) <expTime>', self.mockexpose),
             ('expose', '@(bias|test)', self.expose),
             ('expose', '@(dark|object) <expTime>', self.expose),
-            ('centroid', '<expTime>', self.centroid),
-            ('centroidOnDummy', '<expTime>', self.centroidOnDummy),
+            ('expose_standard', '', self.expose),
+            ('expose_long', '', self.expose),
+            ('centroidOnly', '<expTime>', self.centroidOnly),
+            ('test_centroid', '', self.test_centroid),
+            ('fakeExpose','<expTime> <expType> <filename> <getArc>', self.fakeExpose),
             ('reconnect', '', self.reconnect),
+            ('imageStats', '', self.imageStats),
+            ('quickPlot', '', self.quickPlot),
         ]
 
         # Define typed command arguments for the above commands.
         self.keys = keys.KeysDictionary("mcs_mcs", (1, 1),
                                         keys.Key("expTime", types.Float(), help="The exposure time"),
+                                        keys.Key("expType", types.String(), help="The exposure type"),
+                                        keys.Key("filename", types.String(), help="Image filename"),
+                                        keys.Key("getArc", types.Int(), help="flag for arc image")
                                         )
-
 
     def ping(self, cmd):
         """Query the actor for liveness/happiness."""
@@ -143,14 +157,18 @@ class McsCmd(object):
 
         filename = self.getNextFilename(cmd)
         dummy_filename = self.getNextDummyFilename(cmd)
+
+        
         self.dummy_filename = dummy_filename
         
         image = self.actor.camera.expose(cmd, expTime, expType, filename)
         pyfits.writeto(dummy_filename, image, checksum=False, clobber=True)
+
         cmd.inform("filename=%s and dummy file=%s" % (filename, dummy_filename))
 
         return filename, image
-     
+
+
     def mockexpose(self, cmd):
         """ Take an exposure and return mock image. Does not centroid. """
 
@@ -181,70 +199,124 @@ class McsCmd(object):
 
         if (expTime != self.expTime):
             self.actor.camera.setExposureTime(cmd,expTime)
-    
-
+ 
         cmd.diag('text="Exposure time now is %d ms." '% (expTime))    
-        
-
+ 
         filename, image = self._doExpose(cmd, expTime, expType)
         cmd.finish('exposureState=done')
 
+
+    def doCentroidCoarse(self, cmd):
+        
+
+        pass
+        
+    def _doCentroid(self,cmd,image,fittype):
+
+        pass
+
+        
+    def fakeExpose(self,cmd):
+        
+        cmdKeys = cmd.cmd.keywords
+
+        expTime = cmdKeys['expTime'].values[0]
+        expType = cmdKeys['expType'].values[0]
+        filename = cmdKeys['filename'].values[0]
+        getArc = cmdKeys['getArc'].values[0]
+
+        if(getArc==1):
+            image, arc_image=self._doFakeExpose(cmd,expTime,expType,filename,getArc)
+        else:
+            image = self._doFakeExpose(cmd,expTime,expType,filename,getArc)
+
+        self.actor.image = image
+
+        cmd.finish('exposureState=done')
+            
+    def _doFakeExpose(self, cmd,expTime,expType,filename,getArc):
+        
+        
+        """ Fake exposure, returns either image, or image + arc image. """
+
+        # Actually, we want dtype,naxis,axNlen,base64(array)
+        return base64.b64encode(array.tostring())
+        
+
+        image=pyfits.getdata(filename+".fits",0).astype('<i4')
+        
+        #if needed, read the arc file
+        
+        if(getArc==1):
+            arc_image=pyfits.getdata(filename+"_arc.fits",0).astype('<i4')
+            return image, arc_image
+        else:
+            return image
+ 
     def _encodeArray(self, array):
         """ Temporarily wrap a binary array transfer encoding. """
 
         # Actually, we want dtype,naxis,axNlen,base64(array)
         return base64.b64encode(array.tostring())
+
+    def imageStats(self, cmd):
+
+        print("Statistics Summary\n")
+        print("mean=",self.actor.image.mean())
+        print("min=",self.actor.image.min())
+        print("max=",self.actor.image.max())
+
+        py.clf()
+        py.hist(self.actor.image.ravel())
+        py.title("Image Histogram")
+        py.ylim(0,1e5)
+        py.savefig("test.jpg")
+        #py.show()
         
-    def centroidOnDummy(self, cmd):
+        cmd.finish('Statistics Calculated')
+    def quickPlot(self,cmd):
+        py.clf()
+        npoint=len(self.actor.homes)//2
+        for i in range(0,npoint):
+            py.plot([self.actor.homes[i]],self.actor.homes[i+npoint],'dg')
+        py.title("Centroids")
+
+        py.savefig("test1.jpg")
+            
+    def centroidOnly(self, cmd):
         """ Take an exposure and measure centroids. """
-
+        
         expTime = cmd.cmd.keywords["expTime"].values[0]
-        expType = 'object' if expTime > 0 else 'test'
+        expType = 'object' 
+        print(centroid.__file__)
 
-        filename, image = self._doExpose(cmd, expTime, expType)
+        cmd.inform('state="taking exposure"')
+                
+        #filename, image = self._doExpose(cmd, expTime, expType)
+        
+        image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
 
         # The encoding scheme is temporary, and will become encapsulated.
         cmd.inform('state="measuring"')
-        
-        image=pyfits.getdata(self.dummy_filename).astype('<i4')
 
-        #get homes positions
-        a=get_homes_call(image)
-
-        #turn into numpy array
-        home_centroids=numpy.frombuffer(a,dtype='<f8')
-        
-        #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
-
-        centroidsStr = self._encodeArray(home_centroids)
-        cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
-        
-        cmd.inform('state="archiving"')
-        self.dumpCentroidtoDB(cmd, home_centroids)
-        cmd.inform('state="archived"')
-        
-        cmd.finish('exposureState=done')
-
-
-    def centroid(self, cmd):
-        """ Take an exposure and measure centroids. """
-
-        expTime = cmd.cmd.keywords["expTime"].values[0]
-        expType = 'object' if expTime > 0 else 'test'
-
-        filename, image = self._doExpose(cmd, expTime, expType)
-
-        # The encoding scheme is temporary, and will become encapsulated.
-        cmd.inform('state="measuring"')
         centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
         self.dumpCentroidtoDB(cmd, centroids)
+        
+        a=get_homes_call(image)
+        homes=np.frombuffer(a,dtype='<f8')
 
-        centroidsStr = self._encodeArray(centroids)
-        cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
+        #centroidsStr = self._encodeArray(centroids)
+        #cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
+        #
+        cmd.inform('state="centroids measured"')
+
+        self.actor.image=image
+        self.actor.homes=homes
 
         cmd.finish('exposureState=done')
+        
+    def test_centroid(self, cmd):
 
-def test_centroid(self, cmd):
         
         """ 
         Demo Command to run a centroid sequence. 
@@ -265,7 +337,9 @@ def test_centroid(self, cmd):
         expTime=1
         expType='object'
         
-        image=_doFakeExpose(cmd, expTime, expType, "TestData/home",0)
+        image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
+
+        print("Read Image\n");
 
         #centroid call
         
@@ -275,12 +349,14 @@ def test_centroid(self, cmd):
         
         homes=np.frombuffer(a,dtype='<f8')
 
+        print(homes)
+
         #second step: short exposure with arc image
-        #image=pyfits.getdata('TestData/first_move.fits').astype('<i4')
-        #arc_image=pyfits.getdata('TestData/first_move_arc.fits').astype('<i4')
+        #image=pyfits.getdata('/Users/karr/GoogleDrive/first_move.fits').astype('<i4')
+        #arc_image=pyfits.getdata('/Users/karr/GoogleDrive/first_move_arc.fits').astype('<i4')
 
         expTime=0.5
-        image, arc_image=_doFakeExpose(cmd, expTime, expType, "TestData/first_move",1)
+        image, arc_image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/first_move",1)
         
         #Call the centroiding/finding
         
@@ -296,7 +372,7 @@ def test_centroid(self, cmd):
         #arc_image=pyfits.getdata('./second_move.fits').astype('<i4')
 
         expTime=0.5
-        image, arc_image=_doFakeExpose(cmd, expTime, expType, "TestData/second_move",1)
+        image, arc_image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/second_move",1)
 
         b=centroid_coarse_call(image,arc_image,homes)
 
@@ -308,7 +384,7 @@ def test_centroid(self, cmd):
         image=pyfits.getdata('./third_move.fits').astype('<i4')
 
         expTime=1.0
-        image = _doFakeExpose(cmd, expTime, expType, "TestData/third_move",0)
+        image = _doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/third_move",0)
 
         #we need to pass it the list of previous positions as well
         
@@ -318,8 +394,8 @@ def test_centroid(self, cmd):
         yp=np.zeros((npos))
 
         for i in range(npos):
-	    xp[i]=homepos[i][6]
-	    yp[i]=homepos[i][7]
+            xp[i]=homepos[i][6]
+            yp[i]=homepos[i][7]
 
         #and the call
         c=centroid_fine_call(image,homes,xp,yp)
