@@ -290,19 +290,19 @@ class McsCmd(object):
         expType = 'object' 
         print(centroid.__file__)
 
-        cmd.inform('state="taking exposure"')
+        #cmd.inform('state="taking exposure"')
                 
         #filename, image = self._doExpose(cmd, expTime, expType)
         
-        image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
-
+        #image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
+        
         # The encoding scheme is temporary, and will become encapsulated.
         cmd.inform('state="measuring"')
 
-        centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
-        self.dumpCentroidtoDB(cmd, centroids)
+        #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
+        #self.dumpCentroidtoDB(cmd, centroids)
         
-        a=get_homes_call(image)
+        a=get_homes_call(self.actor.image)
         homes=np.frombuffer(a,dtype='<f8')
 
         #centroidsStr = self._encodeArray(centroids)
@@ -310,7 +310,7 @@ class McsCmd(object):
         #
         cmd.inform('state="centroids measured"')
 
-        self.actor.image=image
+
         self.actor.homes=homes
 
         cmd.finish('exposureState=done')
