@@ -3,6 +3,8 @@ import numpy
 import time
 import subprocess as sub
 import astropy.io.fits as pyfits
+import os
+import shutil
 
 
 class Camera(object):
@@ -77,8 +79,10 @@ class mcsCamera(Camera):
 
         if cmd:
             cmd.inform('exposureState="reading"')
-
-        f = pyfits.open('/home/pfs/mhs/devel/ics_mcsActor/coadd.fits')      
+        
+        shutil.copy('/home/pfs/mhs/devel/ics_mcsActor/coadd.fits', filename)
+        f = pyfits.open('/home/pfs/mhs/devel/ics_mcsActor/coadd.fits')
+              
         image = f[0].data
         #image = numpy.random.normal(self.biasLevel, 
         #                            scale=self.readNoise, 
