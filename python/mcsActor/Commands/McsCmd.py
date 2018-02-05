@@ -32,7 +32,7 @@ class McsCmd(object):
     def __init__(self, actor):
         # This lets us access the rest of the actor.
         self.actor = actor
-        self.expTime = 100
+        self.expTime = 1000
 
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -68,7 +68,7 @@ class McsCmd(object):
         self.actor.connectCamera(cmd)
         self.actor.camera.setExposureTime(cmd,self.expTime)
 
-        cmd.finish('text="AIT camera connected!"')
+        cmd.finish('text="Camera connected!"')
         
     def status(self, cmd):
         """Report status and version; obtain and send current data"""
@@ -78,7 +78,7 @@ class McsCmd(object):
         self.actor.connectCamera(cmd)
         self.actor.camera.setExposureTime(cmd,self.expTime)
 
-        cmd.inform('text="AIT camera present!"')
+        cmd.inform('text="MCS camera present!"')
         cmd.finish()
 
     def getNextFilename(self, cmd):
