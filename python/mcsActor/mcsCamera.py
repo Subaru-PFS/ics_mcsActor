@@ -69,7 +69,8 @@ class mcsCamera(Camera):
             #time.sleep((expTime/1000.0) + self._exposureOverheadTime())
 
         # Command camera to do exposure sequence
-        p = sub.Popen(['canonexp', '-f', filename, '-t', str(expTime), '-c'],stdout=sub.PIPE,stderr=sub.PIPE)
+        slicename=filename[0:14]
+        p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],stdout=sub.PIPE,stderr=sub.PIPE)
         output, errors = p.communicate()
         if (output == 'done'):
             cmd.inform('exposureState="done"')       
@@ -77,7 +78,7 @@ class mcsCamera(Camera):
         if cmd:
             cmd.inform('exposureState="reading"')
 
-        f = pyfits.open('/home/chyan/mhs/data/mcs/schmidt_fiber_snr400_rmod71.fits')      
+        f = pyfits.open('/home/pfs/mhs/devel/ics_mcsActor/coadd.fits')      
         image = f[0].data
         #image = numpy.random.normal(self.biasLevel, 
         #                            scale=self.readNoise, 
