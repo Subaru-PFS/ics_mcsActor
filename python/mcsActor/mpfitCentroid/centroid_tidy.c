@@ -13,9 +13,9 @@
 
 //Definitions for parallizing the code (NTHREAD=# of cores)
 
-#define XSPLIT  1 //# of subregions in X direction
-#define YSPLIT  1 //# of subregions in Y direction
-#define NTHREAD 1  //# of cores
+#define XSPLIT  2 //# of subregions in X direction
+#define YSPLIT  2 //# of subregions in Y direction
+#define NTHREAD 4  //# of cores
 
 //toggle screen output for debugging/testing 
 
@@ -72,7 +72,7 @@ void* subimage_Thread(void *arg)
   int fpix0=((struct thread_data*)arg)->fpix0;    //first and last pixels
   int fpix1=((struct thread_data*)arg)->fpix1;   
 
-  double hmin=((struct thread_data*)arg)->hmin;          //data threshold
+  int hmin=((struct thread_data*)arg)->hmin;          //data threshold
   double fwhm=((struct thread_data*)arg)->fwhm;          //fwhm
   int boxsize=((struct thread_data*)arg)->boxsize;      //box size for mpfit
   int nbox=((struct thread_data*)arg)->nbox;            //boxsize for find
@@ -102,6 +102,7 @@ void* subimage_Thread(void *arg)
     }
   /*---------------------------------------------------------------*/
 
+  
   //set up the image mask
 
   //make the mask and do the convolution
@@ -112,7 +113,7 @@ void* subimage_Thread(void *arg)
   
     {
     printf("Finding Maxima\n"); 
-    printf("hmin=%lf\n\n",hmin); 
+    printf("hmin=%ld\n\n",hmin); 
     }
 
   /*---------------------------------------------------------------*/
@@ -121,13 +122,12 @@ void* subimage_Thread(void *arg)
 
   
   //now find pixels where value is greater than hmin and hmin is a local maximum
-    
   for (i = 0;i< n_y;i++)
     {
   
       for (j=0;j<n_x;j++)
   	{
-  
+
   	  //is the pixel greater than the threshold
   	  if(h[i*n_x+j]>hmin)
   	    {
@@ -255,7 +255,7 @@ void* subimage_Thread(void *arg)
 
   /*-------------------------------------------------------------------------------------*/
 
-struct centroids *centroid(int *image, int n_x, int n_y, double hmin, double fwhm,int boxsize,int *np,int VERBOSE, int fittype)
+struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,int boxsize,int *np,int VERBOSE, int fittype)
 {
 
   /*main routine. parses input values, calls setup routine, divides up the threads, 
@@ -284,14 +284,14 @@ struct centroids *centroid(int *image, int n_x, int n_y, double hmin, double fwh
   int nhalf;        //dimension of kernel
   double *c1;       //kernel integrated along one dimension
 
-  //nbox=2*floor(0.637*fwhm) + 1;   //boxsize for smoothing
+  nbox=2*floor(0.637*fwhm) + 1;   //boxsize for smoothing
 
   if(VERBOSE == 1)
     {
       printf("Starting Program\n");
       printf("  nbox = %d\n",nbox);
       printf("  fwhm = %lf\n",fwhm);
-      printf("  thresh = %lf\n",hmin);
+      printf("  thresh = %d\n",hmin);
       printf("  boxsize = %d\n",boxsize);
 
     }
@@ -330,6 +330,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, double hmin, double fwh
   double rmin=fwhm*3;  //radius to look for duplicate/false points
   int deadfirst=0;    //flag that first node has been deleted, to keep track fo pointers
   int firstval=1;     //flag that we're looking at the first node, to keep track of pointers
+  char filename[sizeof "file100.fits"];
 
   //double *xpos,  *ypos,  *peak, *back, *fx, *fy, *qual;
   //xpos=malloc(ii*sizeof(double));
@@ -381,14 +382,16 @@ struct centroids *centroid(int *image, int n_x, int n_y, double hmin, double fwh
 
 
   //Cycle through the subimages and set up the threading variables
-
+  int ind, ind1, ind2;
   //Split the image in X and Y directions
   for (ii=0;ii<XSPLIT;ii++)
     {
       for (jj=0;jj<YSPLIT;jj++)
 	{
 
-	  cand_list[ii+XSPLIT*jj]=NULL;      //Initialize list of candidate points
+	  ind=ii+XSPLIT*jj;
+	  
+	  cand_list[ind]=NULL;      //Initialize list of candidate points
 
 	  /*Calculate boundaries of subimages. Different cases for subrejions on the edge of the image,
 	    or interior, to properly calculate the overlaps. */
@@ -406,7 +409,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, double hmin, double fwh
 	  //Edge of the whole image at +X side 
 	  if(ii==XSPLIT-1)
 	    {
-	      lpix0=n_x;
+	      lpix0=n_x-1;
 	    }
 	  //Split between interior split on +X side
 	  else
@@ -428,7 +431,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, double hmin, double fwh
 	  //Edge of the whole image at +Y side 
 	  if(jj==YSPLIT-1)
 	    {
-	      lpix1=n_y;
+	      lpix1=n_y-1;
 	    }
 	  //Split between interior split on +Y side
 	  else
@@ -441,45 +444,49 @@ struct centroids *centroid(int *image, int n_x, int n_y, double hmin, double fwh
 	  ny=lpix1-fpix1+1;
 
 	  //Set the dimentions and image size for that thread
-	  thread_data_array[ii+XSPLIT*jj].n_x=nx;
-	  thread_data_array[ii+XSPLIT*jj].n_y=ny;
-	  thread_data_array[ii+XSPLIT*jj].image=malloc(nx*ny*sizeof(int));
+	  thread_data_array[ind].n_x=nx;
+	  thread_data_array[ind].n_y=ny;
+	  thread_data_array[ind].image=malloc(nx*ny*sizeof(int));
 	  
 	  //Assign the image data 
-
 	  for(i=0;i<ny;i++)
 	    {
 	      for(j=0;j<nx;j++)
 		{
-		  thread_data_array[ii+XSPLIT*jj].image[i*nx+j]=image[(i+fpix0-1)*nx+(j+fpix1-1)];
+		  ind1=i*nx+j;
+		  //!! something is going wrong here, in the second index - fixed!
+		  ind2=(i+fpix1-1)*n_x+(j+fpix0-1);
+		  thread_data_array[ind].image[ind1]=image[ind2];
 		}
 	    }
 
-	  thread_data_array[ii+XSPLIT*jj].fpix0=fpix0;  
-	  thread_data_array[ii+XSPLIT*jj].fpix1=fpix1;  
+
+	  
+	  thread_data_array[ind].fpix0=fpix0;  
+	  thread_data_array[ind].fpix1=fpix1;  
 								      
 	  //Set the values that need to be passed (same variable names as defined above)
 
-	  thread_data_array[ii+XSPLIT*jj].hmin=hmin;        
-	  thread_data_array[ii+XSPLIT*jj].fwhm=fwhm;        
-	  thread_data_array[ii+XSPLIT*jj].boxsize=boxsize;
-	  thread_data_array[ii+XSPLIT*jj].nbox=nbox;
-	  thread_data_array[ii+XSPLIT*jj].nhalf=nhalf;
-	  thread_data_array[ii+XSPLIT*jj].mask=mask;
-	  thread_data_array[ii+XSPLIT*jj].pixels=pixels;
-	  thread_data_array[ii+XSPLIT*jj].gx=gx;
-	  thread_data_array[ii+XSPLIT*jj].c1=c1;
-	  thread_data_array[ii+XSPLIT*jj].sharplim[0]=sharplim[0];
-	  thread_data_array[ii+XSPLIT*jj].sharplim[1]=sharplim[1];
-	  thread_data_array[ii+XSPLIT*jj].roundlim[0]=roundlim[0];
-	  thread_data_array[ii+XSPLIT*jj].roundlim[1]=roundlim[1];
-	  thread_data_array[ii+XSPLIT*jj].cand_list=cand_list[ii+XSPLIT*jj];
-	  thread_data_array[ii+XSPLIT*jj].VERBOSE=VERBOSE;
-	  thread_data_array[ii+XSPLIT*jj].fittype=fittype;
+	  thread_data_array[ind].hmin=hmin;        
+	  thread_data_array[ind].fwhm=fwhm;        
+	  thread_data_array[ind].boxsize=boxsize;
+	  thread_data_array[ind].nbox=nbox;
+	  thread_data_array[ind].nhalf=nhalf;
+	  thread_data_array[ind].mask=mask;
+	  thread_data_array[ind].pixels=pixels;
+	  thread_data_array[ind].gx=gx;
+	  thread_data_array[ind].c1=c1;
+	  thread_data_array[ind].sharplim[0]=sharplim[0];
+	  thread_data_array[ind].sharplim[1]=sharplim[1];
+	  thread_data_array[ind].roundlim[0]=roundlim[0];
+	  thread_data_array[ind].roundlim[1]=roundlim[1];
+	  thread_data_array[ind].cand_list=cand_list[ind];
+	  thread_data_array[ind].VERBOSE=VERBOSE;
+	  thread_data_array[ind].fittype=fittype;
 	  
 
 	  //Set up the individual threads
-	  ret[ii+XSPLIT*jj]=pthread_create(&pth[ii+XSPLIT*jj],NULL,subimage_Thread,(void *) &thread_data_array[ii+XSPLIT*jj]);
+	  ret[ind]=pthread_create(&pth[ind],NULL,subimage_Thread,(void *) &thread_data_array[ind]);
 
 	}
     }
@@ -497,9 +504,11 @@ struct centroids *centroid(int *image, int n_x, int n_y, double hmin, double fwh
       image. */
 
     //First go through the lists and link up each segment. 
-
+    int iii;
     for(ii=0;ii<NTHREAD-1;ii++)
       {
+
+	iii=0;
 
 	//Set to the first value in the first list.
 	if(ii==0)
@@ -519,15 +528,20 @@ struct centroids *centroid(int *image, int n_x, int n_y, double hmin, double fwh
 		  }
 
 		//Add the offset for that subimage
-		cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
-		cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
+		if(iii != 0)
+		  {
+		    cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
+		    cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
+		  }       
+
 		cand_val=cand_val->next;
-		
+		iii=iii+1;
+
 	      }
 	    //And the last point in the list
 	    cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
 	    cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
-	    
+
 	    //and get the next list
 	    cand_val->next=thread_data_array[ii+1].cand_list;
 	  }
@@ -544,7 +558,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, double hmin, double fwh
 
 	    if(VERBOSE==1)
 	      {
-		printf("ZZ %lf %lf\n",cand_val->x,cand_val->y);
+		//printf("ZZ %lf %lf\n",cand_val->x,cand_val->y);
 	      }
 	    cand_val->x=cand_val->x+thread_data_array[NTHREAD-1].fpix0-1;
 	    cand_val->y=cand_val->y+thread_data_array[NTHREAD-1].fpix1-1;
