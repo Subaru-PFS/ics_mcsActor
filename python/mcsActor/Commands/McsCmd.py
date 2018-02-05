@@ -19,7 +19,7 @@ from centroid import centroid_fine_call
 import pyfits
 import numpy as np
 import pylab as py
-
+import centroid
 
 class McsCmd(object):
     # Setting the default exposure time.
@@ -44,10 +44,12 @@ class McsCmd(object):
             ('expose', '@(dark|object) <expTime>', self.expose),
             ('expose_standard', '', self.expose),
             ('expose_long', '', self.expose),
-            ('centroid', '<expTime>', self.centroid),
+            ('centroidOnly', '<expTime>', self.centroidOnly),
             ('test_centroid', '', self.test_centroid),
             ('fakeExpose','<expTime> <expType> <filename> <getArc>', self.fakeExpose),
             ('reconnect', '', self.reconnect),
+            ('imageStats', '', self.imageStats),
+            ('quickPlot', '', self.quickPlot),
         ]
 
         # Define typed command arguments for the above commands.
@@ -178,6 +180,16 @@ class McsCmd(object):
         cmd.finish('exposureState=done')
 
 
+    def doCentroidCoarse(self, cmd):
+        
+
+        pass
+        
+    def _doCentroid(self,cmd,image,fittype):
+
+        pass
+
+        
     def fakeExpose(self,cmd):
         
         cmdKeys = cmd.cmd.keywords
@@ -204,7 +216,7 @@ class McsCmd(object):
         #read the image file
         
         image=pyfits.getdata(filename+".fits",0).astype('<i4')
-
+        
         #if needed, read the arc file
         
         if(getArc==1):
@@ -218,26 +230,59 @@ class McsCmd(object):
 
         # Actually, we want dtype,naxis,axNlen,base64(array)
         return base64.b64encode(array.tostring())
+
+    def imageStats(self, cmd):
+
+        print("Statistics Summary\n")
+        print("mean=",self.actor.image.mean())
+        print("min=",self.actor.image.min())
+        print("max=",self.actor.image.max())
+
+        py.clf()
+        py.hist(self.actor.image.ravel())
+        py.title("Image Histogram")
+        py.ylim(0,1e5)
+        py.savefig("test.jpg")
+        #py.show()
         
-    def centroid(self, cmd):
+        cmd.finish('Statistics Calculated')
+    def quickPlot(self,cmd):
+        py.clf()
+        npoint=len(self.actor.homes)//2
+        for i in range(0,npoint):
+            py.plot([self.actor.homes[i]],self.actor.homes[i+npoint],'dg')
+        py.title("Centroids")
+
+        py.savefig("test1.jpg")
+            
+    def centroidOnly(self, cmd):
         """ Take an exposure and measure centroids. """
-
+        
         expTime = cmd.cmd.keywords["expTime"].values[0]
-        expType = 'object' if expTime > 0 else 'test'
+        expType = 'object' 
+        print(centroid.__file__)
 
-        filename, image = self._doExpose(cmd, expTime, expType)
+        cmd.inform('state="taking exposure"')
+                
+        #filename, image = self._doExpose(cmd, expTime, expType)
+        
+        image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
 
         # The encoding scheme is temporary, and will become encapsulated.
         cmd.inform('state="measuring"')
-        centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
 
-        centroidsStr = self._encodeArray(centroids)
-        cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
+        a=get_homes_call(image)
+        homes=np.frombuffer(a,dtype='<f8')
+
+        #centroidsStr = self._encodeArray(centroids)
+        #cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
+        #
+        cmd.inform('state="centroids measured"')
+
+        self.actor.image=image
+        self.actor.homes=homes
 
         cmd.finish('exposureState=done')
-
-
-
         
     def test_centroid(self, cmd):
         
