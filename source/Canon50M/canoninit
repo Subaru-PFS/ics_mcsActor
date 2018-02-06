@@ -1,0 +1,4 @@
+#! /bin/bash 
+set CANONPATH = /home/chyan/Canon50M/
+/opt/EDTpdv/initcam -f /home/chyan/Canon50M/canon-8960x5778.cfg
+shutter -o
