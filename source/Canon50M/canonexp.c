@@ -405,7 +405,7 @@ int main(int argc, char *argv[]){
 	free(bufs);
 	//pdv_free(image_p);
 	pdv_close(pdv_p);
-
+	printf("done\n");
 	return EXIT_SUCCESS;
 
 }

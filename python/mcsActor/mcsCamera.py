@@ -67,29 +67,24 @@ class mcsCamera(Camera):
             cmd.inform('exposureState="exposing"')
         if expType not in ('bias', 'test') and expTime > 0:
             pass
-            # The expTime unit is ms.
-            #time.sleep((expTime/1000.0) + self._exposureOverheadTime())
+            
 
         # Command camera to do exposure sequence
-        slicename=filename[0:14]
+        slicename=filename[0:37]+'_'
+        cmd.inform('text="slice name: %s"' % (slicename))
         p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],stdout=sub.PIPE,stderr=sub.PIPE)
         output, errors = p.communicate()
         if (output == 'done'):
             cmd.inform('exposureState="done"')       
 
         if cmd:
-            cmd.inform('exposureState="reading"')
+            cmd.inform('exposureState="image reading"')
         
         shutil.copy('/home/pfs/mhs/devel/ics_mcsActor/coadd.fits', filename)
         f = pyfits.open('/home/pfs/mhs/devel/ics_mcsActor/coadd.fits')
               
         image = f[0].data
-        #image = numpy.random.normal(self.biasLevel, 
-        #                            scale=self.readNoise, 
-        #                            size=self.imageSize).astype('u2')
 
-        if expType != 'test':
-            time.sleep(self._readoutTime())
         return image
         
         

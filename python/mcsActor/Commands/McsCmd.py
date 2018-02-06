@@ -5,11 +5,11 @@
 from __future__ import print_function
 from builtins import zip
 
-
-
 from builtins import range
 from builtins import object
 import matplotlib
+import matplotlib.pyplot as plt
+
 matplotlib.use('Agg')
 
 import os
@@ -211,6 +211,15 @@ class McsCmd(object):
  
         filename, image = self._doExpose(cmd, expTime, expType)
         self.actor.image = image
+        
+        cmd.inform('text="image median = %d." '% (np.median(self.actor.image))) 
+        cmd.inform('text="image mean = %d." '% (self.actor.image.mean())) 
+        cmd.inform('text="image min = %d." '% (self.actor.image.min())) 
+        cmd.inform('text="image max = %d." '% (self.actor.image.max())) 
+        
+        plt.ion()
+        plt.plot(np.arange(10))
+        plt.show()
         cmd.finish('exposureState=done')
 
 
@@ -282,6 +291,7 @@ class McsCmd(object):
         #py.show()
         
         cmd.finish('Statistics Calculated')
+        
     def quickPlot(self,cmd):
         py.clf()
         npoint=len(self.actor.homes)//2
