@@ -1,10 +1,17 @@
 #!/usr/bin/env python
 
+
+
 from __future__ import print_function
 from builtins import zip
 
+
+
 from builtins import range
 from builtins import object
+import matplotlib
+matplotlib.use('Agg')
+
 import os
 import base64
 import numpy
@@ -203,6 +210,7 @@ class McsCmd(object):
         cmd.diag('text="Exposure time now is %d ms." '% (expTime))    
  
         filename, image = self._doExpose(cmd, expTime, expType)
+        self.actor.image = image
         cmd.finish('exposureState=done')
 
 
@@ -290,28 +298,30 @@ class McsCmd(object):
         expType = 'object' 
         print(centroid.__file__)
 
-        cmd.inform('state="taking exposure"')
+        #cmd.inform('state="taking exposure"')
                 
         #filename, image = self._doExpose(cmd, expTime, expType)
         
-        image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
-
+        #image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
+        
         # The encoding scheme is temporary, and will become encapsulated.
         cmd.inform('state="measuring"')
 
-        centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
-        self.dumpCentroidtoDB(cmd, centroids)
+        #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
+        #self.dumpCentroidtoDB(cmd, centroids)
         
-        a=get_homes_call(image)
+        a=get_homes_call(self.actor.image.astype('<i4'))
         homes=np.frombuffer(a,dtype='<f8')
 
         #centroidsStr = self._encodeArray(centroids)
         #cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
         #
         cmd.inform('state="centroids measured"')
-
-        self.actor.image=image
         self.actor.homes=homes
+        npoint=len(self.actor.homes)//2
+        for i in range(0,npoint):
+            print(self.actor.homes[i],self.actor.homes[i+npoint],'dg')
+        
 
         cmd.finish('exposureState=done')
         
