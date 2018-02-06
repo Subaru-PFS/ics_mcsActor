@@ -134,10 +134,13 @@ class McsCmd(object):
             
         return os.path.join(path, 'dummy_MCSA%010d.fits' % (self.actor.exposureID))
     
-    def dumpCentroidtoDB(self, cmd, array):
-        """Query MPA database and return json string to an attribute."""
+    def dumpCentroidtoDB(self, cmd):
+        """Connect to database and return json string to an attribute."""
+        file = open("/home/pfs/mhs/devel/ics_mcsActor/etc/dbpasswd.cfg", "r")
+        passstring = file.read() 
+        cmd.inform('text="Connected to FPS database with pw %s."'%(passstring))
         try:
-            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
+            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password="+passstring)
             cmd.diag('text="Connected to FPS database."')
         except:
             cmd.diag('text="I am unable to connect to the database."')
@@ -219,6 +222,8 @@ class McsCmd(object):
         #plt.show()
         basename=filename[0:37]
         self.imageStats(cmd, basename)
+        
+        self.dumpCentroidtoDB(cmd)
         cmd.finish('exposureState=done')
 
 
@@ -317,6 +322,7 @@ class McsCmd(object):
         #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
         #self.dumpCentroidtoDB(cmd, centroids)
         
+        #a=get_homes_call(self.actor.image.astype('<i4'))
         a=get_homes_call(self.actor.image.astype('<i4'))
         homes=np.frombuffer(a,dtype='<f8')
 
