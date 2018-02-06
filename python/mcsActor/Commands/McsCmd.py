@@ -212,14 +212,13 @@ class McsCmd(object):
         filename, image = self._doExpose(cmd, expTime, expType)
         self.actor.image = image
         
-        cmd.inform('text="image median = %d." '% (np.median(self.actor.image))) 
-        cmd.inform('text="image mean = %d." '% (self.actor.image.mean())) 
-        cmd.inform('text="image min = %d." '% (self.actor.image.min())) 
-        cmd.inform('text="image max = %d." '% (self.actor.image.max())) 
-        
-        plt.ion()
-        plt.plot(np.arange(10))
-        plt.show()
+        #import pdb; pdb.set_trace()
+        #plt.ion()
+        #plt.hist(self.actor.image.ravel())
+        #plt.savefig('foo.pdf')
+        #plt.show()
+        basename=filename[0:37]
+        self.imageStats(cmd, basename)
         cmd.finish('exposureState=done')
 
 
@@ -276,19 +275,17 @@ class McsCmd(object):
         # Actually, we want dtype,naxis,axNlen,base64(array)
         return base64.b64encode(array.tostring())
 
-    def imageStats(self, cmd):
+    def imageStats(self, cmd, basename):
 
-        print("Statistics Summary\n")
-        print("mean=",self.actor.image.mean())
-        print("min=",self.actor.image.min())
-        print("max=",self.actor.image.max())
+        cmd.inform('text="image median = %d." '% (np.median(self.actor.image))) 
+        cmd.inform('text="image mean = %d." '% (self.actor.image.mean())) 
+        cmd.inform('text="image min = %d." '% (self.actor.image.min())) 
+        cmd.inform('text="image max = %d." '% (self.actor.image.max())) 
+        
+        plt.hist(self.actor.image.ravel())
+        plt.savefig(basename+'.pdf')
+        plt.show()
 
-        py.clf()
-        py.hist(self.actor.image.ravel())
-        py.title("Image Histogram")
-        py.ylim(0,1e5)
-        py.savefig("test.jpg")
-        #py.show()
         
         cmd.finish('Statistics Calculated')
         
