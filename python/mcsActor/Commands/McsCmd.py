@@ -5,11 +5,11 @@
 from __future__ import print_function
 from builtins import zip
 
-
-
 from builtins import range
 from builtins import object
 import matplotlib
+import matplotlib.pyplot as plt
+
 matplotlib.use('Agg')
 
 import os
@@ -28,7 +28,7 @@ import psycopg2.extras
 from xml.etree.ElementTree import dump
 
 
-sys.path.append("/home/chyan/mhs/devel/ics_mcsActor/python/mcsActor/mpfitCentroid")
+sys.path.append("/home/pfs/mhs/devel/ics_mcsActor/python/mcsActor/mpfitCentroid")
 from centroid import get_homes_call
 from centroid import centroid_coarse_call
 from centroid import centroid_fine_call
@@ -134,10 +134,13 @@ class McsCmd(object):
             
         return os.path.join(path, 'dummy_MCSA%010d.fits' % (self.actor.exposureID))
     
-    def dumpCentroidtoDB(self, cmd, array):
-        """Query MPA database and return json string to an attribute."""
+    def dumpCentroidtoDB(self, cmd):
+        """Connect to database and return json string to an attribute."""
+        file = open("/home/pfs/mhs/devel/ics_mcsActor/etc/dbpasswd.cfg", "r")
+        passstring = file.read() 
+        cmd.inform('text="Connected to FPS database with pw %s."'%(passstring))
         try:
-            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
+            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password="+passstring)
             cmd.diag('text="Connected to FPS database."')
         except:
             cmd.diag('text="I am unable to connect to the database."')
@@ -211,6 +214,16 @@ class McsCmd(object):
  
         filename, image = self._doExpose(cmd, expTime, expType)
         self.actor.image = image
+        
+        #import pdb; pdb.set_trace()
+        #plt.ion()
+        #plt.hist(self.actor.image.ravel())
+        #plt.savefig('foo.pdf')
+        #plt.show()
+        basename=filename[0:37]
+        self.imageStats(cmd, basename)
+        
+        self.dumpCentroidtoDB(cmd)
         cmd.finish('exposureState=done')
 
 
@@ -267,21 +280,20 @@ class McsCmd(object):
         # Actually, we want dtype,naxis,axNlen,base64(array)
         return base64.b64encode(array.tostring())
 
-    def imageStats(self, cmd):
+    def imageStats(self, cmd, basename):
 
-        print("Statistics Summary\n")
-        print("mean=",self.actor.image.mean())
-        print("min=",self.actor.image.min())
-        print("max=",self.actor.image.max())
+        cmd.inform('text="image median = %d." '% (np.median(self.actor.image))) 
+        cmd.inform('text="image mean = %d." '% (self.actor.image.mean())) 
+        cmd.inform('text="image min = %d." '% (self.actor.image.min())) 
+        cmd.inform('text="image max = %d." '% (self.actor.image.max())) 
+        
+        #plt.hist(self.actor.image.ravel())
+        #plt.savefig(basename+'.pdf')
+        #plt.show()
 
-        py.clf()
-        py.hist(self.actor.image.ravel())
-        py.title("Image Histogram")
-        py.ylim(0,1e5)
-        py.savefig("test.jpg")
-        #py.show()
         
         cmd.finish('Statistics Calculated')
+        
     def quickPlot(self,cmd):
         py.clf()
         npoint=len(self.actor.homes)//2
@@ -309,19 +321,22 @@ class McsCmd(object):
 
         #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
         #self.dumpCentroidtoDB(cmd, centroids)
-        
+        cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
         a=get_homes_call(self.actor.image.astype('<i4'))
+        
+        #a=get_homes_call(self.actor.image.astype('<i4'))
         homes=np.frombuffer(a,dtype='<f8')
 
         #centroidsStr = self._encodeArray(centroids)
         #cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
         #
+        cmd.inform('text="size = %d." '% (homes.shape))
         cmd.inform('state="centroids measured"')
         self.actor.homes=homes
         npoint=len(self.actor.homes)//2
         for i in range(0,npoint):
             print(self.actor.homes[i],self.actor.homes[i+npoint],'dg')
-        
+            cmd.inform('text="size = %f %f." '% (self.actor.homes[i],self.actor.homes[i+npoint]))
 
         cmd.finish('exposureState=done')
         

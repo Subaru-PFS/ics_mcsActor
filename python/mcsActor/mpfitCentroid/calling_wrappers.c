@@ -25,7 +25,7 @@ double *get_homes(int *image,int n_x, int n_y, int *np,int hmin, double fwhm, in
 
   
   int fittype=1; //set the fit time (1D fits)
-  int verbose=0; //suppress debugging output
+  int verbose=1; //suppress debugging output
 
   //call the centroiding
   centroids *positions=centroid(image,n_x, n_y,hmin,fwhm,boxsize,np,verbose,fittype);
