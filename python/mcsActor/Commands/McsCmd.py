@@ -64,6 +64,7 @@ class McsCmd(object):
             ('expose_standard', '', self.expose),
             ('expose_long', '', self.expose),
             ('centroidOnly', '<expTime>', self.centroidOnly),
+            ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
             ('test_centroid', '', self.test_centroid),
             ('fakeExpose','<expTime> <expType> <filename> <getArc>', self.fakeExpose),
             ('reconnect', '', self.reconnect),
@@ -305,7 +306,36 @@ class McsCmd(object):
         py.title("Centroids")
 
         py.savefig("test1.jpg")
-            
+
+def fakeCentroidOnly(self,cmd):
+
+        cmd.inform('state="measuring"')
+
+        npos=2350
+        centroids=np.zeros((2350,7))
+
+        #fake positions
+        pos=np.meshgrid(np.arange(50),np.arange(47))
+        centroids[:,0]=pos[0]*150
+        centroids[:,1]=pos[1]*100
+
+        #fake FWHM
+        centroids[:,2]=np.normal(3.,0.4,npos)
+        centroids[:,3]=np.normal(3.,0.4,npos)
+
+        #fake peaks
+        centroids[:,4]=np.normal(5000,100,npos)
+
+        #fake backgrounds
+        centroids[:,5]=np.normal(800,30,npos)
+
+        #fake qualities
+        centroids[:,6]=np.ones(npos)
+
+        self.actor.centroids=centroids
+
+        cmd.inform('state="finished"')
+ 
     def centroidOnly(self, cmd):
         """ Take an exposure and measure centroids. """
         
