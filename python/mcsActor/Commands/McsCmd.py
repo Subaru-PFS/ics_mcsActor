@@ -9,7 +9,7 @@ from builtins import range
 from builtins import object
 import matplotlib
 import matplotlib.pyplot as plt
-
+import time
 matplotlib.use('Agg')
 
 import os
@@ -32,6 +32,7 @@ sys.path.append("/home/pfs/mhs/devel/ics_mcsActor/python/mcsActor/mpfitCentroid"
 from centroid import get_homes_call
 from centroid import centroid_coarse_call
 from centroid import centroid_fine_call
+from centroid import centroid_only
 
 import pyfits
 import numpy as np
@@ -68,6 +69,8 @@ class McsCmd(object):
             ('reconnect', '', self.reconnect),
             ('imageStats', '', self.imageStats),
             ('quickPlot', '', self.quickPlot),
+            ('timeTest','',self.timeTest),
+            ('seeingTest','',self.seeingTest),
         ]
 
         # Define typed command arguments for the above commands.
@@ -108,7 +111,7 @@ class McsCmd(object):
         In real life, we will instantiate a Subaru-compliant image pathname generating object.  
 
         """
-        
+
         self.actor.exposureID += 1
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
         path = os.path.expandvars(os.path.expanduser(path))
@@ -428,3 +431,64 @@ class McsCmd(object):
         #cython to numpy
         
         homepos=np.frombuffer(c,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
+
+
+   # def timeTest():
+   #
+   #     expTime=1000.
+   #     expType="object"
+   #     filename, image = self._doExpose(cmd, expTime, expType)
+   #     self.actor.image = image
+   #     
+   #     homepos=np.frombuffer(c,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
+
+
+    def timeTest(self,cmd):
+
+
+        fwhm=3.
+        hmin=3000
+        boxsize=9
+        expTime=1000.
+        expType="object"
+        filename, image = self._doExpose(cmd, expTime, expType)
+        self.actor.image = image.astype('<i4')
+
+        t1=time.time()
+        for i in range(20):
+            #expTime=1000.
+            #expType="object"
+            #filename, image = self._doExpose(cmd, expTime, expType)
+            #self.actor.image = image.astype('<i4')
+
+            a=centroid_only(self.actor.image,fwhm,hmin,boxsize)
+        
+            centroids=np.frombuffer(a,dtype='<f8')
+            numpoints=len(centroids)//7
+            self.actor.centroids=np.reshape(centroids,(numpoints,7))
+            cmd.inform('text="size = %d." '% (numpoints))
+        t2=time.time()
+        cmd.inform('text="time = %f." '% ((t2-t1)/20.))
+
+        cmd.finish('exposureState=done')
+    def seeingTest(self,cmd):
+
+        fwhm=3.
+        hmin=3000
+        boxsize=9
+        expType="object"
+
+
+        exptimes=np.array([500,1000.,2000.,3000.,4000.,5000,10000.])
+        for expTime in exptimes:
+
+            
+            for i in range(30):
+            
+                filename, image = self._doExpose(cmd, expTime, expType)
+                if(i==0):
+                    cmd.inform('="expTime = %f. first= %s" '% (expTime,filename))
+                    #self.actor.image = image.astype('<i4')
+            cmd.inform('="expTime = %f. last= %s" '% (expTime,filename))
+
+        cmd.finish('exposureState=done')

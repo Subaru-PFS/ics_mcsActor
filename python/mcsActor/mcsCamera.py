@@ -3,6 +3,8 @@ import numpy
 import time
 import subprocess as sub
 import astropy.io.fits as pyfits
+import os
+import shutil
 
 
 class Camera(object):
@@ -65,26 +67,24 @@ class mcsCamera(Camera):
             cmd.inform('exposureState="exposing"')
         if expType not in ('bias', 'test') and expTime > 0:
             pass
-            # The expTime unit is ms.
-            #time.sleep((expTime/1000.0) + self._exposureOverheadTime())
+            
 
         # Command camera to do exposure sequence
-        p = sub.Popen(['canonexp', '-f', filename, '-t', str(expTime), '-c'],stdout=sub.PIPE,stderr=sub.PIPE)
+        slicename=filename[0:37]+'_'
+        cmd.inform('text="slice name: %s"' % (slicename))
+        p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],stdout=sub.PIPE,stderr=sub.PIPE)
         output, errors = p.communicate()
         if (output == 'done'):
             cmd.inform('exposureState="done"')       
 
         if cmd:
-            cmd.inform('exposureState="reading"')
-
-        f = pyfits.open('/home/chyan/mhs/data/mcs/schmidt_fiber_snr400_rmod71.fits')      
+            cmd.inform('exposureState="image reading"')
+        
+        shutil.copy('/home/pfs/mhs/devel/ics_mcsActor/coadd.fits', filename)
+        f = pyfits.open('/home/pfs/mhs/devel/ics_mcsActor/coadd.fits')
+              
         image = f[0].data
-        #image = numpy.random.normal(self.biasLevel, 
-        #                            scale=self.readNoise, 
-        #                            size=self.imageSize).astype('u2')
 
-        if expType != 'test':
-            time.sleep(self._readoutTime())
         return image
         
         
