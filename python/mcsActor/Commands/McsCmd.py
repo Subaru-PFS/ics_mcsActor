@@ -9,6 +9,7 @@ from builtins import range
 from builtins import object
 import matplotlib
 import matplotlib.pyplot as plt
+import time
 
 matplotlib.use('Agg')
 
@@ -32,6 +33,7 @@ sys.path.append("/home/pfs/mhs/devel/ics_mcsActor/python/mcsActor/mpfitCentroid"
 from centroid import get_homes_call
 from centroid import centroid_coarse_call
 from centroid import centroid_fine_call
+from centroid import centroid_only
 
 import pyfits
 import numpy as np
@@ -63,11 +65,14 @@ class McsCmd(object):
             ('expose_standard', '', self.expose),
             ('expose_long', '', self.expose),
             ('centroidOnly', '<expTime>', self.centroidOnly),
+            ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
             ('test_centroid', '', self.test_centroid),
             ('fakeExpose','<expTime> <expType> <filename> <getArc>', self.fakeExpose),
             ('reconnect', '', self.reconnect),
             ('imageStats', '', self.imageStats),
             ('quickPlot', '', self.quickPlot),
+            ('timeTest','',self.timeTest),
+            ('seeingTest','',self.seeingTest),
         ]
 
         # Define typed command arguments for the above commands.
@@ -108,7 +113,7 @@ class McsCmd(object):
         In real life, we will instantiate a Subaru-compliant image pathname generating object.  
 
         """
-        
+
         self.actor.exposureID += 1
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
         path = os.path.expandvars(os.path.expanduser(path))
@@ -285,11 +290,7 @@ class McsCmd(object):
         cmd.inform('text="image median = %d." '% (np.median(self.actor.image))) 
         cmd.inform('text="image mean = %d." '% (self.actor.image.mean())) 
         cmd.inform('text="image min = %d." '% (self.actor.image.min())) 
-        cmd.inform('text="image max = %d." '% (self.actor.image.max())) 
-        
-        plt.hist(self.actor.image.ravel())
-        plt.savefig(basename+'.pdf')
-        plt.show()
+        cmd.inform('text="image max = %d." '% (self.actor.image.max()))
 
         
         cmd.finish('Statistics Calculated')
@@ -302,7 +303,36 @@ class McsCmd(object):
         py.title("Centroids")
 
         py.savefig("test1.jpg")
-            
+
+def fakeCentroidOnly(self,cmd):
+
+        cmd.inform('state="measuring"')
+
+        npos=2350
+        centroids=np.zeros((2350,7))
+
+        #fake positions
+        pos=np.meshgrid(np.arange(50),np.arange(47))
+        centroids[:,0]=pos[0]*150
+        centroids[:,1]=pos[1]*100
+
+        #fake FWHM
+        centroids[:,2]=np.normal(3.,0.4,npos)
+        centroids[:,3]=np.normal(3.,0.4,npos)
+
+        #fake peaks
+        centroids[:,4]=np.normal(5000,100,npos)
+
+        #fake backgrounds
+        centroids[:,5]=np.normal(800,30,npos)
+
+        #fake qualities
+        centroids[:,6]=np.ones(npos)
+
+        self.actor.centroids=centroids
+
+        cmd.inform('state="finished"')
+ 
     def centroidOnly(self, cmd):
         """ Take an exposure and measure centroids. """
         
@@ -321,20 +351,24 @@ class McsCmd(object):
 
         #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
         #self.dumpCentroidtoDB(cmd, centroids)
+
+        cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
+
+        a=get_homes_call(self.actor.image.astype('<i4'))
         
         #a=get_homes_call(self.actor.image.astype('<i4'))
-        a=get_homes_call(self.actor.image.astype('<i4'))
         homes=np.frombuffer(a,dtype='<f8')
 
         #centroidsStr = self._encodeArray(centroids)
         #cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
         #
+        cmd.inform('text="size = %d." '% (homes.shape))
         cmd.inform('state="centroids measured"')
         self.actor.homes=homes
         npoint=len(self.actor.homes)//2
         for i in range(0,npoint):
             print(self.actor.homes[i],self.actor.homes[i+npoint],'dg')
-        
+            cmd.inform('text="size = %f %f." '% (self.actor.homes[i],self.actor.homes[i+npoint]))
 
         cmd.finish('exposureState=done')
         
@@ -426,3 +460,64 @@ class McsCmd(object):
         #cython to numpy
         
         homepos=np.frombuffer(c,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
+
+
+   # def timeTest():
+   #
+   #     expTime=1000.
+   #     expType="object"
+   #     filename, image = self._doExpose(cmd, expTime, expType)
+   #     self.actor.image = image
+   #     
+   #     homepos=np.frombuffer(c,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
+
+
+    def timeTest(self,cmd):
+
+
+        fwhm=3.
+        hmin=3000
+        boxsize=9
+        expTime=1000.
+        expType="object"
+        filename, image = self._doExpose(cmd, expTime, expType)
+        self.actor.image = image.astype('<i4')
+
+        t1=time.time()
+        for i in range(20):
+            #expTime=1000.
+            #expType="object"
+            #filename, image = self._doExpose(cmd, expTime, expType)
+            #self.actor.image = image.astype('<i4')
+
+            a=centroid_only(self.actor.image,fwhm,hmin,boxsize)
+        
+            centroids=np.frombuffer(a,dtype='<f8')
+            numpoints=len(centroids)//7
+            self.actor.centroids=np.reshape(centroids,(numpoints,7))
+            cmd.inform('text="size = %d." '% (numpoints))
+        t2=time.time()
+        cmd.inform('text="time = %f." '% ((t2-t1)/20.))
+
+        cmd.finish('exposureState=done')
+    def seeingTest(self,cmd):
+
+        fwhm=3.
+        hmin=3000
+        boxsize=9
+        expType="object"
+
+
+        exptimes=np.array([500,1000.,2000.,3000.,4000.,5000,10000.])
+        for expTime in exptimes:
+
+            
+            for i in range(30):
+            
+                filename, image = self._doExpose(cmd, expTime, expType)
+                if(i==0):
+                    cmd.inform('="expTime = %f. first= %s" '% (expTime,filename))
+                    #self.actor.image = image.astype('<i4')
+            cmd.inform('="expTime = %f. last= %s" '% (expTime,filename))
+
+        cmd.finish('exposureState=done')
