@@ -1,3 +1,8 @@
-/build/
+*.so
+*.o
+*.pyc
+__pycache__/
+
+build/
 /.pydevproject
 /.project

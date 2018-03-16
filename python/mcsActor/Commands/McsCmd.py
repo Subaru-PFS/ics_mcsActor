@@ -10,6 +10,7 @@ from builtins import object
 import matplotlib
 import matplotlib.pyplot as plt
 import time
+
 matplotlib.use('Agg')
 
 import os
@@ -289,11 +290,7 @@ class McsCmd(object):
         cmd.inform('text="image median = %d." '% (np.median(self.actor.image))) 
         cmd.inform('text="image mean = %d." '% (self.actor.image.mean())) 
         cmd.inform('text="image min = %d." '% (self.actor.image.min())) 
-        cmd.inform('text="image max = %d." '% (self.actor.image.max())) 
-        
-        #plt.hist(self.actor.image.ravel())
-        #plt.savefig(basename+'.pdf')
-        #plt.show()
+        cmd.inform('text="image max = %d." '% (self.actor.image.max()))
 
         
         cmd.finish('Statistics Calculated')
@@ -354,7 +351,9 @@ def fakeCentroidOnly(self,cmd):
 
         #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
         #self.dumpCentroidtoDB(cmd, centroids)
+
         cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
+
         a=get_homes_call(self.actor.image.astype('<i4'))
         
         #a=get_homes_call(self.actor.image.astype('<i4'))
