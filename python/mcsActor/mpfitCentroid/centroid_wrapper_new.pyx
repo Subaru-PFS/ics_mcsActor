@@ -118,11 +118,10 @@ def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhm, int hmin
     cdef centroids *val
     cdef char *cp
     cdef int npoint[1]
-    fittype=2
 
     #The function call
     with nogil:
-         vals=centroid(<int *>image.data,image.shape[1],image.shape[0],hmin,fwhm, boxsize, npoint, 0, fittype)
+         vals=centroid(<int *>image.data,image.shape[1],image.shape[0],hmin,fwhm, boxsize, npoint, 0, 1)
 
     #convert the output into a buffer string
     cp = <char *> vals

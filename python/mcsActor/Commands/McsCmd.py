@@ -17,6 +17,7 @@ import base64
 import numpy
 import astropy.io.fits as pyfits
 import sys
+import time
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
@@ -37,7 +38,6 @@ import pyfits
 import numpy as np
 import pylab as py
 import centroid
-
 
 class McsCmd(object):
     # Setting the default exposure time.
@@ -77,6 +77,13 @@ class McsCmd(object):
                                         keys.Key("expType", types.String(), help="The exposure type"),
                                         keys.Key("filename", types.String(), help="Image filename"),
                                         keys.Key("getArc", types.Int(), help="flag for arc image")
+                                        keys.Key("r1", types.Float(), help="lower bound for roundlim")
+                                        keys.Key("r2", types.Float(), help="upper bound for roundlim")
+                                        keys.Key("s1", types.Float(), help="lower bound for sharplim")
+                                        keys.Key("s2", types.Float(), help="upper bound for sharplim")
+                                        keys.Key("boxsize", types.Int(), help="fitting boxsize")
+                                        keys.Key("fwhm", types.Float(), help="expected fwhm")
+                                        keys.Key("thresh", types.Int(), help="threshold for peak finding")
                                         )
 
     def ping(self, cmd):
@@ -227,10 +234,39 @@ class McsCmd(object):
         self.dumpCentroidtoDB(cmd)
         cmd.finish('exposureState=done')
 
+    def manualInitCentroid(self,cmd):
+
+        #a routine to manually adjust the values set in initCentroid,
+        #for comisssioning purposes
+
+        self.actor.fwhm = cmd.cmd.keywords["fwhm"].values[0]
+        self.actor.fwhm = cmd.cmd.keywords["thresh"].values[0]
+        self.actor.fwhm = cmd.cmd.keywords["boxsize"].values[0]
+        r1 = cmd.cmd.keywords["r1"].values[0]
+        r2 = cmd.cmd.keywords["f2"].values[0]
+        s1 = cmd.cmd.keywords["s1"].values[0]
+        s2 = cmd.cmd.keywords["s2"].values[0]
+
+        self.actor.roundlim=[r1,r2]
+        self.actor.sharplim=[s1,s2]
+        
+    def initCentroid(self,cmd):
+
+        #initialize centroid parameters
+        
+        self.actor.fwhm=3.
+        self.actor.thresh=1800
+        self.actor.boxsize=9
+        self.actor.roundlim=[-1.,1.]
+        self.actor.sharplim=[0.05,0.5]
 
     def doCentroidCoarse(self, cmd):
         
+        expTime = cmd.cmd.keywords["expTime"].values[0]
+        expType = 'object' 
 
+        
+        
         pass
         
     def _doCentroid(self,cmd,image,fittype):
@@ -306,6 +342,9 @@ class McsCmd(object):
 
 def fakeCentroidOnly(self,cmd):
 
+        #generates test data of the right format, useful for
+        #testing database injection
+    
         cmd.inform('state="measuring"')
 
         npos=2350
@@ -332,43 +371,33 @@ def fakeCentroidOnly(self,cmd):
         self.actor.centroids=centroids
 
         cmd.inform('state="finished"')
- 
+
     def centroidOnly(self, cmd):
         """ Take an exposure and measure centroids. """
         
         expTime = cmd.cmd.keywords["expTime"].values[0]
         expType = 'object' 
-        print(centroid.__file__)
-
-        #cmd.inform('state="taking exposure"')
-                
-        #filename, image = self._doExpose(cmd, expTime, expType)
         
-        #image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
-        
-        # The encoding scheme is temporary, and will become encapsulated.
         cmd.inform('state="measuring"')
 
-        #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
-        #self.dumpCentroidtoDB(cmd, centroids)
-        cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
-        a=get_homes_call(self.actor.image.astype('<i4'))
+        #call teh centroiding routine. The parameters need to have been set with initCentroid
+        #or manualInitCentroid prior to this. 
         
+        a=centroid_only(self.actor.image.astype('<i4'),self.actor.fwhm,self.actor.thresh,self.actor.boxsize,self.actor.roundlim,self.actor.sharplim)
+
+        #read into a numpy buffer
+        centroids=np.frombuffer(a,dtype='<f8')
+
+        #reshape
+        np=len(centroids)//7
+        self.actor.centroids=np.reshape(centroids,(np,7))
+
         #a=get_homes_call(self.actor.image.astype('<i4'))
-        homes=np.frombuffer(a,dtype='<f8')
+        #homes=np.frombuffer(a,dtype='<f8')
 
-        #centroidsStr = self._encodeArray(centroids)
-        #cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
-        #
-        cmd.inform('text="size = %d." '% (homes.shape))
+        #update status
         cmd.inform('state="centroids measured"')
-        self.actor.homes=homes
-        npoint=len(self.actor.homes)//2
-        for i in range(0,npoint):
-            print(self.actor.homes[i],self.actor.homes[i+npoint],'dg')
-            cmd.inform('text="size = %f %f." '% (self.actor.homes[i],self.actor.homes[i+npoint]))
-
-        cmd.finish('exposureState=done')
+        cmd.inform('text="detected %d points" '% (np))
         
     def test_centroid(self, cmd):
 
@@ -413,13 +442,15 @@ def fakeCentroidOnly(self,cmd):
         expTime=0.5
         image, arc_image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/first_move",1)
         
+        filename, image, arcimage = self._doExpose(cmd, expTime, expType)
+
         #Call the centroiding/finding
         
         b=centroid_coarse_call(image,arc_image,homes)
 
         #convert from cython output to numpy typed array
         
-        homepos=np.frombuffer(b,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
+        fibreid=np.frombuffer(b,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
 
         #second move, same as the first
 
@@ -458,3 +489,80 @@ def fakeCentroidOnly(self,cmd):
         #cython to numpy
         
         homepos=np.frombuffer(c,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
+
+    def displayImageResults(self, cmd):
+
+        """
+
+        A simple routine to plot the image with the detected centroids
+        overlaid, for calibration purposes.
+
+        """
+        
+        filename = cmd.cmd.keywords["fileName"].values[0]
+        image = pyfits.getdata(filename)
+
+        py.imshow(image)
+        py.scatter(self.actor.centroids[:,0],self.actor.centroids[:,1],'og')
+        py.show()
+
+    def showCentroidStats():
+
+        """
+
+        a simple routine to display various parameters from a centroid
+        run, primarily for calibration/testing purposes
+
+        """
+
+        av_rms_x=self.actor.centroids[:,2].mean()
+        av_rms_y=self.actor.centroids[:,3].mean()
+        av_peak=self.actor.centroids[:,4].mean()
+        av_back=self.actor.centroids[:,5].mean()
+
+        
+    def rmsValues():
+
+        """
+
+        wrapper routine to pull the centroids of an image sequence
+        from the database and calculate RMS values of the position,
+        along with some other diagnostic values.
+
+        """
+
+        centroidList=[]
+        n=10
+        
+        for i in range(n):
+            
+            filename, image = self._doExpose(cmd, expTime, expType)
+            self.actor.image = image
+        
+            a=centroid_only(self.actor.image.astype('<i4'),self.actor.fwhm,self.actor.thresh,self.actor.boxsize,self.actor.roundlim,self.actor.sharplim)
+            np=len(centroids)//7
+            centroids=np.reshape(centroids,(np,7))
+
+            centroidList.append(centroids)
+
+        rmsPlots(centroidList)
+
+    _doFlatField(self,cmd,image,flat):
+        
+        
+    def timeTest(self, cmd):
+
+        time1=time.time()
+        for i in range(20):
+            filename, image = self._doExpose(cmd, expTime, expType)
+            self.actor.image = image
+        
+            a=centroid_only(self.actor.image.astype('<i4'),self.actor.fwhm,self.actor.thresh,self.actor.boxsize,self.actor.roundlim,self.actor.sharplim)
+        
+            #read into a numpy buffer
+            centroids=np.frombuffer(a,dtype='<f8')
+
+            #reshape
+            np=len(centroids)//7
+            self.actor.centroids=np.reshape(centroids,(np,7))
+        time2=time.time()

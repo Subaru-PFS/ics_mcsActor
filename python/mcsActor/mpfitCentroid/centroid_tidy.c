@@ -13,9 +13,9 @@
 
 //Definitions for parallizing the code (NTHREAD=# of cores)
 
-#define XSPLIT  2 //# of subregions in X direction
-#define YSPLIT  2 //# of subregions in Y direction
-#define NTHREAD 4  //# of cores
+#define XSPLIT  1 //# of subregions in X direction
+#define YSPLIT  1 //# of subregions in Y direction
+#define NTHREAD 1  //# of cores
 
 //toggle screen output for debugging/testing 
 
@@ -199,14 +199,16 @@ void* subimage_Thread(void *arg)
   	{
 
 	  sharp=calculate_sharp(image,mask,nhalf,ix,iy,n_x,n_y,pixels,nbox);
-	  
-
           //if it fits the sharpness criteria continue to roundness
 	  if(sharp < sharplim[1] && sharp > sharplim[0])
 	    {
 	      
 	      around=calculate_round(image,mask,nhalf,ix,iy,n_x,n_y,pixels,nbox,c1);
-	      
+	      if(around > roundlim[1] || around < roundlim[0])
+		{
+		  //printf("%d %d %lf\n",ix,iy,around);
+		}
+
 	  //if the roundness passes, add to the list
 	  if(around > roundlim[0] && around < roundlim[1])
 	    {
@@ -275,7 +277,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,i
   sharplim[0]=0.05;
   sharplim[1]=0.5;
   roundlim[0]=-1.;
-  roundlim[1]=1.;
+  roundlim[1]=1.2;
   
 
   double *gx;       // 1D filter kernel

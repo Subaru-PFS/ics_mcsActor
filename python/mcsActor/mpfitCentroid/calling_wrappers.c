@@ -14,8 +14,6 @@
 #include "fibreid.h"
 
 
-
-
 double *get_homes(int *image,int n_x, int n_y, int *np,int hmin, double fwhm, int boxsize)
 {
 
