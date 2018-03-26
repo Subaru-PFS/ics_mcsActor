@@ -32,7 +32,21 @@
 #define S_CLOSE  0
 #define S_OPEN   1
 
-int OpenShutter(void* time)
+int setShutterStatus(int status)
+{
+	int i, outputData;
+	int res;
+
+	i = open("/dev/ttyUSB0", O_RDWR);
+	outputData=status;
+	res = ioctl(i, GP0_SET_VALUE,&outputData);
+	close(i);
+	return(0);
+}
+
+
+
+int OpenShutterTime(void* time)
 {
 
 	int i, outputData;
@@ -45,17 +59,16 @@ int OpenShutter(void* time)
 	/* Adding a delay so that the image readout will start before shutter is opened */
 	usleep(delay*1000);
 	printf("Opening shutter for %d msec.\n",*(int *)time);
-	outputData=1;
+	outputData=S_OPEN;
 	res = ioctl(i, GP0_SET_VALUE,&outputData);
 	usleep(*(int *)time*1000);
-	outputData=0;
+	outputData=S_CLOSE;
 
 	res = ioctl(i, GP0_SET_VALUE,&outputData);
 
 	close(i);
 
 	return(0);
-
 }
 
 int WriteFitsImage(char *filename, int height, int width, u_char * image_p)
@@ -106,18 +119,10 @@ int WriteFitsImage(char *filename, int height, int width, u_char * image_p)
     }
     nelements = naxes[0] * naxes[1];          /* number of pixels to write */
 
-    /* initialize the values in the image with a linear ramp function */
-    /*for (jj = 0; jj < naxes[1]; jj++)
-    {   for (ii = 0; ii < naxes[0]; ii++)
-        {
-            //sarray[jj][ii]=image_p[jj*naxes[1]+ii];
-        }
-    }
-*/
     memcpy(array, image_p, nelements*sizeof(unsigned short));
 
     for (ii=0;ii<nelements;ii++){
-    	if (array[ii] > 65535) array[ii]=65535;
+    		if (array[ii] > 65535) array[ii]=65535;
     }
 
 
@@ -146,7 +151,7 @@ int WriteFitsImage(char *filename, int height, int width, u_char * image_p)
 
     fits_close_file(fptr, &status);                /* close the file */
     if (status != 0) {
-    	fprintf(stderr, "Error: (%s:%s:%d) can not get close image in disk "
+    		fprintf(stderr, "Error: (%s:%s:%d) can not get close image in disk "
     			".\n", __FILE__, __func__, __LINE__);
         	exit(1);
      }
@@ -348,7 +353,7 @@ int main(int argc, char *argv[]){
 		}
     }
 	
-	ret=pthread_create(&id,NULL,(void *) OpenShutter, (void *)&exptime);
+	ret=pthread_create(&id,NULL,(void *) OpenShutterTime, (void *)&exptime);
 
 	(void) edt_dtime();		/* init time for check */
 	pdv_start_images(pdv_p, loops);

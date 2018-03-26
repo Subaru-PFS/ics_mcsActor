@@ -304,7 +304,7 @@ class McsCmd(object):
 
         py.savefig("test1.jpg")
 
-def fakeCentroidOnly(self,cmd):
+    def fakeCentroidOnly(self,cmd):
 
         cmd.inform('state="measuring"')
 
@@ -461,17 +461,78 @@ def fakeCentroidOnly(self,cmd):
         
         homepos=np.frombuffer(c,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
 
+    def _makeTables(self, conn, doDrop=False):
+        """ Create test tables. Someone said 20 measured things. """
+        
+        cmd = '''create table mcsPerFiber (
+        id SERIAL PRIMARY KEY,
+        frameId integer,
+        moveId smallint,
+        fiberId smallint,
+        
+        centroidX real, centroidY real,
+        f1x real, f1y real,
+        f2x real, f2y real,
+        f3x real, f3y real,
+        f4x real, f4y real,
+        f5x real, f5y real,
+        f6x real, f6y real,
+        f7x real, f7y real,
+        f8x real, f8y real,
+        f9x real, f9y real
+        );'''
+    
+        
+        with conn.cursor() as curs:
+            if doDrop:
+                curs.execute('drop table mcsPerFiber')
+            curs.execute(cmd)
+        conn.commit()
+    def _writeCentroids(self, centArr, nextRowId, frameId, moveId, conn=None):
+        """ Write all measurements for a given (frameId, moveId) """
+    
+        # Save measurements to a CSV buffer
+        measBuf = io.StringIO()
+        np.savetxt(measBuf, centArr, delimiter=',', fmt='%0.6g')
+        measBuf.seek(0,0)
+        
+        buf = io.StringIO()
+        for l_i in range(len(centArr)):
+            line = '%d,%d,%d,%d,%s' % (nextRowId + l_i, frameId, moveId, l_i,
+                                       measBuf.readline())
+            buf.write(line)
+        buf.seek(0,0)
+        
+        if conn is not None:
+            with conn.cursor() as curs:
+                curs.copy_from(buf,'mcsPerFiber',',')
+            conn.commit()
+            buf.seek(0,0)
+            
+        return buf
 
-   # def timeTest():
-   #
-   #     expTime=1000.
-   #     expType="object"
-   #     filename, image = self._doExpose(cmd, expTime, expType)
-   #     self.actor.image = image
-   #     
-   #     homepos=np.frombuffer(c,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
+    def _readCentroids(self, conn, frameId, moveId):
+        """ Read all measurements for a given (frameId, moveId)"""
+        buf = io.StringIO()
+    
+        cmd = f"""copy (select * from mcsPerFiber where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
+        with conn.cursor() as curs:
+            curs.copy_expert(cmd, buf)
+        conn.commit()
+        buf.seek(0,0)
+    
+        # Skip the frameId, etc. columns.
+        arr = np.genfromtxt(buf, dtype='f4',
+                            delimiter=',',usecols=range(4,24))
+        return arr
 
-
+    def _writeDBtable(self):
+        conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfspass'")
+        cur = conn.cursor()
+        cur.execute("select * from information_schema.tables where table_name=%s", ('test',))
+        print(bool(cur.rowcount))
+        conn.close()
+        
     def timeTest(self,cmd):
 
 
@@ -500,6 +561,8 @@ def fakeCentroidOnly(self,cmd):
         cmd.inform('text="time = %f." '% ((t2-t1)/20.))
 
         cmd.finish('exposureState=done')
+        
+        
     def seeingTest(self,cmd):
 
         fwhm=3.
