@@ -1,7 +1,8 @@
 from builtins import object
 import numpy
 import time
-import pyfits
+
+import astropy.io.fits as pyfits
 
 class Camera(object):
     pass
