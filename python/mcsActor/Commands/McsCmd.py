@@ -28,17 +28,12 @@ import psycopg2
 import psycopg2.extras
 from xml.etree.ElementTree import dump
 
+import mpfitCentroid.centroid as centroid
 
-sys.path.append("/home/pfs/mhs/devel/ics_mcsActor/python/mcsActor/mpfitCentroid")
-from centroid import get_homes_call
-from centroid import centroid_coarse_call
-from centroid import centroid_fine_call
-from centroid import centroid_only
-
-import pyfits
 import numpy as np
 import pylab as py
-import centroid
+
+matplotlib.use('Agg')
 
 
 class McsCmd(object):
@@ -354,7 +349,7 @@ class McsCmd(object):
 
         cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
 
-        a=get_homes_call(self.actor.image.astype('<i4'))
+        a = centroid.get_homes_call(self.actor.image.astype('<i4'))
         
         #a=get_homes_call(self.actor.image.astype('<i4'))
         homes=np.frombuffer(a,dtype='<f8')
@@ -400,7 +395,7 @@ class McsCmd(object):
 
         #centroid call
         
-        a=get_homes_call(image)
+        a = centroid.get_homes_call(image)
 
         #convert cython output into numpy array
         
@@ -417,7 +412,7 @@ class McsCmd(object):
         
         #Call the centroiding/finding
         
-        b=centroid_coarse_call(image,arc_image,homes)
+        b = centroid.centroid_coarse_call(image,arc_image,homes)
 
         #convert from cython output to numpy typed array
         
@@ -431,7 +426,7 @@ class McsCmd(object):
         expTime=0.5
         image, arc_image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/second_move",1)
 
-        b=centroid_coarse_call(image,arc_image,homes)
+        b = centroid.centroid_coarse_call(image,arc_image,homes)
 
         homepos=np.frombuffer(b,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
 
@@ -455,7 +450,7 @@ class McsCmd(object):
             yp[i]=homepos[i][7]
 
         #and the call
-        c=centroid_fine_call(image,homes,xp,yp)
+        c = centroid.centroid_fine_call(image,homes,xp,yp)
 
         #cython to numpy
         
@@ -551,7 +546,7 @@ class McsCmd(object):
             #filename, image = self._doExpose(cmd, expTime, expType)
             #self.actor.image = image.astype('<i4')
 
-            a=centroid_only(self.actor.image,fwhm,hmin,boxsize)
+            a = centroid.centroid_only(self.actor.image,fwhm,hmin,boxsize)
         
             centroids=np.frombuffer(a,dtype='<f8')
             numpoints=len(centroids)//7
