@@ -45,6 +45,8 @@ class McsCmd(object):
         self.actor = actor
         self.expTime = 1000
 
+        self.simulationPath = (None, None)
+
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -68,6 +70,8 @@ class McsCmd(object):
             ('quickPlot', '', self.quickPlot),
             ('timeTest','',self.timeTest),
             ('seeingTest','',self.seeingTest),
+            ('simulate', 'on <path>', self.simulateOn),
+            ('simulate', 'off', self.simulateOff),
         ]
 
         # Define typed command arguments for the above commands.
@@ -75,6 +79,7 @@ class McsCmd(object):
                                         keys.Key("expTime", types.Float(), help="The exposure time"),
                                         keys.Key("expType", types.String(), help="The exposure type"),
                                         keys.Key("filename", types.String(), help="Image filename"),
+                                        keys.Key("path", types.String(), help="Simulated image directory"),
                                         keys.Key("getArc", types.Int(), help="flag for arc image")
                                         )
 
@@ -101,6 +106,38 @@ class McsCmd(object):
 
         cmd.inform('text="MCS camera present!"')
         cmd.finish()
+
+    def simulateOff(self, cmd):
+        self.simulationPath = None
+
+    def simulateOn(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+
+        path = cmdKeys['path'].values[0]
+
+        if not os.path.isdir(path):
+            cmd.fail('text="path %s is not a directory"' % (path))
+            return
+
+        self.simulationPath = (path, 0)
+        cmd.finish()
+
+    def getNextSimulationImage(self, cmd):
+        import glob
+
+        path, idx = self.simulationPath
+        files = sorted(glob.glob(os.path.join(path, '*.fits')))
+        if len(files) == 0:
+            raise RuntimeError(f"no .fits files in {path}")
+
+        if len(files) > idx+1:
+            idx = 0
+
+        imagePath = files[idx]
+        image = pyfits.getdata(imagePath, 0)
+        self.simulationPath = (path, idx+1)
+
+        return image
 
     def getNextFilename(self, cmd):
         """ Fetch next image filename. 
@@ -168,13 +205,16 @@ class McsCmd(object):
         filename = self.getNextFilename(cmd)
         dummy_filename = self.getNextDummyFilename(cmd)
 
-        
         self.dummy_filename = dummy_filename
-        
-        image = self.actor.camera.expose(cmd, expTime, expType, filename)
+
+        if self.simulationPath is None:
+            image = self.actor.camera.expose(cmd, expTime, expType, filename)
+        else:
+            image = self.getNextSimulationImage(cmd)
+
         pyfits.writeto(dummy_filename, image, checksum=False, clobber=True)
 
-        cmd.inform("filename=%s and dummy file=%s" % (filename, dummy_filename))
+        cmd.inform('filename="%s"; text="dummy file=%s"' % (filename, dummy_filename))
 
         return filename, image
 
