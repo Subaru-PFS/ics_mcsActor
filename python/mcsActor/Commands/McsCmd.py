@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-
-
 from __future__ import print_function
 from builtins import zip
 
@@ -10,8 +8,6 @@ from builtins import object
 import matplotlib
 import matplotlib.pyplot as plt
 import time
-
-matplotlib.use('Agg')
 
 import os
 import base64
