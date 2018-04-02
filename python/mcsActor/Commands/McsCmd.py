@@ -187,17 +187,20 @@ class McsCmd(object):
     
     def dumpCentroidtoDB(self, cmd):
         """Connect to database and return json string to an attribute."""
-        file = open("/home/pfs/mhs/devel/ics_mcsActor/etc/dbpasswd.cfg", "r")
-        passstring = file.read() 
-        cmd.inform('text="Connected to FPS database with pw %s."'%(passstring))
+        try:
+            file = open("/home/pfs/mhs/devel/ics_mcsActor/etc/dbpasswd.cfg", "r")
+            passstring = file.read()
+            cmd.inform('text="Connected to FPS database with pw %s."'%(passstring))
+        except:
+            cmd.warn('text="could not get db password"')
+            return
         try:
             conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password="+passstring)
             cmd.diag('text="Connected to FPS database."')
         except:
-            cmd.diag('text="I am unable to connect to the database."')
-    #        print("I am unable to connect to the database.")
-        #pass        
-        cur = conn.cursor()
+            cmd.warn('text="I am unable to connect to the database."')
+        #pass
+        #cur = conn.cursor()
     
     def _doMockExpose(self, cmd, expTime, expType):
         """ Take an exposure and save it to disk. """
@@ -277,7 +280,7 @@ class McsCmd(object):
         #plt.savefig('foo.pdf')
         #plt.show()
         basename=filename[0:37]
-        self.imageStats(cmd, basename)
+        self.imageStats(cmd, basename, doFinish=False)
         
         self.dumpCentroidtoDB(cmd)
         cmd.finish('exposureState=done')
@@ -336,15 +339,15 @@ class McsCmd(object):
         # Actually, we want dtype,naxis,axNlen,base64(array)
         return base64.b64encode(array.tostring())
 
-    def imageStats(self, cmd, basename):
+    def imageStats(self, cmd, basename, doFinish=True):
 
         cmd.inform('text="image median = %d." '% (np.median(self.actor.image))) 
         cmd.inform('text="image mean = %d." '% (self.actor.image.mean())) 
         cmd.inform('text="image min = %d." '% (self.actor.image.min())) 
         cmd.inform('text="image max = %d." '% (self.actor.image.max()))
 
-        
-        cmd.finish('Statistics Calculated')
+        if doFinish:
+            cmd.finish('Statistics Calculated')
         
     def quickPlot(self,cmd):
         py.clf()
