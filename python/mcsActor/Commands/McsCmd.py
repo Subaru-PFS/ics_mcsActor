@@ -143,14 +143,32 @@ class McsCmd(object):
 
         """
 
-        self.actor.exposureID += 1
+        ret = self.actor.cmdr.call(actor='gen2', cmdStr='getFrameId', timeLim=3.0)
+        if ret.didFail:
+            raise RuntimeError("getNextFilename failed!")
+
+        self.actor.exposureID = self.actor.models['gen2'].keyVarDict['frameid'].valueList[0]
+
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
         path = os.path.expandvars(os.path.expanduser(path))
 
         if not os.path.isdir(path):
             os.makedirs(path, 0o755)
             
-        return os.path.join(path, 'MCSA%010d.fits' % (self.actor.exposureID))
+        return os.path.join(path, 'PFSC%06d00.fits' % (self.actor.exposureID))
+
+    def _constructHeader(self, expType, expTime):
+        ret = self.actor.cmdr.call(actor='gen2',
+                                   cmdStr=f'getFitsCards \
+                                            frameid={self.actor.exposureID} \
+                                            expType={expType} expTime={expTime}',
+                                   timeLim=3.0)
+        if ret.didFail:
+            raise RuntimeError("getFitsCards failed!")
+
+        hdr = self.actor.models['gen2'].keyVarDict['header'].valueList[0]
+
+        return pyfits.Header.fromstring(hdr)
 
     def getNextDummyFilename(self, cmd):
         """ Fetch next image filename. 
@@ -158,8 +176,7 @@ class McsCmd(object):
         In real life, we will instantiate a Subaru-compliant image pathname generating object.  
 
         """
-        
-        #self.actor.exposureID += 1
+
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
         path = os.path.expandvars(os.path.expanduser(path))
 
@@ -195,23 +212,25 @@ class McsCmd(object):
         cmd.inform("filename=%s " % (filename))
 
         return filename, image
-   
+
     def _doExpose(self, cmd, expTime, expType):
         """ Take an exposure and save it to disk. """
 
         filename = self.getNextFilename(cmd)
-        dummy_filename = self.getNextDummyFilename(cmd)
-
-        self.dummy_filename = dummy_filename
 
         if self.simulationPath is None:
-            image = self.actor.camera.expose(cmd, expTime, expType, filename)
+            image = self.actor.camera.expose(cmd, expTime, expType)
         else:
             image = self.getNextSimulationImage(cmd)
 
-        pyfits.writeto(dummy_filename, image, checksum=False, clobber=True)
+        hdr = self._constructHeader(expType, expTime)
+        phdu = pyfits.PrimaryHDU(header=hdr)
+        imgHdu = pyfits.CompImageHDU(image, compression_type='GZIP_2')
+        hduList = pyfits.HDUList([phdu, imgHdu])
 
-        cmd.inform('filename="%s"; text="dummy file=%s"' % (filename, dummy_filename))
+        hduList.writeto(filename, checksum=False, overwrite=True)
+
+        cmd.inform('filename="%s"' % (filename))
 
         return filename, image
 
