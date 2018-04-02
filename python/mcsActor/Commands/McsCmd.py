@@ -41,7 +41,7 @@ class McsCmd(object):
         self.actor = actor
         self.expTime = 1000
 
-        self.simulationPath = (None, None)
+        self.simulationPath = None
 
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -105,6 +105,7 @@ class McsCmd(object):
 
     def simulateOff(self, cmd):
         self.simulationPath = None
+        cmd.finish('text="set simulation path to %s"' % str(self.simulationPath))
 
     def simulateOn(self, cmd):
         cmdKeys = cmd.cmd.keywords
@@ -116,7 +117,7 @@ class McsCmd(object):
             return
 
         self.simulationPath = (path, 0)
-        cmd.finish()
+        cmd.finish('text="set simulation path to %s"' % str(self.simulationPath))
 
     def getNextSimulationImage(self, cmd):
         import glob
