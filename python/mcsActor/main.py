@@ -12,7 +12,8 @@ class Mcs(actorcore.Actor.Actor):
         # This sets up the connections to/from the hub, the logger, and the twisted reactor.
         #
         actorcore.Actor.Actor.__init__(self, name, 
-                                       productName=productName, 
+                                       productName=productName,
+                                       modelNames=('gen2',),
                                        configFile=configFile)
 
         # We will actually use a allocator with "global" sequencing
