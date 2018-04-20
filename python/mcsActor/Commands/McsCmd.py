@@ -143,11 +143,11 @@ class McsCmd(object):
 
         """
 
-        ret = self.actor.cmdr.call(actor='gen2', cmdStr='getFrameId', timeLim=3.0)
+        ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit', timeLim=10.0)
         if ret.didFail:
             raise RuntimeError("getNextFilename failed!")
 
-        self.actor.exposureID = self.actor.models['gen2'].keyVarDict['frameid'].valueList[0]
+        self.actor.exposureID = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
 
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
         path = os.path.expandvars(os.path.expanduser(path))
