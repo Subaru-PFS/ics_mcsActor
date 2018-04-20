@@ -228,7 +228,7 @@ class McsCmd(object):
 
         hdr = self._constructHeader(expType, expTime)
         phdu = pyfits.PrimaryHDU(header=hdr)
-        imgHdu = pyfits.CompImageHDU(image, compression_type='GZIP_2')
+        imgHdu = pyfits.CompImageHDU(image, compression_type='RICE_1')
         hduList = pyfits.HDUList([phdu, imgHdu])
 
         hduList.writeto(filename, checksum=False, overwrite=True)
