@@ -66,7 +66,7 @@ class McsCmd(object):
             ('quickPlot', '', self.quickPlot),
             ('timeTest','',self.timeTest),
             ('seeingTest','',self.seeingTest),
-            ('simulate', 'on <path>', self.simulateOn),
+            ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
         ]
 
