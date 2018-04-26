@@ -16,7 +16,7 @@ LDFLAGS += $(ALL_CFLAGS) -L. -L/opt/EDTpdv/ -L/usr/local/lib  -I/cfht/include -I
 LDLIBS += -lpdv -lpthread -lm -ldl -lcfitsio
 
 
-TARGET =  canonexp shutter canoninit
+TARGET =  canonexp shutter canoninit.sh shutterinit.sh
 CONFIG =  canon-8960x5778.cfg
 
 %.o : %.c
