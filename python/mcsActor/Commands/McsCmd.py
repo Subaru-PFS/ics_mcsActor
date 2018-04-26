@@ -30,7 +30,7 @@ import mpfitCentroid.centroid as centroid
 import numpy as np
 import pylab as py
 
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 
 
 class McsCmd(object):
@@ -149,8 +149,13 @@ class McsCmd(object):
 
         self.actor.exposureID = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
 
-        path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
-        path = os.path.expandvars(os.path.expanduser(path))
+        # Commissioning hack:
+        #
+        if True:
+            path = "/data/mcs"
+        else:
+            path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
+            path = os.path.expandvars(os.path.expanduser(path))
 
         if not os.path.isdir(path):
             os.makedirs(path, 0o755)
@@ -220,11 +225,12 @@ class McsCmd(object):
         """ Take an exposure and save it to disk. """
 
         filename = self.getNextFilename(cmd)
-
+        cmd.diag(f'text="new expose: {filename}"')
         if self.simulationPath is None:
-            image = self.actor.camera.expose(cmd, expTime, expType)
+            image = self.actor.camera.expose(cmd, expTime, expType, filename)
         else:
             image = self.getNextSimulationImage(cmd)
+        cmd.diag(f'text="done: {image.shape}"')
 
         hdr = self._constructHeader(expType, expTime)
         phdu = pyfits.PrimaryHDU(header=hdr)
@@ -280,9 +286,9 @@ class McsCmd(object):
         #plt.savefig('foo.pdf')
         #plt.show()
         basename=filename[0:37]
-        self.imageStats(cmd, basename, doFinish=False)
+        #self.imageStats(cmd, basename, doFinish=False)
         
-        self.dumpCentroidtoDB(cmd)
+        #self.dumpCentroidtoDB(cmd)
         cmd.finish('exposureState=done')
 
 
