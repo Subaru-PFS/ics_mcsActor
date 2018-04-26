@@ -223,7 +223,6 @@ class McsCmd(object):
 
         filename = self.getNextFilename(cmd)
 
-
         if self.simulationPath is None:
             image = self.actor.camera.expose(cmd, expTime, expType)
         else:
@@ -625,9 +624,9 @@ class McsCmd(object):
         t2=time.time()
         cmd.inform('text="time = %f." '% ((t2-t1)/1.))
 
-        #pyfits.writeto(dummy_filename, image, checksum=False, clobber=True)
+        hduList.writeto(filename, checksum=False, overwrite=True)
 
-        cmd.inform("filename=%s and dummy file=%s" % (filename, dummy_filename))
+        cmd.inform('filename="%s"' % (filename))
 
         return filename, image
 
@@ -674,7 +673,7 @@ class McsCmd(object):
         #plt.savefig('foo.pdf')
         #plt.show()
         basename=filename[0:37]
-        self.imageStats(cmd, basename)
+        self.imageStats(cmd, basename, doFinish=False)
         
         self.dumpCentroidtoDB(cmd)
         cmd.finish('exposureState=done')
@@ -733,15 +732,15 @@ class McsCmd(object):
         # Actually, we want dtype,naxis,axNlen,base64(array)
         return base64.b64encode(array.tostring())
 
-    def imageStats(self, cmd, basename):
+    def imageStats(self, cmd, basename, doFinish=True):
 
         cmd.inform('text="image median = %d." '% (np.median(self.actor.image))) 
         cmd.inform('text="image mean = %d." '% (self.actor.image.mean())) 
         cmd.inform('text="image min = %d." '% (self.actor.image.min())) 
         cmd.inform('text="image max = %d." '% (self.actor.image.max()))
 
-        
-        cmd.finish('Statistics Calculated')
+        if doFinish:
+            cmd.finish('Statistics Calculated')
         
     def quickPlot(self,cmd):
         py.clf()
@@ -802,7 +801,7 @@ class McsCmd(object):
 
         cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
 
-        a=get_homes_call(self.actor.image.astype('<i4'))
+        a = centroid.get_homes_call(self.actor.image.astype('<i4'))
         
         #a=get_homes_call(self.actor.image.astype('<i4'))
         homes=np.frombuffer(a,dtype='<f8')
@@ -848,7 +847,7 @@ class McsCmd(object):
 
         #centroid call
         
-        a=get_homes_call(image)
+        a = centroid.get_homes_call(image)
 
         #convert cython output into numpy array
         
@@ -865,7 +864,7 @@ class McsCmd(object):
         
         #Call the centroiding/finding
         
-        b=centroid_coarse_call(image,arc_image,homes)
+        b = centroid.centroid_coarse_call(image,arc_image,homes)
 
         #convert from cython output to numpy typed array
         
@@ -879,7 +878,7 @@ class McsCmd(object):
         expTime=0.5
         image, arc_image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/second_move",1)
 
-        b=centroid_coarse_call(image,arc_image,homes)
+        b = centroid.centroid_coarse_call(image,arc_image,homes)
 
         homepos=np.frombuffer(b,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
 
@@ -903,7 +902,7 @@ class McsCmd(object):
             yp[i]=homepos[i][7]
 
         #and the call
-        c=centroid_fine_call(image,homes,xp,yp)
+        c = centroid.centroid_fine_call(image,homes,xp,yp)
 
         #cython to numpy
         
