@@ -6,7 +6,6 @@ import astropy.io.fits as pyfits
 import os
 import shutil
 
-
 class Camera(object):
     pass
 
@@ -68,22 +67,28 @@ class mcsCamera(Camera):
         if expType not in ('bias', 'test') and expTime > 0:
             pass
             
-
+        t1=time.time()
         # Command camera to do exposure sequence
         slicename=filename[0:37]+'_'
         cmd.inform('text="slice name: %s"' % (slicename))
-        p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],stdout=sub.PIPE,stderr=sub.PIPE)
+        p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
         output, errors = p.communicate()
+	#cmd.inform(stdout)
+        t2=time.time()
         if (output == 'done'):
             cmd.inform('exposureState="done"')       
 
         if cmd:
             cmd.inform('exposureState="image reading"')
+
         
         shutil.copy('/home/pfs/mhs/devel/ics_mcsActor/coadd.fits', filename)
         f = pyfits.open('/home/pfs/mhs/devel/ics_mcsActor/coadd.fits')
               
         image = f[0].data
+        t3=time.time()
+        cmd.inform('text="ttime = %f." '% ((t2-t1)/1.))
+        cmd.inform('text="ttime = %f." '% ((t3-t2)/1.))
 
         return image
         
