@@ -12,7 +12,8 @@ class Mcs(actorcore.Actor.Actor):
         # This sets up the connections to/from the hub, the logger, and the twisted reactor.
         #
         actorcore.Actor.Actor.__init__(self, name, 
-                                       productName=productName, 
+                                       productName=productName,
+                                       modelNames=('gen2',),
                                        configFile=configFile)
 
         # We will actually use a allocator with "global" sequencing
@@ -23,8 +24,13 @@ class Mcs(actorcore.Actor.Actor):
     def connectCamera(self, cmd, doFinish=True):
 
         reload(mcsCamera)
-        self.camera = mcsCamera.mcsCamera()
-        #self.camera = fakeCamera.FakeCamera()
+        try:
+            self.camera = mcsCamera.mcsCamera()
+            cmd.info('text="loaded real MCS camera"')
+        except Exception as e:
+            cmd.warn('text="failed to load MCS camera, loading fakeCamera: %s"' % (e))
+            self.camera = fakeCamera.FakeCamera()
+
         self.camera.sendStatusKeys(cmd)
         self.camera.initialCamera(cmd)
 #

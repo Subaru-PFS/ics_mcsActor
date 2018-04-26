@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-
-
 from __future__ import print_function
 from builtins import zip
 
@@ -11,8 +9,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import time
 import io
-
-matplotlib.use('Agg')
 
 import os
 import base64
@@ -29,17 +25,12 @@ import psycopg2
 import psycopg2.extras
 from xml.etree.ElementTree import dump
 
+import mpfitCentroid.centroid as centroid
 
-sys.path.append("/home/pfs/mhs/devel/ics_mcsActor/python/mcsActor/mpfitCentroid")
-from centroid import get_homes_call
-from centroid import centroid_coarse_call
-from centroid import centroid_fine_call
-from centroid import centroid_only
-
-import pyfits
 import numpy as np
 import pylab as py
-import centroid
+
+matplotlib.use('Agg')
 
 
 class McsCmd(object):
@@ -50,6 +41,8 @@ class McsCmd(object):
         # This lets us access the rest of the actor.
         self.actor = actor
         self.expTime = 1000
+
+        self.simulationPath = None
 
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -75,6 +68,8 @@ class McsCmd(object):
             ('timeTest','',self.timeTest),
             ('timeTestFull','',self.timeTestFull),
             ('seeingTest','',self.seeingTest),
+            ('simulate', '<path>', self.simulateOn),
+            ('simulate', 'off', self.simulateOff),
         ]
 
         # Define typed command arguments for the above commands.
@@ -82,6 +77,7 @@ class McsCmd(object):
                                         keys.Key("expTime", types.Float(), help="The exposure time"),
                                         keys.Key("expType", types.String(), help="The exposure type"),
                                         keys.Key("filename", types.String(), help="Image filename"),
+                                        keys.Key("path", types.String(), help="Simulated image directory"),
                                         keys.Key("getArc", types.Int(), help="flag for arc image")
                                         )
 
@@ -109,6 +105,39 @@ class McsCmd(object):
         cmd.inform('text="MCS camera present!"')
         cmd.finish()
 
+    def simulateOff(self, cmd):
+        self.simulationPath = None
+        cmd.finish('text="set simulation path to %s"' % str(self.simulationPath))
+
+    def simulateOn(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+
+        path = cmdKeys['path'].values[0]
+
+        if not os.path.isdir(path):
+            cmd.fail('text="path %s is not a directory"' % (path))
+            return
+
+        self.simulationPath = (path, 0)
+        cmd.finish('text="set simulation path to %s"' % str(self.simulationPath))
+
+    def getNextSimulationImage(self, cmd):
+        import glob
+
+        path, idx = self.simulationPath
+        files = sorted(glob.glob(os.path.join(path, '*.fits')))
+        if len(files) == 0:
+            raise RuntimeError(f"no .fits files in {path}")
+
+        if len(files) > idx+1:
+            idx = 0
+
+        imagePath = files[idx]
+        image = pyfits.getdata(imagePath, 0)
+        self.simulationPath = (path, idx+1)
+
+        return image
+
     def getNextFilename(self, cmd):
         """ Fetch next image filename. 
 
@@ -116,14 +145,32 @@ class McsCmd(object):
 
         """
 
-        self.actor.exposureID += 1
+        ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit', timeLim=10.0)
+        if ret.didFail:
+            raise RuntimeError("getNextFilename failed!")
+
+        self.actor.exposureID = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
+
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
         path = os.path.expandvars(os.path.expanduser(path))
 
         if not os.path.isdir(path):
             os.makedirs(path, 0o755)
             
-        return os.path.join(path, 'MCSA%010d.fits' % (self.actor.exposureID))
+        return os.path.join(path, 'PFSC%06d00.fits' % (self.actor.exposureID))
+
+    def _constructHeader(self, expType, expTime):
+        ret = self.actor.cmdr.call(actor='gen2',
+                                   cmdStr=f'getFitsCards \
+                                            frameid={self.actor.exposureID} \
+                                            expType={expType} expTime={expTime}',
+                                   timeLim=3.0)
+        if ret.didFail:
+            raise RuntimeError("getFitsCards failed!")
+
+        hdr = self.actor.models['gen2'].keyVarDict['header'].valueList[0]
+
+        return pyfits.Header.fromstring(hdr)
 
     def getNextDummyFilename(self, cmd):
         """ Fetch next image filename. 
@@ -131,8 +178,7 @@ class McsCmd(object):
         In real life, we will instantiate a Subaru-compliant image pathname generating object.  
 
         """
-        
-        #self.actor.exposureID += 1
+
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
         path = os.path.expandvars(os.path.expanduser(path))
 
@@ -143,17 +189,20 @@ class McsCmd(object):
     
     def dumpCentroidtoDB(self, cmd):
         """Connect to database and return json string to an attribute."""
-        file = open("/home/pfs/mhs/devel/ics_mcsActor/etc/dbpasswd.cfg", "r")
-        passstring = file.read() 
-        cmd.inform('text="Connected to FPS database with pw %s."'%(passstring))
+        try:
+            file = open("/home/pfs/mhs/devel/ics_mcsActor/etc/dbpasswd.cfg", "r")
+            passstring = file.read()
+            cmd.inform('text="Connected to FPS database with pw %s."'%(passstring))
+        except:
+            cmd.warn('text="could not get db password"')
+            return
         try:
             conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password="+passstring)
             cmd.diag('text="Connected to FPS database."')
         except:
-            cmd.diag('text="I am unable to connect to the database."')
-    #        print("I am unable to connect to the database.")
-        #pass        
-        cur = conn.cursor()
+            cmd.warn('text="I am unable to connect to the database."')
+        #pass
+        #cur = conn.cursor()
     
     def _doMockExpose(self, cmd, expTime, expType):
         """ Take an exposure and save it to disk. """
@@ -168,24 +217,26 @@ class McsCmd(object):
         cmd.inform("filename=%s " % (filename))
 
         return filename, image
-   
+
     def _doExpose(self, cmd, expTime, expType):
         """ Take an exposure and save it to disk. """
 
         filename = self.getNextFilename(cmd)
-        dummy_filename = self.getNextDummyFilename(cmd)
 
-        
-        self.dummy_filename = dummy_filename
 
-        t1=time.time()
-        image = self.actor.camera.expose(cmd, expTime, expType, filename)
-        t2=time.time()
-        cmd.inform('text="subtime = %f." '% ((t2-t1)/1.))
+        if self.simulationPath is None:
+            image = self.actor.camera.expose(cmd, expTime, expType)
+        else:
+            image = self.getNextSimulationImage(cmd)
 
-        #pyfits.writeto(dummy_filename, image, checksum=False, clobber=True)
+        hdr = self._constructHeader(expType, expTime)
+        phdu = pyfits.PrimaryHDU(header=hdr)
+        imgHdu = pyfits.CompImageHDU(image, compression_type='RICE_1')
+        hduList = pyfits.HDUList([phdu, imgHdu])
 
-        cmd.inform("filename=%s and dummy file=%s" % (filename, dummy_filename))
+        hduList.writeto(filename, checksum=False, overwrite=True)
+
+        cmd.inform('filename="%s"' % (filename))
 
         return filename, image
 
@@ -232,7 +283,7 @@ class McsCmd(object):
         #plt.savefig('foo.pdf')
         #plt.show()
         basename=filename[0:37]
-        self.imageStats(cmd, basename)
+        self.imageStats(cmd, basename, doFinish=False)
         
         self.dumpCentroidtoDB(cmd)
         cmd.finish('exposureState=done')
@@ -291,15 +342,15 @@ class McsCmd(object):
         # Actually, we want dtype,naxis,axNlen,base64(array)
         return base64.b64encode(array.tostring())
 
-    def imageStats(self, cmd, basename):
+    def imageStats(self, cmd, basename, doFinish=True):
 
         cmd.inform('text="image median = %d." '% (np.median(self.actor.image))) 
         cmd.inform('text="image mean = %d." '% (self.actor.image.mean())) 
         cmd.inform('text="image min = %d." '% (self.actor.image.min())) 
         cmd.inform('text="image max = %d." '% (self.actor.image.max()))
 
-        
-        cmd.finish('Statistics Calculated')
+        if doFinish:
+            cmd.finish('Statistics Calculated')
         
     def quickPlot(self,cmd):
         py.clf()
@@ -360,7 +411,7 @@ class McsCmd(object):
 
         cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
 
-        a=get_homes_call(self.actor.image.astype('<i4'))
+        a = centroid.get_homes_call(self.actor.image.astype('<i4'))
         
         #a=get_homes_call(self.actor.image.astype('<i4'))
         homes=np.frombuffer(a,dtype='<f8')
@@ -406,7 +457,7 @@ class McsCmd(object):
 
         #centroid call
         
-        a=get_homes_call(image)
+        a = centroid.get_homes_call(image)
 
         #convert cython output into numpy array
         
@@ -423,7 +474,7 @@ class McsCmd(object):
         
         #Call the centroiding/finding
         
-        b=centroid_coarse_call(image,arc_image,homes)
+        b = centroid.centroid_coarse_call(image,arc_image,homes)
 
         #convert from cython output to numpy typed array
         
@@ -437,7 +488,7 @@ class McsCmd(object):
         expTime=0.5
         image, arc_image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/second_move",1)
 
-        b=centroid_coarse_call(image,arc_image,homes)
+        b = centroid.centroid_coarse_call(image,arc_image,homes)
 
         homepos=np.frombuffer(b,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
 
@@ -461,7 +512,7 @@ class McsCmd(object):
             yp[i]=homepos[i][7]
 
         #and the call
-        c=centroid_fine_call(image,homes,xp,yp)
+        c = centroid.centroid_fine_call(image,homes,xp,yp)
 
         #cython to numpy
         
@@ -985,7 +1036,7 @@ class McsCmd(object):
             #filename, image = self._doExpose(cmd, expTime, expType)
             #self.actor.image = image.astype('<i4')
 
-            a=centroid_only(self.actor.image,fwhm,hmin,boxsize)
+            a = centroid.centroid_only(self.actor.image,fwhm,hmin,boxsize)
         
             centroids=np.frombuffer(a,dtype='<f8')
             numpoints=len(centroids)//7
