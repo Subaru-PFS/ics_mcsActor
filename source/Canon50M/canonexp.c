@@ -379,7 +379,7 @@ int main(int argc, char *argv[]){
 		sprintf(string,"%s%04i%s",file,i+1,".fits");
 
 		//process and/or display image previously acquired here
-		WriteFitsImage(string, s_height, s_width,bufs[i]);
+		//WriteFitsImage(string, s_height, s_width,bufs[i]);
 
 		if (verbose){
 			save_ts=getClockTime();;

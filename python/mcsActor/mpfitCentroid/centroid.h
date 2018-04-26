@@ -30,7 +30,7 @@ double calculate_round(int *image,int *mask, int nhalf, int ix, int iy, int n_x,
 
 int *get_data(char *filename,long *n_x,long *n_y);
 
-struct centroids *centroid(int *image, int n_x, int n_y, double hmin, double fwhm,int boxsize,int *np,int VERBOSE,int fittype);  /* function declaration */
+struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,int boxsize,int *np,int VERBOSE,int fittype);  /* function declaration */
 
 #endif // centroid_H_
 
