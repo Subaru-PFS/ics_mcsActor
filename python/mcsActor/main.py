@@ -13,7 +13,7 @@ class Mcs(actorcore.ICC.ICC):
         #
         super().__init__(name, 
                          productName=productName,
-                         modelNames=('meb','mcs'),
+                         modelNames=('gen2','meb','mcs'),
                          configFile=configFile)
 
         # We will actually use a allocator with "global" sequencing

@@ -168,6 +168,8 @@ class McsCmd(object):
         return os.path.join(path, 'PFSC%06d00.fits' % (self.actor.exposureID))
 
     def _getInstHeader(self, cmd):
+        """ Gather FITS cards from all actors we are interested in. """
+
         cards = fitsUtils.gatherHeaderCards(cmd, self.actor, shortNames=True)
 
         # Until we convert to fitsio, convert cards to pyfits
@@ -182,10 +184,12 @@ class McsCmd(object):
         return pycards
 
     def _constructHeader(self, cmd, expType, expTime):
+        if expType == 'bias':
+            expTime = 0.0
         ret = self.actor.cmdr.call(actor='gen2',
                                    cmdStr=f'getFitsCards \
                                             frameid={self.actor.exposureID} \
-                                            expType={expType} expTime={expTime}',
+                                            expType={expType} expTime={expTime/1000.0}',
                                    timeLim=3.0)
         if ret.didFail:
             raise RuntimeError("getFitsCards failed!")
