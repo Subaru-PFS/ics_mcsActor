@@ -25,7 +25,10 @@ import psycopg2
 import psycopg2.extras
 from xml.etree.ElementTree import dump
 
-import mpfitCentroid.centroid as centroid
+try:
+    import mpfitCentroid.centroid as centroid
+except:
+    pass
 
 import numpy as np
 import pylab as py
@@ -63,7 +66,7 @@ class McsCmd(object):
             ('reconnect', '', self.reconnect),
             ('imageStats', '', self.imageStats),
             ('quickPlot', '', self.quickPlot),
-            ('timeTest','',self.timeTest),
+            #('timeTest','',self.timeTest),
             ('timeTestFull','',self.timeTestFull),
             ('seeingTest','',self.seeingTest),
             ('simulate', '<path>', self.simulateOn),
@@ -154,7 +157,7 @@ class McsCmd(object):
         if True:
             path = "/data/mcs"
         else:
-            path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
+            path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d'))
             path = os.path.expandvars(os.path.expanduser(path))
 
         if not os.path.isdir(path):
