@@ -14,18 +14,23 @@ import os
 import base64
 import numpy
 import astropy.io.fits as pyfits
+import fitsio
 import sys
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 
+from actorcore.utility import fits as fitsUtils
 from opscore.utility.qstr import qstr
 
 import psycopg2
 import psycopg2.extras
 from xml.etree.ElementTree import dump
 
-import mpfitCentroid.centroid as centroid
+try:
+    import mpfitCentroid.centroid as centroid
+except:
+    pass
 
 import numpy as np
 import pylab as py
@@ -63,7 +68,7 @@ class McsCmd(object):
             ('reconnect', '', self.reconnect),
             ('imageStats', '', self.imageStats),
             ('quickPlot', '', self.quickPlot),
-            ('timeTest','',self.timeTest),
+            #('timeTest','',self.timeTest),
             ('timeTestFull','',self.timeTestFull),
             ('seeingTest','',self.seeingTest),
             ('simulate', '<path>', self.simulateOn),
@@ -152,9 +157,9 @@ class McsCmd(object):
         # Commissioning hack:
         #
         if True:
-            path = "/data/mcs"
+            path = os.path.join("/data/mcs", time.strftime('%Y-%m-%d'))
         else:
-            path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
+            path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d'))
             path = os.path.expandvars(os.path.expanduser(path))
 
         if not os.path.isdir(path):
@@ -162,18 +167,43 @@ class McsCmd(object):
             
         return os.path.join(path, 'PFSC%06d00.fits' % (self.actor.exposureID))
 
-    def _constructHeader(self, expType, expTime):
+    def _getInstHeader(self, cmd):
+        """ Gather FITS cards from all actors we are interested in. """
+
+        cards = fitsUtils.gatherHeaderCards(cmd, self.actor, shortNames=True)
+
+        # Until we convert to fitsio, convert cards to pyfits
+        pycards = []
+        for c in cards:
+            if isinstance(c, str):
+                pcard = 'COMMENT', c
+            else:
+                pcard = c['name'], c['value'], c.get('comment', '')
+            pycards.append(pcard)
+
+        return pycards
+
+    def _constructHeader(self, cmd, expType, expTime):
+        if expType == 'bias':
+            expTime = 0.0
         ret = self.actor.cmdr.call(actor='gen2',
                                    cmdStr=f'getFitsCards \
                                             frameid={self.actor.exposureID} \
-                                            expType={expType} expTime={expTime}',
+                                            expType={expType} expTime={expTime/1000.0}',
                                    timeLim=3.0)
         if ret.didFail:
             raise RuntimeError("getFitsCards failed!")
 
-        hdr = self.actor.models['gen2'].keyVarDict['header'].valueList[0]
+        hdrString = self.actor.models['gen2'].keyVarDict['header'].valueList[0]
+        hdr = pyfits.Header.fromstring(hdrString)
 
-        return pyfits.Header.fromstring(hdr)
+        try:
+            instCards = self._getInstHeader(cmd)
+            hdr.extend(instCards, bottom=True)
+        except Exception as e:
+            cmd.warn(f'text="FAILED to gather MEB cards: {e}"')
+
+        return hdr
 
     def getNextDummyFilename(self, cmd):
         """ Fetch next image filename. 
@@ -232,7 +262,7 @@ class McsCmd(object):
             image = self.getNextSimulationImage(cmd)
         cmd.diag(f'text="done: {image.shape}"')
 
-        hdr = self._constructHeader(expType, expTime)
+        hdr = self._constructHeader(cmd, expType, expTime)
         phdu = pyfits.PrimaryHDU(header=hdr)
         imgHdu = pyfits.CompImageHDU(image, compression_type='RICE_1')
         hduList = pyfits.HDUList([phdu, imgHdu])
