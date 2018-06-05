@@ -157,7 +157,7 @@ class McsCmd(object):
         # Commissioning hack:
         #
         if True:
-            path = "/data/mcs"
+            path = os.path.join("/data/mcs", time.strftime('%Y-%m-%d'))
         else:
             path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d'))
             path = os.path.expandvars(os.path.expanduser(path))
