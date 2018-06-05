@@ -26,13 +26,14 @@ class Mcs(actorcore.ICC.ICC):
         reload(mcsCamera)
         try:
             self.camera = mcsCamera.mcsCamera()
+            self.camera.initialCamera(cmd)
             cmd.inform('text="loaded real MCS camera"')
         except Exception as e:
             cmd.warn('text="failed to load MCS camera, loading fakeCamera: %s"' % (e))
             self.camera = fakeCamera.FakeCamera()
+            self.camera.initialCamera(cmd)
 
         self.camera.sendStatusKeys(cmd)
-        self.camera.initialCamera(cmd)
 #
 # To work
 
