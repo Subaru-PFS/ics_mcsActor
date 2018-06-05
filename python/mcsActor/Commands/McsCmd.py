@@ -14,11 +14,13 @@ import os
 import base64
 import numpy
 import astropy.io.fits as pyfits
+import fitsio
 import sys
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 
+from actorcore.utility import fits as fitsUtils
 from opscore.utility.qstr import qstr
 
 import psycopg2
@@ -165,7 +167,21 @@ class McsCmd(object):
             
         return os.path.join(path, 'PFSC%06d00.fits' % (self.actor.exposureID))
 
-    def _constructHeader(self, expType, expTime):
+    def _getInstHeader(self, cmd):
+        cards = fitsUtils.gatherHeaderCards(cmd, self.actor, shortNames=True)
+
+        # Until we convert to fitsio, convert cards to pyfits
+        pycards = []
+        for c in cards:
+            if isinstance(c, str):
+                pcard = 'COMMENT', c
+            else:
+                pcard = c['name'], c['value'], c.get('comment', '')
+            pycards.append(pcard)
+
+        return pycards
+
+    def _constructHeader(self, cmd, expType, expTime):
         ret = self.actor.cmdr.call(actor='gen2',
                                    cmdStr=f'getFitsCards \
                                             frameid={self.actor.exposureID} \
@@ -174,9 +190,16 @@ class McsCmd(object):
         if ret.didFail:
             raise RuntimeError("getFitsCards failed!")
 
-        hdr = self.actor.models['gen2'].keyVarDict['header'].valueList[0]
+        hdrString = self.actor.models['gen2'].keyVarDict['header'].valueList[0]
+        hdr = pyfits.Header.fromstring(hdrString)
 
-        return pyfits.Header.fromstring(hdr)
+        try:
+            instCards = self._getInstHeader(cmd)
+            hdr.extend(instCards, bottom=True)
+        except Exception as e:
+            cmd.warn(f'text="FAILED to gather MEB cards: {e}"')
+
+        return hdr
 
     def getNextDummyFilename(self, cmd):
         """ Fetch next image filename. 
@@ -235,7 +258,7 @@ class McsCmd(object):
             image = self.getNextSimulationImage(cmd)
         cmd.diag(f'text="done: {image.shape}"')
 
-        hdr = self._constructHeader(expType, expTime)
+        hdr = self._constructHeader(cmd, expType, expTime)
         phdu = pyfits.PrimaryHDU(header=hdr)
         imgHdu = pyfits.CompImageHDU(image, compression_type='RICE_1')
         hduList = pyfits.HDUList([phdu, imgHdu])

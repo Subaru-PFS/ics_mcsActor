@@ -1,20 +1,20 @@
 #!/usr/bin/env python
 
 from __future__ import absolute_import
-import actorcore.Actor
+import actorcore.ICC
 import aitCamera
 import mcsCamera
 import fakeCamera
 from past.builtins import reload
 
-class Mcs(actorcore.Actor.Actor):
+class Mcs(actorcore.ICC.ICC):
     def __init__(self, name, productName=None, configFile=None, debugLevel=30):
         # This sets up the connections to/from the hub, the logger, and the twisted reactor.
         #
-        actorcore.Actor.Actor.__init__(self, name, 
-                                       productName=productName,
-                                       modelNames=('gen2',),
-                                       configFile=configFile)
+        super().__init__(name, 
+                         productName=productName,
+                         modelNames=('meb','mcs'),
+                         configFile=configFile)
 
         # We will actually use a allocator with "global" sequencing
         self.exposureID = 0
