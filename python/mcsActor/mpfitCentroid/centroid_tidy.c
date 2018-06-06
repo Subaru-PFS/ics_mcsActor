@@ -87,14 +87,14 @@ void* subimage_Thread(void *arg)
   roundlim[1]=((struct thread_data*)arg)->roundlim[1];
   struct cand_point *cand_head=((struct thread_data*)arg)->cand_list;  //output list of found points
   int fittype=((struct thread_data*)arg)->fittype;
-  int VERBOSE=((struct thread_data*)arg)->VERBOSE;
+  int verbose=((struct thread_data*)arg)->verbose;
 
   double sharp, around;
   int ix,iy;
   int hpoint=(boxsize-1)/2;
 
 
-  if(VERBOSE == 1)
+  if(verbose == 1)
     {
       printf("In Thread\n"); 
       printf("Starting Processing\n"); 
@@ -106,10 +106,10 @@ void* subimage_Thread(void *arg)
   //set up the image mask
 
   //make the mask and do the convolution
-  imagemask=make_mask(image,nbox,n_x,n_y,hmin,VERBOSE);
-  h=convol_sep(image,imagemask,gx,n_x,n_y,nbox,VERBOSE);
+  imagemask=make_mask(image,nbox,n_x,n_y,hmin,verbose);
+  h=convol_sep(image,imagemask,gx,n_x,n_y,nbox,verbose);
 
-  if(VERBOSE == 1)
+  if(verbose == 1)
   
     {
     printf("Finding Maxima\n"); 
@@ -164,7 +164,7 @@ void* subimage_Thread(void *arg)
 
     }
   
-  if(VERBOSE == 1)
+  if(verbose == 1)
     {
       printf("Found %i Maxima\n\n",npoint); 
       printf("Starting Statistics \n"); 
@@ -237,7 +237,7 @@ void* subimage_Thread(void *arg)
 	    }
 	} 
   }
-  if(VERBOSE == 1)
+  if(verbose == 1)
     {
       printf("Finished Filtering/Centroiding\n");
       printf("Tidying Results\n");
@@ -257,7 +257,7 @@ void* subimage_Thread(void *arg)
 
   /*-------------------------------------------------------------------------------------*/
 
-struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,int boxsize,int *np,int VERBOSE, int fittype)
+struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,int boxsize,int *np, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh, int verbose)
 {
 
   /*main routine. parses input values, calls setup routine, divides up the threads, 
@@ -274,10 +274,10 @@ struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,i
   double roundlim[2];  //round limits for fine
 
   //default values for sharp/roundlim
-  sharplim[0]=0.05;
-  sharplim[1]=0.5;
-  roundlim[0]=-1.;
-  roundlim[1]=1.2;
+  sharplim[0]=sharpLow;
+  sharplim[1]=sharpHigh;
+  roundlim[0]=roundLow;
+  roundlim[1]=roundHigh;
   
 
   double *gx;       // 1D filter kernel
@@ -288,7 +288,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,i
 
   nbox=2*floor(0.637*fwhm) + 1;   //boxsize for smoothing
 
-  if(VERBOSE == 1)
+  if(verbose == 1)
     {
       printf("Starting Program\n");
       printf("  nbox = %d\n",nbox);
@@ -329,7 +329,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,i
   double p1,p2;   //fluxes of first and second avalue
   double rs;     //square o fdistance between x1,y1 and x2,y2
 
-  double rmin=fwhm*3;  //radius to look for duplicate/false points
+  double rmin=(fwhm*fwhm*9);  //radius to look for duplicate/false points
   int deadfirst=0;    //flag that first node has been deleted, to keep track fo pointers
   int firstval=1;     //flag that we're looking at the first node, to keep track of pointers
   char filename[sizeof "file100.fits"];
@@ -350,9 +350,9 @@ struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,i
 
   //Call routine to initialize kernel and information
 
-  input_values(&nbox,&gx,&c1,&mask,&pixels,&nhalf,fwhm,VERBOSE);
+  input_values(&nbox,&gx,&c1,&mask,&pixels,&nhalf,fwhm,verbose);
   //Verbose debugging information
-  if(VERBOSE ==1 )
+  if(verbose ==1 )
     {
       printf("A %d %d %lf\n",pixels,nbox,fwhm);
       for (i=0;i<nbox;i++)
@@ -483,7 +483,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,i
 	  thread_data_array[ind].roundlim[0]=roundlim[0];
 	  thread_data_array[ind].roundlim[1]=roundlim[1];
 	  thread_data_array[ind].cand_list=cand_list[ind];
-	  thread_data_array[ind].VERBOSE=VERBOSE;
+	  thread_data_array[ind].verbose=verbose;
 	  thread_data_array[ind].fittype=fittype;
 	  
 
@@ -524,7 +524,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,i
 	    while(cand_val->next != NULL)
 	      {
 
-		if(VERBOSE==1)
+		if(verbose==1)
 		  {
 		    printf("BB %d %lf %lf\n",ii,cand_val->x,cand_val->y);
 		  }
@@ -558,7 +558,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,i
 	while(cand_val != NULL)
 	  {
 
-	    if(VERBOSE==1)
+	    if(verbose==1)
 	      {
 		//printf("ZZ %lf %lf\n",cand_val->x,cand_val->y);
 	      }
@@ -714,7 +714,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,i
 
   //now it's sorted, print the results in region file format if we want to check it.
 
-  if(VERBOSE==1)
+  if(verbose==1)
     {
       curr_val=top_val;
       while(curr_val != NULL)

@@ -2089,12 +2089,17 @@ static const char __pyx_k_boxsize[] = "boxsize";
 static const char __pyx_k_fittype[] = "fittype";
 static const char __pyx_k_fortran[] = "fortran";
 static const char __pyx_k_memview[] = "memview";
+static const char __pyx_k_verbose[] = "verbose";
 static const char __pyx_k_Ellipsis[] = "Ellipsis";
 static const char __pyx_k_arcimage[] = "arcimage";
 static const char __pyx_k_centroid[] = "centroid";
 static const char __pyx_k_itemsize[] = "itemsize";
+static const char __pyx_k_roundLow[] = "roundLow";
+static const char __pyx_k_sharpLow[] = "sharpLow";
 static const char __pyx_k_TypeError[] = "TypeError";
 static const char __pyx_k_enumerate[] = "enumerate";
+static const char __pyx_k_roundHigh[] = "roundHigh";
+static const char __pyx_k_sharpHigh[] = "sharpHigh";
 static const char __pyx_k_IndexError[] = "IndexError";
 static const char __pyx_k_ValueError[] = "ValueError";
 static const char __pyx_k_frombuffer[] = "frombuffer";
@@ -2104,7 +2109,6 @@ static const char __pyx_k_MemoryError[] = "MemoryError";
 static const char __pyx_k_RuntimeError[] = "RuntimeError";
 static const char __pyx_k_centroid_only[] = "centroid_only";
 static const char __pyx_k_pyx_getbuffer[] = "__pyx_getbuffer";
-static const char __pyx_k_get_homes_call[] = "get_homes_call";
 static const char __pyx_k_allocate_buffer[] = "allocate_buffer";
 static const char __pyx_k_astropy_io_fits[] = "astropy.io.fits";
 static const char __pyx_k_dtype_is_object[] = "dtype_is_object";
@@ -2197,7 +2201,6 @@ static PyObject *__pyx_n_s_frombuffer;
 static PyObject *__pyx_n_s_fwhm;
 static PyObject *__pyx_n_s_fx;
 static PyObject *__pyx_n_s_fy;
-static PyObject *__pyx_n_s_get_homes_call;
 static PyObject *__pyx_kp_s_got_differing_extents_in_dimensi;
 static PyObject *__pyx_n_s_hmin;
 static PyObject *__pyx_n_s_homes;
@@ -2228,7 +2231,11 @@ static PyObject *__pyx_n_s_pyx_vtable;
 static PyObject *__pyx_n_s_qual;
 static PyObject *__pyx_n_s_range;
 static PyObject *__pyx_n_s_result;
+static PyObject *__pyx_n_s_roundHigh;
+static PyObject *__pyx_n_s_roundLow;
 static PyObject *__pyx_n_s_shape;
+static PyObject *__pyx_n_s_sharpHigh;
+static PyObject *__pyx_n_s_sharpLow;
 static PyObject *__pyx_n_s_size;
 static PyObject *__pyx_n_s_start;
 static PyObject *__pyx_n_s_step;
@@ -2244,14 +2251,14 @@ static PyObject *__pyx_kp_u_unknown_dtype_code_in_numpy_pxd;
 static PyObject *__pyx_n_s_unpack;
 static PyObject *__pyx_n_s_val;
 static PyObject *__pyx_n_s_vals;
+static PyObject *__pyx_n_s_verbose;
 static PyObject *__pyx_n_s_x;
 static PyObject *__pyx_n_s_xp;
 static PyObject *__pyx_n_s_y;
 static PyObject *__pyx_n_s_yp;
-static PyObject *__pyx_pf_8centroid_centroid_fine_call(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image, PyArrayObject *__pyx_v_homes, PyArrayObject *__pyx_v_xp, PyArrayObject *__pyx_v_yp); /* proto */
-static PyObject *__pyx_pf_8centroid_2centroid_coarse_call(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image, PyArrayObject *__pyx_v_arcimage, PyArrayObject *__pyx_v_homes); /* proto */
-static PyObject *__pyx_pf_8centroid_4get_homes_call(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image); /* proto */
-static PyObject *__pyx_pf_8centroid_6centroid_only(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image, double __pyx_v_fwhm, int __pyx_v_hmin, int __pyx_v_boxsize); /* proto */
+static PyObject *__pyx_pf_8centroid_centroid_fine_call(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image, PyArrayObject *__pyx_v_homes, PyArrayObject *__pyx_v_xp, PyArrayObject *__pyx_v_yp, double __pyx_v_fwhm, int __pyx_v_hmin, int __pyx_v_boxsize, int __pyx_v_fittype, double __pyx_v_sharpLow, double __pyx_v_sharpHigh, double __pyx_v_roundLow, double __pyx_v_roundHigh, int __pyx_v_verbose); /* proto */
+static PyObject *__pyx_pf_8centroid_2centroid_coarse_call(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image, PyArrayObject *__pyx_v_arcimage, PyArrayObject *__pyx_v_homes, double __pyx_v_fwhm, int __pyx_v_hmin, int __pyx_v_boxsize, int __pyx_v_fittype, double __pyx_v_sharpLow, double __pyx_v_sharpHigh, double __pyx_v_roundLow, double __pyx_v_roundHigh, int __pyx_v_verbose); /* proto */
+static PyObject *__pyx_pf_8centroid_4centroid_only(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image, double __pyx_v_fwhm, int __pyx_v_hmin, int __pyx_v_boxsize, int __pyx_v_fittype, double __pyx_v_sharpLow, double __pyx_v_sharpHigh, double __pyx_v_roundLow, double __pyx_v_roundHigh, int __pyx_v_verbose); /* proto */
 static int __pyx_pf_7cpython_5array_5array___getbuffer__(arrayobject *__pyx_v_self, Py_buffer *__pyx_v_info, CYTHON_UNUSED int __pyx_v_flags); /* proto */
 static void __pyx_pf_7cpython_5array_5array_2__releasebuffer__(CYTHON_UNUSED arrayobject *__pyx_v_self, Py_buffer *__pyx_v_info); /* proto */
 static int __pyx_pf_5numpy_7ndarray___getbuffer__(PyArrayObject *__pyx_v_self, Py_buffer *__pyx_v_info, int __pyx_v_flags); /* proto */
@@ -2328,20 +2335,18 @@ static PyObject *__pyx_tuple__31;
 static PyObject *__pyx_tuple__33;
 static PyObject *__pyx_tuple__35;
 static PyObject *__pyx_tuple__37;
+static PyObject *__pyx_tuple__38;
 static PyObject *__pyx_tuple__39;
 static PyObject *__pyx_tuple__40;
 static PyObject *__pyx_tuple__41;
-static PyObject *__pyx_tuple__42;
-static PyObject *__pyx_tuple__43;
 static PyObject *__pyx_codeobj__32;
 static PyObject *__pyx_codeobj__34;
 static PyObject *__pyx_codeobj__36;
-static PyObject *__pyx_codeobj__38;
 
-/* "centroid_wrapper.pyx":50
- *      centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,int boxsize,int *npoint,int VERBOSE,int fittype)
+/* "centroid_wrapper.pyx":47
+ *      centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,int boxsize,int *npoint, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose)
  * 
- * def centroid_fine_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[double, ndim=1, mode="c"] homes, np.ndarray[double, ndim=1, mode="c"] xp,np.ndarray[double, ndim=1, mode="c"] yp):             # <<<<<<<<<<<<<<
+ * def centroid_fine_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[double, ndim=1, mode="c"] homes, np.ndarray[double, ndim=1, mode="c"] xp,np.ndarray[double, ndim=1, mode="c"] yp, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):             # <<<<<<<<<<<<<<
  * 
  *     cdef char *cp
  */
@@ -2354,16 +2359,34 @@ static PyObject *__pyx_pw_8centroid_1centroid_fine_call(PyObject *__pyx_self, Py
   PyArrayObject *__pyx_v_homes = 0;
   PyArrayObject *__pyx_v_xp = 0;
   PyArrayObject *__pyx_v_yp = 0;
+  double __pyx_v_fwhm;
+  int __pyx_v_hmin;
+  int __pyx_v_boxsize;
+  int __pyx_v_fittype;
+  double __pyx_v_sharpLow;
+  double __pyx_v_sharpHigh;
+  double __pyx_v_roundLow;
+  double __pyx_v_roundHigh;
+  int __pyx_v_verbose;
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("centroid_fine_call (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_image,&__pyx_n_s_homes,&__pyx_n_s_xp,&__pyx_n_s_yp,0};
-    PyObject* values[4] = {0,0,0,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_image,&__pyx_n_s_homes,&__pyx_n_s_xp,&__pyx_n_s_yp,&__pyx_n_s_fwhm,&__pyx_n_s_hmin,&__pyx_n_s_boxsize,&__pyx_n_s_fittype,&__pyx_n_s_sharpLow,&__pyx_n_s_sharpHigh,&__pyx_n_s_roundLow,&__pyx_n_s_roundHigh,&__pyx_n_s_verbose,0};
+    PyObject* values[13] = {0,0,0,0,0,0,0,0,0,0,0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
+        case 13: values[12] = PyTuple_GET_ITEM(__pyx_args, 12);
+        case 12: values[11] = PyTuple_GET_ITEM(__pyx_args, 11);
+        case 11: values[10] = PyTuple_GET_ITEM(__pyx_args, 10);
+        case 10: values[9] = PyTuple_GET_ITEM(__pyx_args, 9);
+        case  9: values[8] = PyTuple_GET_ITEM(__pyx_args, 8);
+        case  8: values[7] = PyTuple_GET_ITEM(__pyx_args, 7);
+        case  7: values[6] = PyTuple_GET_ITEM(__pyx_args, 6);
+        case  6: values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+        case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
         case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
         case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
         case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
@@ -2379,48 +2402,111 @@ static PyObject *__pyx_pw_8centroid_1centroid_fine_call(PyObject *__pyx_self, Py
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_homes)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 4, 4, 1); __PYX_ERR(0, 50, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, 1); __PYX_ERR(0, 47, __pyx_L3_error)
         }
         case  2:
         if (likely((values[2] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_xp)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 4, 4, 2); __PYX_ERR(0, 50, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, 2); __PYX_ERR(0, 47, __pyx_L3_error)
         }
         case  3:
         if (likely((values[3] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_yp)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 4, 4, 3); __PYX_ERR(0, 50, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, 3); __PYX_ERR(0, 47, __pyx_L3_error)
+        }
+        case  4:
+        if (likely((values[4] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_fwhm)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, 4); __PYX_ERR(0, 47, __pyx_L3_error)
+        }
+        case  5:
+        if (likely((values[5] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_hmin)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, 5); __PYX_ERR(0, 47, __pyx_L3_error)
+        }
+        case  6:
+        if (likely((values[6] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_boxsize)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, 6); __PYX_ERR(0, 47, __pyx_L3_error)
+        }
+        case  7:
+        if (likely((values[7] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_fittype)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, 7); __PYX_ERR(0, 47, __pyx_L3_error)
+        }
+        case  8:
+        if (likely((values[8] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_sharpLow)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, 8); __PYX_ERR(0, 47, __pyx_L3_error)
+        }
+        case  9:
+        if (likely((values[9] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_sharpHigh)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, 9); __PYX_ERR(0, 47, __pyx_L3_error)
+        }
+        case 10:
+        if (likely((values[10] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_roundLow)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, 10); __PYX_ERR(0, 47, __pyx_L3_error)
+        }
+        case 11:
+        if (likely((values[11] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_roundHigh)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, 11); __PYX_ERR(0, 47, __pyx_L3_error)
+        }
+        case 12:
+        if (likely((values[12] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_verbose)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, 12); __PYX_ERR(0, 47, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "centroid_fine_call") < 0)) __PYX_ERR(0, 50, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "centroid_fine_call") < 0)) __PYX_ERR(0, 47, __pyx_L3_error)
       }
-    } else if (PyTuple_GET_SIZE(__pyx_args) != 4) {
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 13) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
       values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
       values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+      values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+      values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+      values[6] = PyTuple_GET_ITEM(__pyx_args, 6);
+      values[7] = PyTuple_GET_ITEM(__pyx_args, 7);
+      values[8] = PyTuple_GET_ITEM(__pyx_args, 8);
+      values[9] = PyTuple_GET_ITEM(__pyx_args, 9);
+      values[10] = PyTuple_GET_ITEM(__pyx_args, 10);
+      values[11] = PyTuple_GET_ITEM(__pyx_args, 11);
+      values[12] = PyTuple_GET_ITEM(__pyx_args, 12);
     }
     __pyx_v_image = ((PyArrayObject *)values[0]);
     __pyx_v_homes = ((PyArrayObject *)values[1]);
     __pyx_v_xp = ((PyArrayObject *)values[2]);
     __pyx_v_yp = ((PyArrayObject *)values[3]);
+    __pyx_v_fwhm = __pyx_PyFloat_AsDouble(values[4]); if (unlikely((__pyx_v_fwhm == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 47, __pyx_L3_error)
+    __pyx_v_hmin = __Pyx_PyInt_As_int(values[5]); if (unlikely((__pyx_v_hmin == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 47, __pyx_L3_error)
+    __pyx_v_boxsize = __Pyx_PyInt_As_int(values[6]); if (unlikely((__pyx_v_boxsize == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 47, __pyx_L3_error)
+    __pyx_v_fittype = __Pyx_PyInt_As_int(values[7]); if (unlikely((__pyx_v_fittype == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 47, __pyx_L3_error)
+    __pyx_v_sharpLow = __pyx_PyFloat_AsDouble(values[8]); if (unlikely((__pyx_v_sharpLow == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 47, __pyx_L3_error)
+    __pyx_v_sharpHigh = __pyx_PyFloat_AsDouble(values[9]); if (unlikely((__pyx_v_sharpHigh == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 47, __pyx_L3_error)
+    __pyx_v_roundLow = __pyx_PyFloat_AsDouble(values[10]); if (unlikely((__pyx_v_roundLow == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 47, __pyx_L3_error)
+    __pyx_v_roundHigh = __pyx_PyFloat_AsDouble(values[11]); if (unlikely((__pyx_v_roundHigh == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 47, __pyx_L3_error)
+    __pyx_v_verbose = __Pyx_PyInt_As_int(values[12]); if (unlikely((__pyx_v_verbose == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 47, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 50, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("centroid_fine_call", 1, 13, 13, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 47, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("centroid.centroid_fine_call", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_image), __pyx_ptype_5numpy_ndarray, 1, "image", 0))) __PYX_ERR(0, 50, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_homes), __pyx_ptype_5numpy_ndarray, 1, "homes", 0))) __PYX_ERR(0, 50, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_xp), __pyx_ptype_5numpy_ndarray, 1, "xp", 0))) __PYX_ERR(0, 50, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_yp), __pyx_ptype_5numpy_ndarray, 1, "yp", 0))) __PYX_ERR(0, 50, __pyx_L1_error)
-  __pyx_r = __pyx_pf_8centroid_centroid_fine_call(__pyx_self, __pyx_v_image, __pyx_v_homes, __pyx_v_xp, __pyx_v_yp);
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_image), __pyx_ptype_5numpy_ndarray, 1, "image", 0))) __PYX_ERR(0, 47, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_homes), __pyx_ptype_5numpy_ndarray, 1, "homes", 0))) __PYX_ERR(0, 47, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_xp), __pyx_ptype_5numpy_ndarray, 1, "xp", 0))) __PYX_ERR(0, 47, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_yp), __pyx_ptype_5numpy_ndarray, 1, "yp", 0))) __PYX_ERR(0, 47, __pyx_L1_error)
+  __pyx_r = __pyx_pf_8centroid_centroid_fine_call(__pyx_self, __pyx_v_image, __pyx_v_homes, __pyx_v_xp, __pyx_v_yp, __pyx_v_fwhm, __pyx_v_hmin, __pyx_v_boxsize, __pyx_v_fittype, __pyx_v_sharpLow, __pyx_v_sharpHigh, __pyx_v_roundLow, __pyx_v_roundHigh, __pyx_v_verbose);
 
   /* function exit code */
   goto __pyx_L0;
@@ -2431,11 +2517,8 @@ static PyObject *__pyx_pw_8centroid_1centroid_fine_call(PyObject *__pyx_self, Py
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_8centroid_centroid_fine_call(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image, PyArrayObject *__pyx_v_homes, PyArrayObject *__pyx_v_xp, PyArrayObject *__pyx_v_yp) {
+static PyObject *__pyx_pf_8centroid_centroid_fine_call(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image, PyArrayObject *__pyx_v_homes, PyArrayObject *__pyx_v_xp, PyArrayObject *__pyx_v_yp, double __pyx_v_fwhm, int __pyx_v_hmin, int __pyx_v_boxsize, int __pyx_v_fittype, double __pyx_v_sharpLow, double __pyx_v_sharpHigh, double __pyx_v_roundLow, double __pyx_v_roundHigh, int __pyx_v_verbose) {
   char *__pyx_v_cp;
-  double __pyx_v_fwhm;
-  int __pyx_v_hmin;
-  int __pyx_v_boxsize;
   struct fibreid *__pyx_v_vals;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_homes;
   __Pyx_Buffer __pyx_pybuffer_homes;
@@ -2467,57 +2550,30 @@ static PyObject *__pyx_pf_8centroid_centroid_fine_call(CYTHON_UNUSED PyObject *_
   __pyx_pybuffernd_yp.rcbuffer = &__pyx_pybuffer_yp;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_image.rcbuffer->pybuffer, (PyObject*)__pyx_v_image, &__Pyx_TypeInfo_int, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 50, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_image.rcbuffer->pybuffer, (PyObject*)__pyx_v_image, &__Pyx_TypeInfo_int, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 47, __pyx_L1_error)
   }
   __pyx_pybuffernd_image.diminfo[0].strides = __pyx_pybuffernd_image.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_image.diminfo[0].shape = __pyx_pybuffernd_image.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_image.diminfo[1].strides = __pyx_pybuffernd_image.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_image.diminfo[1].shape = __pyx_pybuffernd_image.rcbuffer->pybuffer.shape[1];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_homes.rcbuffer->pybuffer, (PyObject*)__pyx_v_homes, &__Pyx_TypeInfo_double, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 50, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_homes.rcbuffer->pybuffer, (PyObject*)__pyx_v_homes, &__Pyx_TypeInfo_double, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 47, __pyx_L1_error)
   }
   __pyx_pybuffernd_homes.diminfo[0].strides = __pyx_pybuffernd_homes.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_homes.diminfo[0].shape = __pyx_pybuffernd_homes.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_xp.rcbuffer->pybuffer, (PyObject*)__pyx_v_xp, &__Pyx_TypeInfo_double, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 50, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_xp.rcbuffer->pybuffer, (PyObject*)__pyx_v_xp, &__Pyx_TypeInfo_double, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 47, __pyx_L1_error)
   }
   __pyx_pybuffernd_xp.diminfo[0].strides = __pyx_pybuffernd_xp.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_xp.diminfo[0].shape = __pyx_pybuffernd_xp.rcbuffer->pybuffer.shape[0];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_yp.rcbuffer->pybuffer, (PyObject*)__pyx_v_yp, &__Pyx_TypeInfo_double, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 50, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_yp.rcbuffer->pybuffer, (PyObject*)__pyx_v_yp, &__Pyx_TypeInfo_double, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 47, __pyx_L1_error)
   }
   __pyx_pybuffernd_yp.diminfo[0].strides = __pyx_pybuffernd_yp.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_yp.diminfo[0].shape = __pyx_pybuffernd_yp.rcbuffer->pybuffer.shape[0];
 
-  /* "centroid_wrapper.pyx":58
+  /* "centroid_wrapper.pyx":52
  *     cdef fibreid *vals
  * 
- *     fwhm=3.             # <<<<<<<<<<<<<<
- *     hmin=500
- *     boxsize=9
- */
-  __pyx_v_fwhm = 3.;
-
-  /* "centroid_wrapper.pyx":59
- * 
- *     fwhm=3.
- *     hmin=500             # <<<<<<<<<<<<<<
- *     boxsize=9
- * 
- */
-  __pyx_v_hmin = 0x1F4;
-
-  /* "centroid_wrapper.pyx":60
- *     fwhm=3.
- *     hmin=500
- *     boxsize=9             # <<<<<<<<<<<<<<
- * 
- *     with nogil:
- */
-  __pyx_v_boxsize = 9;
-
-  /* "centroid_wrapper.pyx":62
- *     boxsize=9
- * 
  *     with nogil:             # <<<<<<<<<<<<<<
- *         vals=centroid_fine(<int *>image.data,<double *>homes.data,<double *>xp.data,<double *>yp.data,image.shape[1],image.shape[0],hmin,fwhm,boxsize,homes.shape[0]/2)
+ *         vals=centroid_fine(<int *>image.data,<double *>homes.data,<double *>xp.data,<double *>yp.data,image.shape[1],image.shape[0],hmin,fwhm,boxsize,homes.shape[0]/2,fittype,sharpLow,sharpHigh,roundLow,roundHigh,verbose)
  * 
  */
   {
@@ -2527,21 +2583,21 @@ static PyObject *__pyx_pf_8centroid_centroid_fine_call(CYTHON_UNUSED PyObject *_
       #endif
       /*try:*/ {
 
-        /* "centroid_wrapper.pyx":63
+        /* "centroid_wrapper.pyx":53
  * 
  *     with nogil:
- *         vals=centroid_fine(<int *>image.data,<double *>homes.data,<double *>xp.data,<double *>yp.data,image.shape[1],image.shape[0],hmin,fwhm,boxsize,homes.shape[0]/2)             # <<<<<<<<<<<<<<
+ *         vals=centroid_fine(<int *>image.data,<double *>homes.data,<double *>xp.data,<double *>yp.data,image.shape[1],image.shape[0],hmin,fwhm,boxsize,homes.shape[0]/2,fittype,sharpLow,sharpHigh,roundLow,roundHigh,verbose)             # <<<<<<<<<<<<<<
  * 
  * 
  */
-        __pyx_v_vals = centroid_fine(((int *)__pyx_v_image->data), ((double *)__pyx_v_homes->data), ((double *)__pyx_v_xp->data), ((double *)__pyx_v_yp->data), (__pyx_v_image->dimensions[1]), (__pyx_v_image->dimensions[0]), __pyx_v_hmin, __pyx_v_fwhm, __pyx_v_boxsize, __Pyx_div_long((__pyx_v_homes->dimensions[0]), 2));
+        __pyx_v_vals = centroid_fine(((int *)__pyx_v_image->data), ((double *)__pyx_v_homes->data), ((double *)__pyx_v_xp->data), ((double *)__pyx_v_yp->data), (__pyx_v_image->dimensions[1]), (__pyx_v_image->dimensions[0]), __pyx_v_hmin, __pyx_v_fwhm, __pyx_v_boxsize, __Pyx_div_long((__pyx_v_homes->dimensions[0]), 2), __pyx_v_fittype, __pyx_v_sharpLow, __pyx_v_sharpHigh, __pyx_v_roundLow, __pyx_v_roundHigh, __pyx_v_verbose);
       }
 
-      /* "centroid_wrapper.pyx":62
- *     boxsize=9
+      /* "centroid_wrapper.pyx":52
+ *     cdef fibreid *vals
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
- *         vals=centroid_fine(<int *>image.data,<double *>homes.data,<double *>xp.data,<double *>yp.data,image.shape[1],image.shape[0],hmin,fwhm,boxsize,homes.shape[0]/2)
+ *         vals=centroid_fine(<int *>image.data,<double *>homes.data,<double *>xp.data,<double *>yp.data,image.shape[1],image.shape[0],hmin,fwhm,boxsize,homes.shape[0]/2,fittype,sharpLow,sharpHigh,roundLow,roundHigh,verbose)
  * 
  */
       /*finally:*/ {
@@ -2555,7 +2611,7 @@ static PyObject *__pyx_pf_8centroid_centroid_fine_call(CYTHON_UNUSED PyObject *_
       }
   }
 
-  /* "centroid_wrapper.pyx":66
+  /* "centroid_wrapper.pyx":56
  * 
  * 
  *     cp = <char *> vals             # <<<<<<<<<<<<<<
@@ -2564,7 +2620,7 @@ static PyObject *__pyx_pf_8centroid_centroid_fine_call(CYTHON_UNUSED PyObject *_
  */
   __pyx_v_cp = ((char *)__pyx_v_vals);
 
-  /* "centroid_wrapper.pyx":68
+  /* "centroid_wrapper.pyx":58
  *     cp = <char *> vals
  * 
  *     return cp[:sizeof(fibreid) * homes.shape[0]/2]             # <<<<<<<<<<<<<<
@@ -2572,16 +2628,16 @@ static PyObject *__pyx_pf_8centroid_centroid_fine_call(CYTHON_UNUSED PyObject *_
  * 
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyBytes_FromStringAndSize(__pyx_v_cp + 0, (((sizeof(struct fibreid)) * (__pyx_v_homes->dimensions[0])) / 2) - 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 68, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyBytes_FromStringAndSize(__pyx_v_cp + 0, (((sizeof(struct fibreid)) * (__pyx_v_homes->dimensions[0])) / 2) - 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 58, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "centroid_wrapper.pyx":50
- *      centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,int boxsize,int *npoint,int VERBOSE,int fittype)
+  /* "centroid_wrapper.pyx":47
+ *      centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,int boxsize,int *npoint, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose)
  * 
- * def centroid_fine_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[double, ndim=1, mode="c"] homes, np.ndarray[double, ndim=1, mode="c"] xp,np.ndarray[double, ndim=1, mode="c"] yp):             # <<<<<<<<<<<<<<
+ * def centroid_fine_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[double, ndim=1, mode="c"] homes, np.ndarray[double, ndim=1, mode="c"] xp,np.ndarray[double, ndim=1, mode="c"] yp, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):             # <<<<<<<<<<<<<<
  * 
  *     cdef char *cp
  */
@@ -2612,10 +2668,10 @@ static PyObject *__pyx_pf_8centroid_centroid_fine_call(CYTHON_UNUSED PyObject *_
   return __pyx_r;
 }
 
-/* "centroid_wrapper.pyx":71
+/* "centroid_wrapper.pyx":61
  * 
  * 
- * def centroid_coarse_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[int, ndim=2, mode="c"] arcimage,np.ndarray[double, ndim=1, mode="c"] homes):             # <<<<<<<<<<<<<<
+ * def centroid_coarse_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[int, ndim=2, mode="c"] arcimage,np.ndarray[double, ndim=1, mode="c"] homes, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):             # <<<<<<<<<<<<<<
  * 
  *     cdef char *cp
  */
@@ -2627,16 +2683,34 @@ static PyObject *__pyx_pw_8centroid_3centroid_coarse_call(PyObject *__pyx_self, 
   PyArrayObject *__pyx_v_image = 0;
   PyArrayObject *__pyx_v_arcimage = 0;
   PyArrayObject *__pyx_v_homes = 0;
+  double __pyx_v_fwhm;
+  int __pyx_v_hmin;
+  int __pyx_v_boxsize;
+  int __pyx_v_fittype;
+  double __pyx_v_sharpLow;
+  double __pyx_v_sharpHigh;
+  double __pyx_v_roundLow;
+  double __pyx_v_roundHigh;
+  int __pyx_v_verbose;
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("centroid_coarse_call (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_image,&__pyx_n_s_arcimage,&__pyx_n_s_homes,0};
-    PyObject* values[3] = {0,0,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_image,&__pyx_n_s_arcimage,&__pyx_n_s_homes,&__pyx_n_s_fwhm,&__pyx_n_s_hmin,&__pyx_n_s_boxsize,&__pyx_n_s_fittype,&__pyx_n_s_sharpLow,&__pyx_n_s_sharpHigh,&__pyx_n_s_roundLow,&__pyx_n_s_roundHigh,&__pyx_n_s_verbose,0};
+    PyObject* values[12] = {0,0,0,0,0,0,0,0,0,0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
+        case 12: values[11] = PyTuple_GET_ITEM(__pyx_args, 11);
+        case 11: values[10] = PyTuple_GET_ITEM(__pyx_args, 10);
+        case 10: values[9] = PyTuple_GET_ITEM(__pyx_args, 9);
+        case  9: values[8] = PyTuple_GET_ITEM(__pyx_args, 8);
+        case  8: values[7] = PyTuple_GET_ITEM(__pyx_args, 7);
+        case  7: values[6] = PyTuple_GET_ITEM(__pyx_args, 6);
+        case  6: values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+        case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+        case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
         case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
         case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
         case  1: values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
@@ -2651,40 +2725,103 @@ static PyObject *__pyx_pw_8centroid_3centroid_coarse_call(PyObject *__pyx_self, 
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_arcimage)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 3, 3, 1); __PYX_ERR(0, 71, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 12, 12, 1); __PYX_ERR(0, 61, __pyx_L3_error)
         }
         case  2:
         if (likely((values[2] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_homes)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 3, 3, 2); __PYX_ERR(0, 71, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 12, 12, 2); __PYX_ERR(0, 61, __pyx_L3_error)
+        }
+        case  3:
+        if (likely((values[3] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_fwhm)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 12, 12, 3); __PYX_ERR(0, 61, __pyx_L3_error)
+        }
+        case  4:
+        if (likely((values[4] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_hmin)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 12, 12, 4); __PYX_ERR(0, 61, __pyx_L3_error)
+        }
+        case  5:
+        if (likely((values[5] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_boxsize)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 12, 12, 5); __PYX_ERR(0, 61, __pyx_L3_error)
+        }
+        case  6:
+        if (likely((values[6] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_fittype)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 12, 12, 6); __PYX_ERR(0, 61, __pyx_L3_error)
+        }
+        case  7:
+        if (likely((values[7] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_sharpLow)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 12, 12, 7); __PYX_ERR(0, 61, __pyx_L3_error)
+        }
+        case  8:
+        if (likely((values[8] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_sharpHigh)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 12, 12, 8); __PYX_ERR(0, 61, __pyx_L3_error)
+        }
+        case  9:
+        if (likely((values[9] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_roundLow)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 12, 12, 9); __PYX_ERR(0, 61, __pyx_L3_error)
+        }
+        case 10:
+        if (likely((values[10] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_roundHigh)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 12, 12, 10); __PYX_ERR(0, 61, __pyx_L3_error)
+        }
+        case 11:
+        if (likely((values[11] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_verbose)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 12, 12, 11); __PYX_ERR(0, 61, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "centroid_coarse_call") < 0)) __PYX_ERR(0, 71, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "centroid_coarse_call") < 0)) __PYX_ERR(0, 61, __pyx_L3_error)
       }
-    } else if (PyTuple_GET_SIZE(__pyx_args) != 3) {
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 12) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
       values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
+      values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+      values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+      values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+      values[6] = PyTuple_GET_ITEM(__pyx_args, 6);
+      values[7] = PyTuple_GET_ITEM(__pyx_args, 7);
+      values[8] = PyTuple_GET_ITEM(__pyx_args, 8);
+      values[9] = PyTuple_GET_ITEM(__pyx_args, 9);
+      values[10] = PyTuple_GET_ITEM(__pyx_args, 10);
+      values[11] = PyTuple_GET_ITEM(__pyx_args, 11);
     }
     __pyx_v_image = ((PyArrayObject *)values[0]);
     __pyx_v_arcimage = ((PyArrayObject *)values[1]);
     __pyx_v_homes = ((PyArrayObject *)values[2]);
+    __pyx_v_fwhm = __pyx_PyFloat_AsDouble(values[3]); if (unlikely((__pyx_v_fwhm == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L3_error)
+    __pyx_v_hmin = __Pyx_PyInt_As_int(values[4]); if (unlikely((__pyx_v_hmin == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L3_error)
+    __pyx_v_boxsize = __Pyx_PyInt_As_int(values[5]); if (unlikely((__pyx_v_boxsize == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L3_error)
+    __pyx_v_fittype = __Pyx_PyInt_As_int(values[6]); if (unlikely((__pyx_v_fittype == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L3_error)
+    __pyx_v_sharpLow = __pyx_PyFloat_AsDouble(values[7]); if (unlikely((__pyx_v_sharpLow == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L3_error)
+    __pyx_v_sharpHigh = __pyx_PyFloat_AsDouble(values[8]); if (unlikely((__pyx_v_sharpHigh == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L3_error)
+    __pyx_v_roundLow = __pyx_PyFloat_AsDouble(values[9]); if (unlikely((__pyx_v_roundLow == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L3_error)
+    __pyx_v_roundHigh = __pyx_PyFloat_AsDouble(values[10]); if (unlikely((__pyx_v_roundHigh == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L3_error)
+    __pyx_v_verbose = __Pyx_PyInt_As_int(values[11]); if (unlikely((__pyx_v_verbose == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 61, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 3, 3, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 71, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("centroid_coarse_call", 1, 12, 12, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 61, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("centroid.centroid_coarse_call", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_image), __pyx_ptype_5numpy_ndarray, 1, "image", 0))) __PYX_ERR(0, 71, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_arcimage), __pyx_ptype_5numpy_ndarray, 1, "arcimage", 0))) __PYX_ERR(0, 71, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_homes), __pyx_ptype_5numpy_ndarray, 1, "homes", 0))) __PYX_ERR(0, 71, __pyx_L1_error)
-  __pyx_r = __pyx_pf_8centroid_2centroid_coarse_call(__pyx_self, __pyx_v_image, __pyx_v_arcimage, __pyx_v_homes);
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_image), __pyx_ptype_5numpy_ndarray, 1, "image", 0))) __PYX_ERR(0, 61, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_arcimage), __pyx_ptype_5numpy_ndarray, 1, "arcimage", 0))) __PYX_ERR(0, 61, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_homes), __pyx_ptype_5numpy_ndarray, 1, "homes", 0))) __PYX_ERR(0, 61, __pyx_L1_error)
+  __pyx_r = __pyx_pf_8centroid_2centroid_coarse_call(__pyx_self, __pyx_v_image, __pyx_v_arcimage, __pyx_v_homes, __pyx_v_fwhm, __pyx_v_hmin, __pyx_v_boxsize, __pyx_v_fittype, __pyx_v_sharpLow, __pyx_v_sharpHigh, __pyx_v_roundLow, __pyx_v_roundHigh, __pyx_v_verbose);
 
   /* function exit code */
   goto __pyx_L0;
@@ -2695,11 +2832,8 @@ static PyObject *__pyx_pw_8centroid_3centroid_coarse_call(PyObject *__pyx_self, 
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_8centroid_2centroid_coarse_call(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image, PyArrayObject *__pyx_v_arcimage, PyArrayObject *__pyx_v_homes) {
+static PyObject *__pyx_pf_8centroid_2centroid_coarse_call(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image, PyArrayObject *__pyx_v_arcimage, PyArrayObject *__pyx_v_homes, double __pyx_v_fwhm, int __pyx_v_hmin, int __pyx_v_boxsize, int __pyx_v_fittype, double __pyx_v_sharpLow, double __pyx_v_sharpHigh, double __pyx_v_roundLow, double __pyx_v_roundHigh, int __pyx_v_verbose) {
   char *__pyx_v_cp;
-  double __pyx_v_fwhm;
-  int __pyx_v_hmin;
-  int __pyx_v_boxsize;
   struct fibreid *__pyx_v_vals;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_arcimage;
   __Pyx_Buffer __pyx_pybuffer_arcimage;
@@ -2725,52 +2859,25 @@ static PyObject *__pyx_pf_8centroid_2centroid_coarse_call(CYTHON_UNUSED PyObject
   __pyx_pybuffernd_homes.rcbuffer = &__pyx_pybuffer_homes;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_image.rcbuffer->pybuffer, (PyObject*)__pyx_v_image, &__Pyx_TypeInfo_int, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 71, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_image.rcbuffer->pybuffer, (PyObject*)__pyx_v_image, &__Pyx_TypeInfo_int, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 61, __pyx_L1_error)
   }
   __pyx_pybuffernd_image.diminfo[0].strides = __pyx_pybuffernd_image.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_image.diminfo[0].shape = __pyx_pybuffernd_image.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_image.diminfo[1].strides = __pyx_pybuffernd_image.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_image.diminfo[1].shape = __pyx_pybuffernd_image.rcbuffer->pybuffer.shape[1];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_arcimage.rcbuffer->pybuffer, (PyObject*)__pyx_v_arcimage, &__Pyx_TypeInfo_int, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 71, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_arcimage.rcbuffer->pybuffer, (PyObject*)__pyx_v_arcimage, &__Pyx_TypeInfo_int, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 61, __pyx_L1_error)
   }
   __pyx_pybuffernd_arcimage.diminfo[0].strides = __pyx_pybuffernd_arcimage.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_arcimage.diminfo[0].shape = __pyx_pybuffernd_arcimage.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_arcimage.diminfo[1].strides = __pyx_pybuffernd_arcimage.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_arcimage.diminfo[1].shape = __pyx_pybuffernd_arcimage.rcbuffer->pybuffer.shape[1];
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_homes.rcbuffer->pybuffer, (PyObject*)__pyx_v_homes, &__Pyx_TypeInfo_double, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 71, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_homes.rcbuffer->pybuffer, (PyObject*)__pyx_v_homes, &__Pyx_TypeInfo_double, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 1, 0, __pyx_stack) == -1)) __PYX_ERR(0, 61, __pyx_L1_error)
   }
   __pyx_pybuffernd_homes.diminfo[0].strides = __pyx_pybuffernd_homes.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_homes.diminfo[0].shape = __pyx_pybuffernd_homes.rcbuffer->pybuffer.shape[0];
 
-  /* "centroid_wrapper.pyx":79
+  /* "centroid_wrapper.pyx":66
  *     cdef fibreid *vals
  * 
- *     fwhm=3.             # <<<<<<<<<<<<<<
- *     hmin=500
- *     boxsize=9
- */
-  __pyx_v_fwhm = 3.;
-
-  /* "centroid_wrapper.pyx":80
- * 
- *     fwhm=3.
- *     hmin=500             # <<<<<<<<<<<<<<
- *     boxsize=9
- * 
- */
-  __pyx_v_hmin = 0x1F4;
-
-  /* "centroid_wrapper.pyx":81
- *     fwhm=3.
- *     hmin=500
- *     boxsize=9             # <<<<<<<<<<<<<<
- * 
- *     with nogil:
- */
-  __pyx_v_boxsize = 9;
-
-  /* "centroid_wrapper.pyx":83
- *     boxsize=9
- * 
  *     with nogil:             # <<<<<<<<<<<<<<
- *         vals=centroid_coarse(<int *>image.data,<int *>arcimage.data,<double *> homes.data,image.shape[1],image.shape[0],hmin,fwhm,boxsize,homes.shape[0]/2)
+ *         vals=centroid_coarse(<int *>image.data,<int *>arcimage.data,<double *> homes.data,image.shape[1],image.shape[0],hmin,fwhm,boxsize,homes.shape[0]/2,fittype,sharpLow,sharpHigh,roundLow,roundHigh,verbose)
  * 
  */
   {
@@ -2780,21 +2887,21 @@ static PyObject *__pyx_pf_8centroid_2centroid_coarse_call(CYTHON_UNUSED PyObject
       #endif
       /*try:*/ {
 
-        /* "centroid_wrapper.pyx":84
+        /* "centroid_wrapper.pyx":67
  * 
  *     with nogil:
- *         vals=centroid_coarse(<int *>image.data,<int *>arcimage.data,<double *> homes.data,image.shape[1],image.shape[0],hmin,fwhm,boxsize,homes.shape[0]/2)             # <<<<<<<<<<<<<<
+ *         vals=centroid_coarse(<int *>image.data,<int *>arcimage.data,<double *> homes.data,image.shape[1],image.shape[0],hmin,fwhm,boxsize,homes.shape[0]/2,fittype,sharpLow,sharpHigh,roundLow,roundHigh,verbose)             # <<<<<<<<<<<<<<
  * 
  * 
  */
-        __pyx_v_vals = centroid_coarse(((int *)__pyx_v_image->data), ((int *)__pyx_v_arcimage->data), ((double *)__pyx_v_homes->data), (__pyx_v_image->dimensions[1]), (__pyx_v_image->dimensions[0]), __pyx_v_hmin, __pyx_v_fwhm, __pyx_v_boxsize, __Pyx_div_long((__pyx_v_homes->dimensions[0]), 2));
+        __pyx_v_vals = centroid_coarse(((int *)__pyx_v_image->data), ((int *)__pyx_v_arcimage->data), ((double *)__pyx_v_homes->data), (__pyx_v_image->dimensions[1]), (__pyx_v_image->dimensions[0]), __pyx_v_hmin, __pyx_v_fwhm, __pyx_v_boxsize, __Pyx_div_long((__pyx_v_homes->dimensions[0]), 2), __pyx_v_fittype, __pyx_v_sharpLow, __pyx_v_sharpHigh, __pyx_v_roundLow, __pyx_v_roundHigh, __pyx_v_verbose);
       }
 
-      /* "centroid_wrapper.pyx":83
- *     boxsize=9
+      /* "centroid_wrapper.pyx":66
+ *     cdef fibreid *vals
  * 
  *     with nogil:             # <<<<<<<<<<<<<<
- *         vals=centroid_coarse(<int *>image.data,<int *>arcimage.data,<double *> homes.data,image.shape[1],image.shape[0],hmin,fwhm,boxsize,homes.shape[0]/2)
+ *         vals=centroid_coarse(<int *>image.data,<int *>arcimage.data,<double *> homes.data,image.shape[1],image.shape[0],hmin,fwhm,boxsize,homes.shape[0]/2,fittype,sharpLow,sharpHigh,roundLow,roundHigh,verbose)
  * 
  */
       /*finally:*/ {
@@ -2808,7 +2915,7 @@ static PyObject *__pyx_pf_8centroid_2centroid_coarse_call(CYTHON_UNUSED PyObject
       }
   }
 
-  /* "centroid_wrapper.pyx":87
+  /* "centroid_wrapper.pyx":70
  * 
  * 
  *     cp = <char *> vals             # <<<<<<<<<<<<<<
@@ -2817,24 +2924,24 @@ static PyObject *__pyx_pf_8centroid_2centroid_coarse_call(CYTHON_UNUSED PyObject
  */
   __pyx_v_cp = ((char *)__pyx_v_vals);
 
-  /* "centroid_wrapper.pyx":89
+  /* "centroid_wrapper.pyx":72
  *     cp = <char *> vals
  * 
  *     return cp[:sizeof(fibreid) * homes.shape[0]/2]             # <<<<<<<<<<<<<<
  * 
- * def get_homes_call(np.ndarray[int,ndim=2,mode="c"] image):
+ * def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):
  */
   __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyBytes_FromStringAndSize(__pyx_v_cp + 0, (((sizeof(struct fibreid)) * (__pyx_v_homes->dimensions[0])) / 2) - 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 89, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyBytes_FromStringAndSize(__pyx_v_cp + 0, (((sizeof(struct fibreid)) * (__pyx_v_homes->dimensions[0])) / 2) - 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 72, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   __pyx_r = __pyx_t_1;
   __pyx_t_1 = 0;
   goto __pyx_L0;
 
-  /* "centroid_wrapper.pyx":71
+  /* "centroid_wrapper.pyx":61
  * 
  * 
- * def centroid_coarse_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[int, ndim=2, mode="c"] arcimage,np.ndarray[double, ndim=1, mode="c"] homes):             # <<<<<<<<<<<<<<
+ * def centroid_coarse_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[int, ndim=2, mode="c"] arcimage,np.ndarray[double, ndim=1, mode="c"] homes, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):             # <<<<<<<<<<<<<<
  * 
  *     cdef char *cp
  */
@@ -2863,203 +2970,45 @@ static PyObject *__pyx_pf_8centroid_2centroid_coarse_call(CYTHON_UNUSED PyObject
   return __pyx_r;
 }
 
-/* "centroid_wrapper.pyx":91
+/* "centroid_wrapper.pyx":74
  *     return cp[:sizeof(fibreid) * homes.shape[0]/2]
  * 
- * def get_homes_call(np.ndarray[int,ndim=2,mode="c"] image):             # <<<<<<<<<<<<<<
- * 
- *     cdef char *cp
- */
-
-/* Python wrapper */
-static PyObject *__pyx_pw_8centroid_5get_homes_call(PyObject *__pyx_self, PyObject *__pyx_v_image); /*proto*/
-static PyMethodDef __pyx_mdef_8centroid_5get_homes_call = {"get_homes_call", (PyCFunction)__pyx_pw_8centroid_5get_homes_call, METH_O, 0};
-static PyObject *__pyx_pw_8centroid_5get_homes_call(PyObject *__pyx_self, PyObject *__pyx_v_image) {
-  PyObject *__pyx_r = 0;
-  __Pyx_RefNannyDeclarations
-  __Pyx_RefNannySetupContext("get_homes_call (wrapper)", 0);
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_image), __pyx_ptype_5numpy_ndarray, 1, "image", 0))) __PYX_ERR(0, 91, __pyx_L1_error)
-  __pyx_r = __pyx_pf_8centroid_4get_homes_call(__pyx_self, ((PyArrayObject *)__pyx_v_image));
-
-  /* function exit code */
-  goto __pyx_L0;
-  __pyx_L1_error:;
-  __pyx_r = NULL;
-  __pyx_L0:;
-  __Pyx_RefNannyFinishContext();
-  return __pyx_r;
-}
-
-static PyObject *__pyx_pf_8centroid_4get_homes_call(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image) {
-  char *__pyx_v_cp;
-  int __pyx_v_npoint[1];
-  double *__pyx_v_homes;
-  double __pyx_v_fwhm;
-  int __pyx_v_hmin;
-  int __pyx_v_boxsize;
-  __Pyx_LocalBuf_ND __pyx_pybuffernd_image;
-  __Pyx_Buffer __pyx_pybuffer_image;
-  PyObject *__pyx_r = NULL;
-  __Pyx_RefNannyDeclarations
-  PyObject *__pyx_t_1 = NULL;
-  __Pyx_RefNannySetupContext("get_homes_call", 0);
-  __pyx_pybuffer_image.pybuffer.buf = NULL;
-  __pyx_pybuffer_image.refcount = 0;
-  __pyx_pybuffernd_image.data = NULL;
-  __pyx_pybuffernd_image.rcbuffer = &__pyx_pybuffer_image;
-  {
-    __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_image.rcbuffer->pybuffer, (PyObject*)__pyx_v_image, &__Pyx_TypeInfo_int, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 91, __pyx_L1_error)
-  }
-  __pyx_pybuffernd_image.diminfo[0].strides = __pyx_pybuffernd_image.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_image.diminfo[0].shape = __pyx_pybuffernd_image.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_image.diminfo[1].strides = __pyx_pybuffernd_image.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_image.diminfo[1].shape = __pyx_pybuffernd_image.rcbuffer->pybuffer.shape[1];
-
-  /* "centroid_wrapper.pyx":100
- *     cdef int boxsize
- * 
- *     fwhm=3.             # <<<<<<<<<<<<<<
- *     hmin=2000
- *     boxsize=9
- */
-  __pyx_v_fwhm = 3.;
-
-  /* "centroid_wrapper.pyx":101
- * 
- *     fwhm=3.
- *     hmin=2000             # <<<<<<<<<<<<<<
- *     boxsize=9
- * 
- */
-  __pyx_v_hmin = 0x7D0;
-
-  /* "centroid_wrapper.pyx":102
- *     fwhm=3.
- *     hmin=2000
- *     boxsize=9             # <<<<<<<<<<<<<<
- * 
- *     with nogil:
- */
-  __pyx_v_boxsize = 9;
-
-  /* "centroid_wrapper.pyx":104
- *     boxsize=9
- * 
- *     with nogil:             # <<<<<<<<<<<<<<
- *         homes=get_homes(<int *>image.data,image.shape[1],image.shape[0],npoint,hmin,fwhm,boxsize)
- * 
- */
-  {
-      #ifdef WITH_THREAD
-      PyThreadState *_save;
-      Py_UNBLOCK_THREADS
-      #endif
-      /*try:*/ {
-
-        /* "centroid_wrapper.pyx":105
- * 
- *     with nogil:
- *         homes=get_homes(<int *>image.data,image.shape[1],image.shape[0],npoint,hmin,fwhm,boxsize)             # <<<<<<<<<<<<<<
- * 
- *     cp = <char *> homes
- */
-        __pyx_v_homes = get_homes(((int *)__pyx_v_image->data), (__pyx_v_image->dimensions[1]), (__pyx_v_image->dimensions[0]), __pyx_v_npoint, __pyx_v_hmin, __pyx_v_fwhm, __pyx_v_boxsize);
-      }
-
-      /* "centroid_wrapper.pyx":104
- *     boxsize=9
- * 
- *     with nogil:             # <<<<<<<<<<<<<<
- *         homes=get_homes(<int *>image.data,image.shape[1],image.shape[0],npoint,hmin,fwhm,boxsize)
- * 
- */
-      /*finally:*/ {
-        /*normal exit:*/{
-          #ifdef WITH_THREAD
-          Py_BLOCK_THREADS
-          #endif
-          goto __pyx_L5;
-        }
-        __pyx_L5:;
-      }
-  }
-
-  /* "centroid_wrapper.pyx":107
- *         homes=get_homes(<int *>image.data,image.shape[1],image.shape[0],npoint,hmin,fwhm,boxsize)
- * 
- *     cp = <char *> homes             # <<<<<<<<<<<<<<
- *     return cp[:sizeof(double) * npoint[0] * 2]
- * 
- */
-  __pyx_v_cp = ((char *)__pyx_v_homes);
-
-  /* "centroid_wrapper.pyx":108
- * 
- *     cp = <char *> homes
- *     return cp[:sizeof(double) * npoint[0] * 2]             # <<<<<<<<<<<<<<
- * 
- * def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhm, int hmin, int boxsize):
- */
-  __Pyx_XDECREF(__pyx_r);
-  __pyx_t_1 = __Pyx_PyBytes_FromStringAndSize(__pyx_v_cp + 0, (((sizeof(double)) * (__pyx_v_npoint[0])) * 2) - 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 108, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_1);
-  __pyx_r = __pyx_t_1;
-  __pyx_t_1 = 0;
-  goto __pyx_L0;
-
-  /* "centroid_wrapper.pyx":91
- *     return cp[:sizeof(fibreid) * homes.shape[0]/2]
- * 
- * def get_homes_call(np.ndarray[int,ndim=2,mode="c"] image):             # <<<<<<<<<<<<<<
- * 
- *     cdef char *cp
- */
-
-  /* function exit code */
-  __pyx_L1_error:;
-  __Pyx_XDECREF(__pyx_t_1);
-  { PyObject *__pyx_type, *__pyx_value, *__pyx_tb;
-    __Pyx_PyThreadState_declare
-    __Pyx_PyThreadState_assign
-    __Pyx_ErrFetch(&__pyx_type, &__pyx_value, &__pyx_tb);
-    __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_image.rcbuffer->pybuffer);
-  __Pyx_ErrRestore(__pyx_type, __pyx_value, __pyx_tb);}
-  __Pyx_AddTraceback("centroid.get_homes_call", __pyx_clineno, __pyx_lineno, __pyx_filename);
-  __pyx_r = NULL;
-  goto __pyx_L2;
-  __pyx_L0:;
-  __Pyx_SafeReleaseBuffer(&__pyx_pybuffernd_image.rcbuffer->pybuffer);
-  __pyx_L2:;
-  __Pyx_XGIVEREF(__pyx_r);
-  __Pyx_RefNannyFinishContext();
-  return __pyx_r;
-}
-
-/* "centroid_wrapper.pyx":110
- *     return cp[:sizeof(double) * npoint[0] * 2]
- * 
- * def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhm, int hmin, int boxsize):             # <<<<<<<<<<<<<<
+ * def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):             # <<<<<<<<<<<<<<
  * 
  *     """
  */
 
 /* Python wrapper */
-static PyObject *__pyx_pw_8centroid_7centroid_only(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
-static char __pyx_doc_8centroid_6centroid_only[] = "\n\n    Take an image, return the centroids\n        \n    ";
-static PyMethodDef __pyx_mdef_8centroid_7centroid_only = {"centroid_only", (PyCFunction)__pyx_pw_8centroid_7centroid_only, METH_VARARGS|METH_KEYWORDS, __pyx_doc_8centroid_6centroid_only};
-static PyObject *__pyx_pw_8centroid_7centroid_only(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
+static PyObject *__pyx_pw_8centroid_5centroid_only(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds); /*proto*/
+static char __pyx_doc_8centroid_4centroid_only[] = "\n\n    Take an image, return the centroids\n        \n    ";
+static PyMethodDef __pyx_mdef_8centroid_5centroid_only = {"centroid_only", (PyCFunction)__pyx_pw_8centroid_5centroid_only, METH_VARARGS|METH_KEYWORDS, __pyx_doc_8centroid_4centroid_only};
+static PyObject *__pyx_pw_8centroid_5centroid_only(PyObject *__pyx_self, PyObject *__pyx_args, PyObject *__pyx_kwds) {
   PyArrayObject *__pyx_v_image = 0;
   double __pyx_v_fwhm;
   int __pyx_v_hmin;
   int __pyx_v_boxsize;
+  int __pyx_v_fittype;
+  double __pyx_v_sharpLow;
+  double __pyx_v_sharpHigh;
+  double __pyx_v_roundLow;
+  double __pyx_v_roundHigh;
+  int __pyx_v_verbose;
   PyObject *__pyx_r = 0;
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("centroid_only (wrapper)", 0);
   {
-    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_image,&__pyx_n_s_fwhm,&__pyx_n_s_hmin,&__pyx_n_s_boxsize,0};
-    PyObject* values[4] = {0,0,0,0};
+    static PyObject **__pyx_pyargnames[] = {&__pyx_n_s_image,&__pyx_n_s_fwhm,&__pyx_n_s_hmin,&__pyx_n_s_boxsize,&__pyx_n_s_fittype,&__pyx_n_s_sharpLow,&__pyx_n_s_sharpHigh,&__pyx_n_s_roundLow,&__pyx_n_s_roundHigh,&__pyx_n_s_verbose,0};
+    PyObject* values[10] = {0,0,0,0,0,0,0,0,0,0};
     if (unlikely(__pyx_kwds)) {
       Py_ssize_t kw_args;
       const Py_ssize_t pos_args = PyTuple_GET_SIZE(__pyx_args);
       switch (pos_args) {
+        case 10: values[9] = PyTuple_GET_ITEM(__pyx_args, 9);
+        case  9: values[8] = PyTuple_GET_ITEM(__pyx_args, 8);
+        case  8: values[7] = PyTuple_GET_ITEM(__pyx_args, 7);
+        case  7: values[6] = PyTuple_GET_ITEM(__pyx_args, 6);
+        case  6: values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+        case  5: values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
         case  4: values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
         case  3: values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
         case  2: values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
@@ -3075,45 +3024,87 @@ static PyObject *__pyx_pw_8centroid_7centroid_only(PyObject *__pyx_self, PyObjec
         case  1:
         if (likely((values[1] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_fwhm)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 4, 4, 1); __PYX_ERR(0, 110, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 10, 10, 1); __PYX_ERR(0, 74, __pyx_L3_error)
         }
         case  2:
         if (likely((values[2] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_hmin)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 4, 4, 2); __PYX_ERR(0, 110, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 10, 10, 2); __PYX_ERR(0, 74, __pyx_L3_error)
         }
         case  3:
         if (likely((values[3] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_boxsize)) != 0)) kw_args--;
         else {
-          __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 4, 4, 3); __PYX_ERR(0, 110, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 10, 10, 3); __PYX_ERR(0, 74, __pyx_L3_error)
+        }
+        case  4:
+        if (likely((values[4] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_fittype)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 10, 10, 4); __PYX_ERR(0, 74, __pyx_L3_error)
+        }
+        case  5:
+        if (likely((values[5] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_sharpLow)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 10, 10, 5); __PYX_ERR(0, 74, __pyx_L3_error)
+        }
+        case  6:
+        if (likely((values[6] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_sharpHigh)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 10, 10, 6); __PYX_ERR(0, 74, __pyx_L3_error)
+        }
+        case  7:
+        if (likely((values[7] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_roundLow)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 10, 10, 7); __PYX_ERR(0, 74, __pyx_L3_error)
+        }
+        case  8:
+        if (likely((values[8] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_roundHigh)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 10, 10, 8); __PYX_ERR(0, 74, __pyx_L3_error)
+        }
+        case  9:
+        if (likely((values[9] = PyDict_GetItem(__pyx_kwds, __pyx_n_s_verbose)) != 0)) kw_args--;
+        else {
+          __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 10, 10, 9); __PYX_ERR(0, 74, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "centroid_only") < 0)) __PYX_ERR(0, 110, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_pyargnames, 0, values, pos_args, "centroid_only") < 0)) __PYX_ERR(0, 74, __pyx_L3_error)
       }
-    } else if (PyTuple_GET_SIZE(__pyx_args) != 4) {
+    } else if (PyTuple_GET_SIZE(__pyx_args) != 10) {
       goto __pyx_L5_argtuple_error;
     } else {
       values[0] = PyTuple_GET_ITEM(__pyx_args, 0);
       values[1] = PyTuple_GET_ITEM(__pyx_args, 1);
       values[2] = PyTuple_GET_ITEM(__pyx_args, 2);
       values[3] = PyTuple_GET_ITEM(__pyx_args, 3);
+      values[4] = PyTuple_GET_ITEM(__pyx_args, 4);
+      values[5] = PyTuple_GET_ITEM(__pyx_args, 5);
+      values[6] = PyTuple_GET_ITEM(__pyx_args, 6);
+      values[7] = PyTuple_GET_ITEM(__pyx_args, 7);
+      values[8] = PyTuple_GET_ITEM(__pyx_args, 8);
+      values[9] = PyTuple_GET_ITEM(__pyx_args, 9);
     }
     __pyx_v_image = ((PyArrayObject *)values[0]);
-    __pyx_v_fwhm = __pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_fwhm == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 110, __pyx_L3_error)
-    __pyx_v_hmin = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_hmin == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 110, __pyx_L3_error)
-    __pyx_v_boxsize = __Pyx_PyInt_As_int(values[3]); if (unlikely((__pyx_v_boxsize == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 110, __pyx_L3_error)
+    __pyx_v_fwhm = __pyx_PyFloat_AsDouble(values[1]); if (unlikely((__pyx_v_fwhm == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 74, __pyx_L3_error)
+    __pyx_v_hmin = __Pyx_PyInt_As_int(values[2]); if (unlikely((__pyx_v_hmin == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 74, __pyx_L3_error)
+    __pyx_v_boxsize = __Pyx_PyInt_As_int(values[3]); if (unlikely((__pyx_v_boxsize == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 74, __pyx_L3_error)
+    __pyx_v_fittype = __Pyx_PyInt_As_int(values[4]); if (unlikely((__pyx_v_fittype == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 74, __pyx_L3_error)
+    __pyx_v_sharpLow = __pyx_PyFloat_AsDouble(values[5]); if (unlikely((__pyx_v_sharpLow == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 74, __pyx_L3_error)
+    __pyx_v_sharpHigh = __pyx_PyFloat_AsDouble(values[6]); if (unlikely((__pyx_v_sharpHigh == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 74, __pyx_L3_error)
+    __pyx_v_roundLow = __pyx_PyFloat_AsDouble(values[7]); if (unlikely((__pyx_v_roundLow == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 74, __pyx_L3_error)
+    __pyx_v_roundHigh = __pyx_PyFloat_AsDouble(values[8]); if (unlikely((__pyx_v_roundHigh == (double)-1) && PyErr_Occurred())) __PYX_ERR(0, 74, __pyx_L3_error)
+    __pyx_v_verbose = __Pyx_PyInt_As_int(values[9]); if (unlikely((__pyx_v_verbose == (int)-1) && PyErr_Occurred())) __PYX_ERR(0, 74, __pyx_L3_error)
   }
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 4, 4, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 110, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("centroid_only", 1, 10, 10, PyTuple_GET_SIZE(__pyx_args)); __PYX_ERR(0, 74, __pyx_L3_error)
   __pyx_L3_error:;
   __Pyx_AddTraceback("centroid.centroid_only", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_image), __pyx_ptype_5numpy_ndarray, 1, "image", 0))) __PYX_ERR(0, 110, __pyx_L1_error)
-  __pyx_r = __pyx_pf_8centroid_6centroid_only(__pyx_self, __pyx_v_image, __pyx_v_fwhm, __pyx_v_hmin, __pyx_v_boxsize);
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_image), __pyx_ptype_5numpy_ndarray, 1, "image", 0))) __PYX_ERR(0, 74, __pyx_L1_error)
+  __pyx_r = __pyx_pf_8centroid_4centroid_only(__pyx_self, __pyx_v_image, __pyx_v_fwhm, __pyx_v_hmin, __pyx_v_boxsize, __pyx_v_fittype, __pyx_v_sharpLow, __pyx_v_sharpHigh, __pyx_v_roundLow, __pyx_v_roundHigh, __pyx_v_verbose);
 
   /* function exit code */
   goto __pyx_L0;
@@ -3124,10 +3115,9 @@ static PyObject *__pyx_pw_8centroid_7centroid_only(PyObject *__pyx_self, PyObjec
   return __pyx_r;
 }
 
-static PyObject *__pyx_pf_8centroid_6centroid_only(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image, double __pyx_v_fwhm, int __pyx_v_hmin, int __pyx_v_boxsize) {
+static PyObject *__pyx_pf_8centroid_4centroid_only(CYTHON_UNUSED PyObject *__pyx_self, PyArrayObject *__pyx_v_image, double __pyx_v_fwhm, int __pyx_v_hmin, int __pyx_v_boxsize, int __pyx_v_fittype, double __pyx_v_sharpLow, double __pyx_v_sharpHigh, double __pyx_v_roundLow, double __pyx_v_roundHigh, int __pyx_v_verbose) {
   char *__pyx_v_cp;
   int __pyx_v_npoint[1];
-  long __pyx_v_fittype;
   struct centroids *__pyx_v_vals;
   PyObject *__pyx_v_result = NULL;
   __Pyx_LocalBuf_ND __pyx_pybuffernd_image;
@@ -3145,24 +3135,15 @@ static PyObject *__pyx_pf_8centroid_6centroid_only(CYTHON_UNUSED PyObject *__pyx
   __pyx_pybuffernd_image.rcbuffer = &__pyx_pybuffer_image;
   {
     __Pyx_BufFmt_StackElem __pyx_stack[1];
-    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_image.rcbuffer->pybuffer, (PyObject*)__pyx_v_image, &__Pyx_TypeInfo_int, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 110, __pyx_L1_error)
+    if (unlikely(__Pyx_GetBufferAndValidate(&__pyx_pybuffernd_image.rcbuffer->pybuffer, (PyObject*)__pyx_v_image, &__Pyx_TypeInfo_int, PyBUF_FORMAT| PyBUF_C_CONTIGUOUS, 2, 0, __pyx_stack) == -1)) __PYX_ERR(0, 74, __pyx_L1_error)
   }
   __pyx_pybuffernd_image.diminfo[0].strides = __pyx_pybuffernd_image.rcbuffer->pybuffer.strides[0]; __pyx_pybuffernd_image.diminfo[0].shape = __pyx_pybuffernd_image.rcbuffer->pybuffer.shape[0]; __pyx_pybuffernd_image.diminfo[1].strides = __pyx_pybuffernd_image.rcbuffer->pybuffer.strides[1]; __pyx_pybuffernd_image.diminfo[1].shape = __pyx_pybuffernd_image.rcbuffer->pybuffer.shape[1];
 
-  /* "centroid_wrapper.pyx":121
- *     cdef char *cp
- *     cdef int npoint[1]
- *     fittype=2             # <<<<<<<<<<<<<<
- * 
- *     #The function call
- */
-  __pyx_v_fittype = 2;
-
-  /* "centroid_wrapper.pyx":124
+  /* "centroid_wrapper.pyx":87
  * 
  *     #The function call
  *     with nogil:             # <<<<<<<<<<<<<<
- *          vals=centroid(<int *>image.data,image.shape[1],image.shape[0],hmin,fwhm, boxsize, npoint, 0, fittype)
+ *          vals=centroid(<int *>image.data,image.shape[1],image.shape[0],hmin,fwhm, boxsize, npoint, fittype, sharpLow, sharpHigh, roundLow, roundHigh, verbose)
  * 
  */
   {
@@ -3172,21 +3153,21 @@ static PyObject *__pyx_pf_8centroid_6centroid_only(CYTHON_UNUSED PyObject *__pyx
       #endif
       /*try:*/ {
 
-        /* "centroid_wrapper.pyx":125
+        /* "centroid_wrapper.pyx":88
  *     #The function call
  *     with nogil:
- *          vals=centroid(<int *>image.data,image.shape[1],image.shape[0],hmin,fwhm, boxsize, npoint, 0, fittype)             # <<<<<<<<<<<<<<
+ *          vals=centroid(<int *>image.data,image.shape[1],image.shape[0],hmin,fwhm, boxsize, npoint, fittype, sharpLow, sharpHigh, roundLow, roundHigh, verbose)             # <<<<<<<<<<<<<<
  * 
  *     #convert the output into a buffer string
  */
-        __pyx_v_vals = centroid(((int *)__pyx_v_image->data), (__pyx_v_image->dimensions[1]), (__pyx_v_image->dimensions[0]), __pyx_v_hmin, __pyx_v_fwhm, __pyx_v_boxsize, __pyx_v_npoint, 0, __pyx_v_fittype);
+        __pyx_v_vals = centroid(((int *)__pyx_v_image->data), (__pyx_v_image->dimensions[1]), (__pyx_v_image->dimensions[0]), __pyx_v_hmin, __pyx_v_fwhm, __pyx_v_boxsize, __pyx_v_npoint, __pyx_v_fittype, __pyx_v_sharpLow, __pyx_v_sharpHigh, __pyx_v_roundLow, __pyx_v_roundHigh, __pyx_v_verbose);
       }
 
-      /* "centroid_wrapper.pyx":124
+      /* "centroid_wrapper.pyx":87
  * 
  *     #The function call
  *     with nogil:             # <<<<<<<<<<<<<<
- *          vals=centroid(<int *>image.data,image.shape[1],image.shape[0],hmin,fwhm, boxsize, npoint, 0, fittype)
+ *          vals=centroid(<int *>image.data,image.shape[1],image.shape[0],hmin,fwhm, boxsize, npoint, fittype, sharpLow, sharpHigh, roundLow, roundHigh, verbose)
  * 
  */
       /*finally:*/ {
@@ -3200,7 +3181,7 @@ static PyObject *__pyx_pf_8centroid_6centroid_only(CYTHON_UNUSED PyObject *__pyx
       }
   }
 
-  /* "centroid_wrapper.pyx":128
+  /* "centroid_wrapper.pyx":91
  * 
  *     #convert the output into a buffer string
  *     cp = <char *> vals             # <<<<<<<<<<<<<<
@@ -3209,28 +3190,28 @@ static PyObject *__pyx_pf_8centroid_6centroid_only(CYTHON_UNUSED PyObject *__pyx
  */
   __pyx_v_cp = ((char *)__pyx_v_vals);
 
-  /* "centroid_wrapper.pyx":132
+  /* "centroid_wrapper.pyx":95
  *     #and into a numpy record array
  * 
  *     result=np.frombuffer(cp[:sizeof(centroids) * npoint[0]],dtype=[('x','<f8'),('y','<f8'),('fx','<f8'),('fy','<f8'),('back','<f8'),('peak','<f8'),('qual','<f8')])             # <<<<<<<<<<<<<<
  * 
  *     return result
  */
-  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_GetModuleGlobalName(__pyx_n_s_np); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_frombuffer); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_GetAttrStr(__pyx_t_1, __pyx_n_s_frombuffer); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
-  __pyx_t_1 = __Pyx_PyBytes_FromStringAndSize(__pyx_v_cp + 0, ((sizeof(struct centroids)) * (__pyx_v_npoint[0])) - 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyBytes_FromStringAndSize(__pyx_v_cp + 0, ((sizeof(struct centroids)) * (__pyx_v_npoint[0])) - 0); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_t_3 = PyTuple_New(1); if (unlikely(!__pyx_t_3)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_3);
   __Pyx_GIVEREF(__pyx_t_1);
   PyTuple_SET_ITEM(__pyx_t_3, 0, __pyx_t_1);
   __pyx_t_1 = 0;
-  __pyx_t_1 = PyDict_New(); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_t_1 = PyDict_New(); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_t_4 = PyList_New(7); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_t_4 = PyList_New(7); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_INCREF(__pyx_tuple_);
   __Pyx_GIVEREF(__pyx_tuple_);
@@ -3253,9 +3234,9 @@ static PyObject *__pyx_pf_8centroid_6centroid_only(CYTHON_UNUSED PyObject *__pyx
   __Pyx_INCREF(__pyx_tuple__7);
   __Pyx_GIVEREF(__pyx_tuple__7);
   PyList_SET_ITEM(__pyx_t_4, 6, __pyx_tuple__7);
-  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_t_4) < 0) __PYX_ERR(0, 132, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_dtype, __pyx_t_4) < 0) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
-  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_3, __pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_t_4 = __Pyx_PyObject_Call(__pyx_t_2, __pyx_t_3, __pyx_t_1); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_4);
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
   __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
@@ -3263,7 +3244,7 @@ static PyObject *__pyx_pf_8centroid_6centroid_only(CYTHON_UNUSED PyObject *__pyx
   __pyx_v_result = __pyx_t_4;
   __pyx_t_4 = 0;
 
-  /* "centroid_wrapper.pyx":134
+  /* "centroid_wrapper.pyx":97
  *     result=np.frombuffer(cp[:sizeof(centroids) * npoint[0]],dtype=[('x','<f8'),('y','<f8'),('fx','<f8'),('fy','<f8'),('back','<f8'),('peak','<f8'),('qual','<f8')])
  * 
  *     return result             # <<<<<<<<<<<<<<
@@ -3273,10 +3254,10 @@ static PyObject *__pyx_pf_8centroid_6centroid_only(CYTHON_UNUSED PyObject *__pyx
   __pyx_r = __pyx_v_result;
   goto __pyx_L0;
 
-  /* "centroid_wrapper.pyx":110
- *     return cp[:sizeof(double) * npoint[0] * 2]
+  /* "centroid_wrapper.pyx":74
+ *     return cp[:sizeof(fibreid) * homes.shape[0]/2]
  * 
- * def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhm, int hmin, int boxsize):             # <<<<<<<<<<<<<<
+ * def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):             # <<<<<<<<<<<<<<
  * 
  *     """
  */
@@ -18853,7 +18834,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_fwhm, __pyx_k_fwhm, sizeof(__pyx_k_fwhm), 0, 0, 1, 1},
   {&__pyx_n_s_fx, __pyx_k_fx, sizeof(__pyx_k_fx), 0, 0, 1, 1},
   {&__pyx_n_s_fy, __pyx_k_fy, sizeof(__pyx_k_fy), 0, 0, 1, 1},
-  {&__pyx_n_s_get_homes_call, __pyx_k_get_homes_call, sizeof(__pyx_k_get_homes_call), 0, 0, 1, 1},
   {&__pyx_kp_s_got_differing_extents_in_dimensi, __pyx_k_got_differing_extents_in_dimensi, sizeof(__pyx_k_got_differing_extents_in_dimensi), 0, 0, 1, 0},
   {&__pyx_n_s_hmin, __pyx_k_hmin, sizeof(__pyx_k_hmin), 0, 0, 1, 1},
   {&__pyx_n_s_homes, __pyx_k_homes, sizeof(__pyx_k_homes), 0, 0, 1, 1},
@@ -18884,7 +18864,11 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_qual, __pyx_k_qual, sizeof(__pyx_k_qual), 0, 0, 1, 1},
   {&__pyx_n_s_range, __pyx_k_range, sizeof(__pyx_k_range), 0, 0, 1, 1},
   {&__pyx_n_s_result, __pyx_k_result, sizeof(__pyx_k_result), 0, 0, 1, 1},
+  {&__pyx_n_s_roundHigh, __pyx_k_roundHigh, sizeof(__pyx_k_roundHigh), 0, 0, 1, 1},
+  {&__pyx_n_s_roundLow, __pyx_k_roundLow, sizeof(__pyx_k_roundLow), 0, 0, 1, 1},
   {&__pyx_n_s_shape, __pyx_k_shape, sizeof(__pyx_k_shape), 0, 0, 1, 1},
+  {&__pyx_n_s_sharpHigh, __pyx_k_sharpHigh, sizeof(__pyx_k_sharpHigh), 0, 0, 1, 1},
+  {&__pyx_n_s_sharpLow, __pyx_k_sharpLow, sizeof(__pyx_k_sharpLow), 0, 0, 1, 1},
   {&__pyx_n_s_size, __pyx_k_size, sizeof(__pyx_k_size), 0, 0, 1, 1},
   {&__pyx_n_s_start, __pyx_k_start, sizeof(__pyx_k_start), 0, 0, 1, 1},
   {&__pyx_n_s_step, __pyx_k_step, sizeof(__pyx_k_step), 0, 0, 1, 1},
@@ -18900,6 +18884,7 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_unpack, __pyx_k_unpack, sizeof(__pyx_k_unpack), 0, 0, 1, 1},
   {&__pyx_n_s_val, __pyx_k_val, sizeof(__pyx_k_val), 0, 0, 1, 1},
   {&__pyx_n_s_vals, __pyx_k_vals, sizeof(__pyx_k_vals), 0, 0, 1, 1},
+  {&__pyx_n_s_verbose, __pyx_k_verbose, sizeof(__pyx_k_verbose), 0, 0, 1, 1},
   {&__pyx_n_s_x, __pyx_k_x, sizeof(__pyx_k_x), 0, 0, 1, 1},
   {&__pyx_n_s_xp, __pyx_k_xp, sizeof(__pyx_k_xp), 0, 0, 1, 1},
   {&__pyx_n_s_y, __pyx_k_y, sizeof(__pyx_k_y), 0, 0, 1, 1},
@@ -18926,32 +18911,32 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_RefNannyDeclarations
   __Pyx_RefNannySetupContext("__Pyx_InitCachedConstants", 0);
 
-  /* "centroid_wrapper.pyx":132
+  /* "centroid_wrapper.pyx":95
  *     #and into a numpy record array
  * 
  *     result=np.frombuffer(cp[:sizeof(centroids) * npoint[0]],dtype=[('x','<f8'),('y','<f8'),('fx','<f8'),('fy','<f8'),('back','<f8'),('peak','<f8'),('qual','<f8')])             # <<<<<<<<<<<<<<
  * 
  *     return result
  */
-  __pyx_tuple_ = PyTuple_Pack(2, __pyx_n_s_x, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple_)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_tuple_ = PyTuple_Pack(2, __pyx_n_s_x, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple_)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple_);
   __Pyx_GIVEREF(__pyx_tuple_);
-  __pyx_tuple__2 = PyTuple_Pack(2, __pyx_n_s_y, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple__2)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_tuple__2 = PyTuple_Pack(2, __pyx_n_s_y, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple__2)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__2);
   __Pyx_GIVEREF(__pyx_tuple__2);
-  __pyx_tuple__3 = PyTuple_Pack(2, __pyx_n_s_fx, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_tuple__3 = PyTuple_Pack(2, __pyx_n_s_fx, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple__3)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__3);
   __Pyx_GIVEREF(__pyx_tuple__3);
-  __pyx_tuple__4 = PyTuple_Pack(2, __pyx_n_s_fy, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple__4)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_tuple__4 = PyTuple_Pack(2, __pyx_n_s_fy, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple__4)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__4);
   __Pyx_GIVEREF(__pyx_tuple__4);
-  __pyx_tuple__5 = PyTuple_Pack(2, __pyx_n_s_back, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple__5)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_tuple__5 = PyTuple_Pack(2, __pyx_n_s_back, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple__5)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__5);
   __Pyx_GIVEREF(__pyx_tuple__5);
-  __pyx_tuple__6 = PyTuple_Pack(2, __pyx_n_s_peak, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple__6)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_tuple__6 = PyTuple_Pack(2, __pyx_n_s_peak, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple__6)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__6);
   __Pyx_GIVEREF(__pyx_tuple__6);
-  __pyx_tuple__7 = PyTuple_Pack(2, __pyx_n_s_qual, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple__7)) __PYX_ERR(0, 132, __pyx_L1_error)
+  __pyx_tuple__7 = PyTuple_Pack(2, __pyx_n_s_qual, __pyx_kp_s_f8); if (unlikely(!__pyx_tuple__7)) __PYX_ERR(0, 95, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__7);
   __Pyx_GIVEREF(__pyx_tuple__7);
 
@@ -19198,53 +19183,41 @@ static int __Pyx_InitCachedConstants(void) {
   __Pyx_GOTREF(__pyx_tuple__29);
   __Pyx_GIVEREF(__pyx_tuple__29);
 
-  /* "centroid_wrapper.pyx":50
- *      centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,int boxsize,int *npoint,int VERBOSE,int fittype)
+  /* "centroid_wrapper.pyx":47
+ *      centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,int boxsize,int *npoint, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose)
  * 
- * def centroid_fine_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[double, ndim=1, mode="c"] homes, np.ndarray[double, ndim=1, mode="c"] xp,np.ndarray[double, ndim=1, mode="c"] yp):             # <<<<<<<<<<<<<<
+ * def centroid_fine_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[double, ndim=1, mode="c"] homes, np.ndarray[double, ndim=1, mode="c"] xp,np.ndarray[double, ndim=1, mode="c"] yp, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):             # <<<<<<<<<<<<<<
  * 
  *     cdef char *cp
  */
-  __pyx_tuple__31 = PyTuple_Pack(9, __pyx_n_s_image, __pyx_n_s_homes, __pyx_n_s_xp, __pyx_n_s_yp, __pyx_n_s_cp, __pyx_n_s_fwhm, __pyx_n_s_hmin, __pyx_n_s_boxsize, __pyx_n_s_vals); if (unlikely(!__pyx_tuple__31)) __PYX_ERR(0, 50, __pyx_L1_error)
+  __pyx_tuple__31 = PyTuple_Pack(15, __pyx_n_s_image, __pyx_n_s_homes, __pyx_n_s_xp, __pyx_n_s_yp, __pyx_n_s_fwhm, __pyx_n_s_hmin, __pyx_n_s_boxsize, __pyx_n_s_fittype, __pyx_n_s_sharpLow, __pyx_n_s_sharpHigh, __pyx_n_s_roundLow, __pyx_n_s_roundHigh, __pyx_n_s_verbose, __pyx_n_s_cp, __pyx_n_s_vals); if (unlikely(!__pyx_tuple__31)) __PYX_ERR(0, 47, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__31);
   __Pyx_GIVEREF(__pyx_tuple__31);
-  __pyx_codeobj__32 = (PyObject*)__Pyx_PyCode_New(4, 0, 9, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__31, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_karr_Science_PFS_Project, __pyx_n_s_centroid_fine_call, 50, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__32)) __PYX_ERR(0, 50, __pyx_L1_error)
+  __pyx_codeobj__32 = (PyObject*)__Pyx_PyCode_New(13, 0, 15, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__31, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_karr_Science_PFS_Project, __pyx_n_s_centroid_fine_call, 47, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__32)) __PYX_ERR(0, 47, __pyx_L1_error)
 
-  /* "centroid_wrapper.pyx":71
+  /* "centroid_wrapper.pyx":61
  * 
  * 
- * def centroid_coarse_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[int, ndim=2, mode="c"] arcimage,np.ndarray[double, ndim=1, mode="c"] homes):             # <<<<<<<<<<<<<<
+ * def centroid_coarse_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[int, ndim=2, mode="c"] arcimage,np.ndarray[double, ndim=1, mode="c"] homes, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):             # <<<<<<<<<<<<<<
  * 
  *     cdef char *cp
  */
-  __pyx_tuple__33 = PyTuple_Pack(8, __pyx_n_s_image, __pyx_n_s_arcimage, __pyx_n_s_homes, __pyx_n_s_cp, __pyx_n_s_fwhm, __pyx_n_s_hmin, __pyx_n_s_boxsize, __pyx_n_s_vals); if (unlikely(!__pyx_tuple__33)) __PYX_ERR(0, 71, __pyx_L1_error)
+  __pyx_tuple__33 = PyTuple_Pack(14, __pyx_n_s_image, __pyx_n_s_arcimage, __pyx_n_s_homes, __pyx_n_s_fwhm, __pyx_n_s_hmin, __pyx_n_s_boxsize, __pyx_n_s_fittype, __pyx_n_s_sharpLow, __pyx_n_s_sharpHigh, __pyx_n_s_roundLow, __pyx_n_s_roundHigh, __pyx_n_s_verbose, __pyx_n_s_cp, __pyx_n_s_vals); if (unlikely(!__pyx_tuple__33)) __PYX_ERR(0, 61, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__33);
   __Pyx_GIVEREF(__pyx_tuple__33);
-  __pyx_codeobj__34 = (PyObject*)__Pyx_PyCode_New(3, 0, 8, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__33, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_karr_Science_PFS_Project, __pyx_n_s_centroid_coarse_call, 71, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__34)) __PYX_ERR(0, 71, __pyx_L1_error)
+  __pyx_codeobj__34 = (PyObject*)__Pyx_PyCode_New(12, 0, 14, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__33, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_karr_Science_PFS_Project, __pyx_n_s_centroid_coarse_call, 61, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__34)) __PYX_ERR(0, 61, __pyx_L1_error)
 
-  /* "centroid_wrapper.pyx":91
+  /* "centroid_wrapper.pyx":74
  *     return cp[:sizeof(fibreid) * homes.shape[0]/2]
  * 
- * def get_homes_call(np.ndarray[int,ndim=2,mode="c"] image):             # <<<<<<<<<<<<<<
- * 
- *     cdef char *cp
- */
-  __pyx_tuple__35 = PyTuple_Pack(7, __pyx_n_s_image, __pyx_n_s_cp, __pyx_n_s_npoint, __pyx_n_s_homes, __pyx_n_s_fwhm, __pyx_n_s_hmin, __pyx_n_s_boxsize); if (unlikely(!__pyx_tuple__35)) __PYX_ERR(0, 91, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__35);
-  __Pyx_GIVEREF(__pyx_tuple__35);
-  __pyx_codeobj__36 = (PyObject*)__Pyx_PyCode_New(1, 0, 7, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__35, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_karr_Science_PFS_Project, __pyx_n_s_get_homes_call, 91, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__36)) __PYX_ERR(0, 91, __pyx_L1_error)
-
-  /* "centroid_wrapper.pyx":110
- *     return cp[:sizeof(double) * npoint[0] * 2]
- * 
- * def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhm, int hmin, int boxsize):             # <<<<<<<<<<<<<<
+ * def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):             # <<<<<<<<<<<<<<
  * 
  *     """
  */
-  __pyx_tuple__37 = PyTuple_Pack(10, __pyx_n_s_image, __pyx_n_s_fwhm, __pyx_n_s_hmin, __pyx_n_s_boxsize, __pyx_n_s_val, __pyx_n_s_cp, __pyx_n_s_npoint, __pyx_n_s_fittype, __pyx_n_s_vals, __pyx_n_s_result); if (unlikely(!__pyx_tuple__37)) __PYX_ERR(0, 110, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__37);
-  __Pyx_GIVEREF(__pyx_tuple__37);
-  __pyx_codeobj__38 = (PyObject*)__Pyx_PyCode_New(4, 0, 10, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__37, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_karr_Science_PFS_Project, __pyx_n_s_centroid_only, 110, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__38)) __PYX_ERR(0, 110, __pyx_L1_error)
+  __pyx_tuple__35 = PyTuple_Pack(15, __pyx_n_s_image, __pyx_n_s_fwhm, __pyx_n_s_hmin, __pyx_n_s_boxsize, __pyx_n_s_fittype, __pyx_n_s_sharpLow, __pyx_n_s_sharpHigh, __pyx_n_s_roundLow, __pyx_n_s_roundHigh, __pyx_n_s_verbose, __pyx_n_s_val, __pyx_n_s_cp, __pyx_n_s_npoint, __pyx_n_s_vals, __pyx_n_s_result); if (unlikely(!__pyx_tuple__35)) __PYX_ERR(0, 74, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__35);
+  __Pyx_GIVEREF(__pyx_tuple__35);
+  __pyx_codeobj__36 = (PyObject*)__Pyx_PyCode_New(10, 0, 15, 0, 0, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__35, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_Users_karr_Science_PFS_Project, __pyx_n_s_centroid_only, 74, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__36)) __PYX_ERR(0, 74, __pyx_L1_error)
 
   /* "View.MemoryView":282
  *         return self.name
@@ -19253,9 +19226,9 @@ static int __Pyx_InitCachedConstants(void) {
  * cdef strided = Enum("<strided and direct>") # default
  * cdef indirect = Enum("<strided and indirect>")
  */
-  __pyx_tuple__39 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct_or_indirect); if (unlikely(!__pyx_tuple__39)) __PYX_ERR(3, 282, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__39);
-  __Pyx_GIVEREF(__pyx_tuple__39);
+  __pyx_tuple__37 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct_or_indirect); if (unlikely(!__pyx_tuple__37)) __PYX_ERR(3, 282, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__37);
+  __Pyx_GIVEREF(__pyx_tuple__37);
 
   /* "View.MemoryView":283
  * 
@@ -19264,9 +19237,9 @@ static int __Pyx_InitCachedConstants(void) {
  * cdef indirect = Enum("<strided and indirect>")
  * 
  */
-  __pyx_tuple__40 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct); if (unlikely(!__pyx_tuple__40)) __PYX_ERR(3, 283, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__40);
-  __Pyx_GIVEREF(__pyx_tuple__40);
+  __pyx_tuple__38 = PyTuple_Pack(1, __pyx_kp_s_strided_and_direct); if (unlikely(!__pyx_tuple__38)) __PYX_ERR(3, 283, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__38);
+  __Pyx_GIVEREF(__pyx_tuple__38);
 
   /* "View.MemoryView":284
  * cdef generic = Enum("<strided and direct or indirect>")
@@ -19275,9 +19248,9 @@ static int __Pyx_InitCachedConstants(void) {
  * 
  * 
  */
-  __pyx_tuple__41 = PyTuple_Pack(1, __pyx_kp_s_strided_and_indirect); if (unlikely(!__pyx_tuple__41)) __PYX_ERR(3, 284, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__41);
-  __Pyx_GIVEREF(__pyx_tuple__41);
+  __pyx_tuple__39 = PyTuple_Pack(1, __pyx_kp_s_strided_and_indirect); if (unlikely(!__pyx_tuple__39)) __PYX_ERR(3, 284, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__39);
+  __Pyx_GIVEREF(__pyx_tuple__39);
 
   /* "View.MemoryView":287
  * 
@@ -19286,9 +19259,9 @@ static int __Pyx_InitCachedConstants(void) {
  * cdef indirect_contiguous = Enum("<contiguous and indirect>")
  * 
  */
-  __pyx_tuple__42 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_direct); if (unlikely(!__pyx_tuple__42)) __PYX_ERR(3, 287, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__42);
-  __Pyx_GIVEREF(__pyx_tuple__42);
+  __pyx_tuple__40 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_direct); if (unlikely(!__pyx_tuple__40)) __PYX_ERR(3, 287, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__40);
+  __Pyx_GIVEREF(__pyx_tuple__40);
 
   /* "View.MemoryView":288
  * 
@@ -19297,9 +19270,9 @@ static int __Pyx_InitCachedConstants(void) {
  * 
  * 
  */
-  __pyx_tuple__43 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_indirect); if (unlikely(!__pyx_tuple__43)) __PYX_ERR(3, 288, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_tuple__43);
-  __Pyx_GIVEREF(__pyx_tuple__43);
+  __pyx_tuple__41 = PyTuple_Pack(1, __pyx_kp_s_contiguous_and_indirect); if (unlikely(!__pyx_tuple__41)) __PYX_ERR(3, 288, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_tuple__41);
+  __Pyx_GIVEREF(__pyx_tuple__41);
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -19514,52 +19487,40 @@ PyMODINIT_FUNC PyInit_centroid(void)
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_ctypes, __pyx_t_2) < 0) __PYX_ERR(0, 7, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "centroid_wrapper.pyx":50
- *      centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,int boxsize,int *npoint,int VERBOSE,int fittype)
+  /* "centroid_wrapper.pyx":47
+ *      centroids *centroid(int *image, int n_x, int n_y, int hmin, double fwhm,int boxsize,int *npoint, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose)
  * 
- * def centroid_fine_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[double, ndim=1, mode="c"] homes, np.ndarray[double, ndim=1, mode="c"] xp,np.ndarray[double, ndim=1, mode="c"] yp):             # <<<<<<<<<<<<<<
- * 
- *     cdef char *cp
- */
-  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_8centroid_1centroid_fine_call, NULL, __pyx_n_s_centroid); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 50, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_centroid_fine_call, __pyx_t_2) < 0) __PYX_ERR(0, 50, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-
-  /* "centroid_wrapper.pyx":71
- * 
- * 
- * def centroid_coarse_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[int, ndim=2, mode="c"] arcimage,np.ndarray[double, ndim=1, mode="c"] homes):             # <<<<<<<<<<<<<<
+ * def centroid_fine_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[double, ndim=1, mode="c"] homes, np.ndarray[double, ndim=1, mode="c"] xp,np.ndarray[double, ndim=1, mode="c"] yp, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):             # <<<<<<<<<<<<<<
  * 
  *     cdef char *cp
  */
-  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_8centroid_3centroid_coarse_call, NULL, __pyx_n_s_centroid); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 71, __pyx_L1_error)
+  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_8centroid_1centroid_fine_call, NULL, __pyx_n_s_centroid); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 47, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_centroid_coarse_call, __pyx_t_2) < 0) __PYX_ERR(0, 71, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_centroid_fine_call, __pyx_t_2) < 0) __PYX_ERR(0, 47, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
-  /* "centroid_wrapper.pyx":91
+  /* "centroid_wrapper.pyx":61
+ * 
+ * 
+ * def centroid_coarse_call(np.ndarray[int, ndim=2, mode="c"] image,np.ndarray[int, ndim=2, mode="c"] arcimage,np.ndarray[double, ndim=1, mode="c"] homes, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):             # <<<<<<<<<<<<<<
+ * 
+ *     cdef char *cp
+ */
+  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_8centroid_3centroid_coarse_call, NULL, __pyx_n_s_centroid); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 61, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_2);
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_centroid_coarse_call, __pyx_t_2) < 0) __PYX_ERR(0, 61, __pyx_L1_error)
+  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
+
+  /* "centroid_wrapper.pyx":74
  *     return cp[:sizeof(fibreid) * homes.shape[0]/2]
  * 
- * def get_homes_call(np.ndarray[int,ndim=2,mode="c"] image):             # <<<<<<<<<<<<<<
- * 
- *     cdef char *cp
- */
-  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_8centroid_5get_homes_call, NULL, __pyx_n_s_centroid); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 91, __pyx_L1_error)
-  __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_get_homes_call, __pyx_t_2) < 0) __PYX_ERR(0, 91, __pyx_L1_error)
-  __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
-
-  /* "centroid_wrapper.pyx":110
- *     return cp[:sizeof(double) * npoint[0] * 2]
- * 
- * def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhm, int hmin, int boxsize):             # <<<<<<<<<<<<<<
+ * def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhm, int hmin, int boxsize, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose):             # <<<<<<<<<<<<<<
  * 
  *     """
  */
-  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_8centroid_7centroid_only, NULL, __pyx_n_s_centroid); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 110, __pyx_L1_error)
+  __pyx_t_2 = PyCFunction_NewEx(&__pyx_mdef_8centroid_5centroid_only, NULL, __pyx_n_s_centroid); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 74, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_centroid_only, __pyx_t_2) < 0) __PYX_ERR(0, 110, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_centroid_only, __pyx_t_2) < 0) __PYX_ERR(0, 74, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_2); __pyx_t_2 = 0;
 
   /* "centroid_wrapper.pyx":1
@@ -19592,7 +19553,7 @@ PyMODINIT_FUNC PyInit_centroid(void)
  * cdef strided = Enum("<strided and direct>") # default
  * cdef indirect = Enum("<strided and indirect>")
  */
-  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__39, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(3, 282, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__37, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(3, 282, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_XGOTREF(generic);
   __Pyx_DECREF_SET(generic, __pyx_t_2);
@@ -19606,7 +19567,7 @@ PyMODINIT_FUNC PyInit_centroid(void)
  * cdef indirect = Enum("<strided and indirect>")
  * 
  */
-  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__40, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(3, 283, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__38, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(3, 283, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_XGOTREF(strided);
   __Pyx_DECREF_SET(strided, __pyx_t_2);
@@ -19620,7 +19581,7 @@ PyMODINIT_FUNC PyInit_centroid(void)
  * 
  * 
  */
-  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__41, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(3, 284, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__39, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(3, 284, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_XGOTREF(indirect);
   __Pyx_DECREF_SET(indirect, __pyx_t_2);
@@ -19634,7 +19595,7 @@ PyMODINIT_FUNC PyInit_centroid(void)
  * cdef indirect_contiguous = Enum("<contiguous and indirect>")
  * 
  */
-  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__42, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(3, 287, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__40, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(3, 287, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_XGOTREF(contiguous);
   __Pyx_DECREF_SET(contiguous, __pyx_t_2);
@@ -19648,7 +19609,7 @@ PyMODINIT_FUNC PyInit_centroid(void)
  * 
  * 
  */
-  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__43, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(3, 288, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyObject_Call(((PyObject *)__pyx_MemviewEnum_type), __pyx_tuple__41, NULL); if (unlikely(!__pyx_t_2)) __PYX_ERR(3, 288, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   __Pyx_XGOTREF(indirect_contiguous);
   __Pyx_DECREF_SET(indirect_contiguous, __pyx_t_2);

@@ -1,0 +1,80 @@
+
+README and notes for iPython notebook for visualization
+
+
+Intro
+-----
+
+This notebook reads in a FITS file for a pinhole mask image and
+does various diagnostic plots. These were chosen based on
+those done during engineering in Hawaii, and consist of the following
+
+- displaying the image for inspection
+- select a region of interest
+- calculate the pinhole mask grid
+- run the centroiding code and display the results
+- tune the centroiding parameters
+- match the pinholes to the spots and display teh results
+- plot image quality diagnostics
+     FWHM (x)
+     FWHM (y)
+     ellipticity
+     peak value
+     total flux of spots
+- calculate and plot a single field distortion map
+     quiver plot
+     colour plot (units of mm)
+     colour plot (units of % of field size)
+
+For the above plots, the scale of the colour plots can be tuned
+manually if desired, and the data can be filtered by maximum value. 
+
+
+Installing
+----------
+
+distortion_routines.py contains python routines used by the
+notebook. You will also need to have compiled the centroiding code (from the
+mpfitCentroid directory) by
+
+> python setup.py build_ext --inplace
+
+and installed ginga and the openCV library, plus astropy
+
+
+Variables That Might Need to Be Changed
+---------------------------------------
+
+filename, prefix: for each image
+
+scale: slightly different between Taipei lab and Hilo.
+
+centroiding parameters
+  rl, rh: ROUND parameters, -1,1 for symmetric PSFs, need larger range
+      	  for elongated
+
+  sl, sh: SHARP paramters, shouldn't need tuning
+
+Mask paramters
+
+   rotation: to 0 or 1 depending on rotation of mask wrt image
+
+   includeClose: set to 1 to include close spaced points in calculations
+
+Plotting Parameters
+
+   limit: sets an upper limit for the points to be excluded in the plot
+   plotrange: a 2 element array wtih minimum and maximum values for
+   	      colour range on plots. Setting to None will default
+	      to min and max.
+
+
+
+Plots
+-----
+
+plots are shown inline in the notebook, and automatically saved to jpg
+files on disk. The file names will start with the prefix variable (which
+can include a path name).
+
+

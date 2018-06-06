@@ -24,7 +24,7 @@ typedef struct thread_data
   double sharplim[2];  //LIMITS FOR SHARP
   double roundlim[2];  //LIMITS FOR ROUND
   int fittype;
-  int VERBOSE;
+  int verbose;
 
   struct cand_point *cand_list;  //LIST OF CANDIDATE POINTS (PASSED BACK TO ROUTINE)
 
