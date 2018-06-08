@@ -5,6 +5,8 @@ from builtins import zip
 
 from builtins import range
 from builtins import object
+import ast
+
 import matplotlib
 import matplotlib.pyplot as plt
 import time
@@ -170,7 +172,9 @@ class McsCmd(object):
     def _getInstHeader(self, cmd):
         """ Gather FITS cards from all actors we are interested in. """
 
+        cmd.debug('text="fetching MHS cards..."')
         cards = fitsUtils.gatherHeaderCards(cmd, self.actor, shortNames=True)
+        cmd.debug('text="fetched %d MHS cards..."' % (len(cards)))
 
         # Until we convert to fitsio, convert cards to pyfits
         pycards = []
@@ -180,6 +184,7 @@ class McsCmd(object):
             else:
                 pcard = c['name'], c['value'], c.get('comment', '')
             pycards.append(pcard)
+            cmd.debug('text=%s' % (qstr("fetched card: %s" % (str(pcard)))))
 
         return pycards
 
@@ -194,9 +199,17 @@ class McsCmd(object):
         if ret.didFail:
             raise RuntimeError("getFitsCards failed!")
 
+        # This is total crap. 
         hdrString = self.actor.models['gen2'].keyVarDict['header'].valueList[0]
-        hdr = pyfits.Header.fromstring(hdrString)
-
+        hdrString = hdrString.replace(r'\\\\', r'\\')
+        hdrString = hdrString.replace(r'\"', r'"')
+        hdrString = "\'" + hdrString + "\'"
+        try:
+            hdr = pyfits.Header.fromstring(ast.literal_eval(hdrString))
+        except Exception as e:
+            cmd.warn('text="FAILED to fetch gen2 cards: %s"' % (e))
+            hdr = []
+        
         try:
             instCards = self._getInstHeader(cmd)
             hdr.extend(instCards, bottom=True)
@@ -263,12 +276,12 @@ class McsCmd(object):
         cmd.diag(f'text="done: {image.shape}"')
 
         hdr = self._constructHeader(cmd, expType, expTime)
+        cmd.diag(f'text="hdr done: {len(hdr)}"')
         phdu = pyfits.PrimaryHDU(header=hdr)
         imgHdu = pyfits.CompImageHDU(image, compression_type='RICE_1')
         hduList = pyfits.HDUList([phdu, imgHdu])
 
         hduList.writeto(filename, checksum=False, overwrite=True)
-
         cmd.inform('filename="%s"' % (filename))
 
         return filename, image
