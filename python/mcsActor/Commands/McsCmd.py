@@ -77,7 +77,7 @@ class McsCmd(object):
 
         # Define typed command arguments for the above commands.
         self.keys = keys.KeysDictionary("mcs_mcs", (1, 1),
-                                        keys.Key("expTime", types.Float(), help="The exposure time"),
+                                        keys.Key("expTime", types.Float(), help="The exposure time, seconds"),
                                         keys.Key("expType", types.String(), help="The exposure type"),
                                         keys.Key("filename", types.String(), help="Image filename"),
                                         keys.Key("path", types.String(), help="Simulated image directory"),
@@ -300,7 +300,7 @@ class McsCmd(object):
         if expType in ('bias', 'test'):
             expTime = self.expTime
         else:
-            expTime = cmd.cmd.keywords["expTime"].values[0]
+            expTime = cmd.cmd.keywords["expTime"].values[0] * 1000
 
         if (expTime != self.expTime):
             self.actor.camera.setExposureTime(cmd,expTime)
