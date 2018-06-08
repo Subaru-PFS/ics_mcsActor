@@ -190,7 +190,7 @@ printUsageSyntax(char *prgname) {
 	   "Usage: %s <INPUT> <OUTPUT> [options...]\n"
 		"	-h, --help   display help message\n"
 		"	-f, --file   name of FITS file to be saved.\n"
-		"	-l, --loops  number of exposure loops.\n"
+		"	-e, --etype  exposure type [flat|object|dark|object].\n"
 		"	-t, --exptime  shutter time.\n"
 		"	-c, --coadd  produce a co-added image.\n"
 		"	-v, --verbose  turn on verbose.\n"
