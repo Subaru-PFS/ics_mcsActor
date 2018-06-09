@@ -232,7 +232,6 @@ int main(int argc, char *argv[]){
     double dtime;
 	/** Check the total number of the arguments */
 	struct option longopts[] = {
-         {"loops" ,0, NULL, 'l'},
 	     {"file" ,0, NULL, 'f'},
 	     {"exptime" ,0, NULL, 't'},
 	     {"coadd" ,0, NULL, 'c'},
@@ -243,9 +242,6 @@ int main(int argc, char *argv[]){
 	while((opt = getopt_long(argc, argv, "f:l:t:vhc",
 	   longopts, NULL))  != -1){
 	      switch(opt) {
-	         case 'l':
-	               loops = atoi(optarg);
-	               break;
 	         case 't':
 	               exptime = atoi(optarg);
 	               break;
