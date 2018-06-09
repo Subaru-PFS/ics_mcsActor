@@ -74,7 +74,7 @@ int OpenShutterTime(void* time)
 int WriteFitsImage(char *filename, int height, int width, u_char * image_p)
 {
     fitsfile *fptr;       /* pointer to the FITS file, defined in fitsio.h */
-    int status, ii, jj;
+    int status, ii;
     long  fpixel, nelements, exposure;
     unsigned short *array=NULL;
 
@@ -209,7 +209,6 @@ int main(int argc, char *argv[]){
 	int    imagesize;
 	int    verbose=0,loops;
 	int    i,ii;
-	int    timeouts = 0;
 	int    exptime = 0;
 	int    ret;
 	int    coadd = 0;
@@ -228,7 +227,7 @@ int main(int argc, char *argv[]){
     char   errstr[64];
     char   string[256];
 
-    double shutter_ts,start_ts,end_ts,save_ts;
+    double shutter_ts,start_ts,save_ts;
     double dtime;
 	/** Check the total number of the arguments */
 	struct option longopts[] = {
@@ -315,8 +314,8 @@ int main(int argc, char *argv[]){
 	
 	image_p=pdv_alloc(pdv_image_size(pdv_p));
 
-	printf("data=%i\n",pdv_image_size(pdv_p));
 	if (verbose) printf("Image size --> Height = %i Width= %i\n", s_height, s_width);
+	if (verbose) printf("Total pixels = %i\n",pdv_image_size(pdv_p));
 
 	if (s_height<1 && s_width<1){
 		fprintf(stderr, "Error: (%s:%s:%d) image size incorrect. "
@@ -363,49 +362,48 @@ int main(int argc, char *argv[]){
 	/* Finishing the shutter thread */
 	pthread_join(id,NULL);
 
-	
-	i=0;
-	while(loops) {
-		start_ts = getClockTime();
-
-		//if (verbose){	
-		//	if (i == 1) fprintf(stdout,"Acquisition + shutter runtime = %f\n", end_ts-shutter_ts);
-		//	fprintf(stdout,"%02i Image acquisition runtime = %f\n",i, end_ts-start_ts);
-		//}
-		sprintf(string,"%s%04i%s",file,i+1,".fits");
-
-		//process and/or display image previously acquired here
-		//WriteFitsImage(string, s_height, s_width,bufs[i]);
-
-		if (verbose){
-			save_ts=getClockTime();;
-			fprintf(stdout,"%02i Image saving runtime = %f\n",i+1, save_ts-start_ts);
-
-		}
-		
-		loops--;
-		i++;
-
-	}	
-	//pdv_free(image_p);
-
+	/* Stacking frames if the flag is set */
 	if (coadd){
 		if (verbose) printf("Coadding all frames.\n");
-		
+
 		coaddframe = (u_char *)malloc(imagesize*sizeof(u_char));
 		sprintf(string,"%s","coadd.fits");
-		
+
 		for(i=0;i<nloops;i++) {
 			for (ii=0;ii<imagesize;ii++){
 				coaddframe[ii]=coaddframe[ii]+bufs[i][ii];
 			}
 		}
 		WriteFitsImage(string, s_height, s_width, coaddframe);
+	} else {
+
+		i=0;
+		while(loops) {
+			start_ts = getClockTime();
+
+			sprintf(string,"%s%04i%s",file,i+1,".fits");
+
+			/*process and/or display image previously acquired here*/
+			WriteFitsImage(string, s_height, s_width,bufs[i]);
+
+			if (verbose){
+				save_ts=getClockTime();;
+				fprintf(stdout,"%02i Image saving runtime = %f\n",i+1, save_ts-start_ts);
+			}
+
+			loops--;
+			i++;
+
+		}
 	}
+
+
+	/* Free imaeg blocks */
 	free(coaddframe);
 	free(bufs);
-	//pdv_free(image_p);
 	pdv_close(pdv_p);
+
+
 	printf("done\n");
 	return EXIT_SUCCESS;
 

@@ -388,8 +388,9 @@ class McsCmd(object):
         # Actually, we want dtype,naxis,axNlen,base64(array)
         return base64.b64encode(array.tostring())
 
-    def imageStats(self, cmd, basename, doFinish=True):
-
+    def imageStats(self, cmd):
+        
+        doFinish = True
         cmd.inform('text="image median = %d." '% (np.median(self.actor.image))) 
         cmd.inform('text="image mean = %d." '% (self.actor.image.mean())) 
         cmd.inform('text="image min = %d." '% (self.actor.image.min())) 

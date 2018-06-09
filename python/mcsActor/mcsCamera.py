@@ -68,27 +68,34 @@ class mcsCamera(Camera):
             pass
             
         t1=time.time()
+       
         # Command camera to do exposure sequence
-        slicename=filename[0:37]+'_'
+        slicename=filename[0:32]+'_'
         cmd.inform('text="slice name: %s"' % (slicename))
         p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
         output, errors = p.communicate()
-	#cmd.inform(stdout)
         t2=time.time()
         if (output == 'done'):
             cmd.inform('exposureState="done"')       
 
         if cmd:
-            cmd.inform('exposureState="image reading"')
+            cmd.inform('exposureState="reading"')
 
+        coaddpath=os.environ['ICS_MCSACTOR_DIR']
+        shutil.copy(coaddpath+'/coadd.fits', filename)
+        f = pyfits.open(coaddpath+'/coadd.fits')
         
-        shutil.copy('/home/pfs/mhs/devel/ics_mcsActor/coadd.fits', filename)
-        f = pyfits.open('/home/pfs/mhs/devel/ics_mcsActor/coadd.fits')
+        # Remove the temporary file
+        try:
+            os.remove(coaddpath+'/coadd.fits')
+        except OSError:
+            pass
+        
               
         image = f[0].data
         t3=time.time()
-        cmd.inform('text="ttime = %f." '% ((t2-t1)/1.))
-        cmd.inform('text="ttime = %f." '% ((t3-t2)/1.))
+        cmd.inform('text="Time for exposure = %f." '% ((t2-t1)/1.))
+        cmd.inform('text="Time for image loading= %f." '% ((t3-t2)/1.))
 
         return image
         
