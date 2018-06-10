@@ -64,17 +64,30 @@ class mcsCamera(Camera):
             expType = 'test'
         if cmd:
             cmd.inform('exposureState="exposing"')
-        if expType not in ('bias', 'test') and expTime > 0:
-            pass
-            
-        t1=time.time()
+        
+        if expType in ('dark','bias') and expTime > 0:
+            cmd.inform('text="ETYPE: %s"' % (expType))
+            t1=time.time()
        
-        # Command camera to do exposure sequence
-        slicename=filename[0:32]+'_'
-        cmd.inform('text="slice name: %s"' % (slicename))
-        p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
-        output, errors = p.communicate()
-        t2=time.time()
+            # Command camera to do exposure sequence
+            slicename=filename[0:32]+'_'
+            cmd.inform('text="slice name: %s"' % (slicename))
+            p = sub.Popen(['canonexp -e ', expType, '-f', slicename, '-t', str(expTime), '-c'],
+                          bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            output, errors = p.communicate()
+            t2=time.time()
+           
+        
+        if expType in ('test','flat','object') and expTime > 0:
+            t1=time.time()
+       
+            # Command camera to do exposure sequence
+            slicename=filename[0:32]+'_'
+            cmd.inform('text="slice name: %s"' % (slicename))
+            p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            output, errors = p.communicate()
+            t2=time.time()
+        
         if (output == 'done'):
             cmd.inform('exposureState="done"')       
 

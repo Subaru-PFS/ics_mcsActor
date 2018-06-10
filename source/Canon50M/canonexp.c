@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <ctype.h>
 #include <getopt.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -20,6 +21,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+
 
 #include "fitsio.h"
 #include "edtinc.h"
@@ -181,6 +183,11 @@ void delay(unsigned int mseconds)
     while (goal > clock());
 }
 
+void strupp(char* lower)
+{
+	while (*lower = toupper(*lower)) lower++;
+}
+
 
 /* Print out the proper program usage syntax */
 static void
@@ -212,6 +219,7 @@ int main(int argc, char *argv[]){
 	int    exptime = 0;
 	int    ret;
 	int    coadd = 0;
+	int    flag = 0;
 
 	EdtDev *pdv_p = NULL;
 
@@ -226,6 +234,9 @@ int main(int argc, char *argv[]){
 	char   edt_devname[256];
     char   errstr[64];
     char   string[256];
+    char   *etype=NULL;
+
+	char etype_list[5][20]={"DARK","BIAS","FLAT","OBJECT","TEST"};
 
     double shutter_ts,start_ts,save_ts;
     double dtime;
@@ -233,14 +244,18 @@ int main(int argc, char *argv[]){
 	struct option longopts[] = {
 	     {"file" ,0, NULL, 'f'},
 	     {"exptime" ,0, NULL, 't'},
+	     {"etype" ,0, NULL, 'e'},
 	     {"coadd" ,0, NULL, 'c'},
 		 {"verbose",0, NULL, 'v'},
 		 {"help", 0, NULL, 'h'},
 		 {0,0,0,0}};
 
-	while((opt = getopt_long(argc, argv, "f:l:t:vhc",
+	while((opt = getopt_long(argc, argv, "e:f:l:t:vhc",
 	   longopts, NULL))  != -1){
 	      switch(opt) {
+	         case 'e':
+	               etype = optarg;
+	               break;
 	         case 't':
 	               exptime = atoi(optarg);
 	               break;
@@ -264,13 +279,17 @@ int main(int argc, char *argv[]){
 	      }
 	}
 
-
 	/** Print the usage syntax if there is no input */
 	if (argc < 2 ) {
 		printUsageSyntax(argv[0]);
 		return EXIT_FAILURE;
 	}
 
+	if (etype == NULL){
+		fprintf(stderr, "Warning: (%s:%s:%d) ETYPE is not set, use OBJECT."
+		"\n", __FILE__, __func__, __LINE__);
+		etype=etype_list[3];
+	}
 	if (file == NULL){
 		fprintf(stderr, "Warning: (%s:%s:%d) there is no FITS file name specified, use \"exposureXX.fits\"."
 		"\n", __FILE__, __func__, __LINE__);
@@ -284,6 +303,32 @@ int main(int argc, char *argv[]){
 	if (loops > 1){
 		if (verbose) printf("take %i exposures.\n",loops);
 	}
+
+	strupp(etype);
+	for (i=0;i<5;i++){
+		if (strcmp(etype, etype_list[i]) == 0){
+			flag++;
+		}
+	}
+	if (flag == 0){
+		fprintf(stderr, "Error: (%s:%s:%d) ETYPE setting incorrect. "
+				"Check ETYPE setting.\n", __FILE__, __func__, __LINE__);
+		return EXIT_FAILURE;
+	}
+
+
+	if (strcmp(etype, "DARK") == 0 || strcmp(etype, "BIAS") == 0){
+		if (verbose) {
+			printf("Exposure type = %s .\n",etype);
+			printf("Setting shutter time = 0\n");
+		}
+		exptime=0;
+	} else {
+		if (verbose) printf("Exposure type = %s .\n",etype);
+	}
+
+	//return EXIT_SUCCESS;
+
 
 	/* Start to establish EDT connection */
 	unit = edt_parse_unit_channel(unitstr, edt_devname, "pdv", &channel);
@@ -302,7 +347,7 @@ int main(int argc, char *argv[]){
      */
 
 	if ((pdv_p = pdv_open_channel(edt_devname, unit, channel)) == NULL){
-    	fprintf(stderr, "Error:pdv_open(%s%d_%d)", edt_devname, unit, channel);
+    		fprintf(stderr, "Error:pdv_open(%s%d_%d)", edt_devname, unit, channel);
         pdv_perror(errstr);
         return EXIT_FAILURE;
 	}
