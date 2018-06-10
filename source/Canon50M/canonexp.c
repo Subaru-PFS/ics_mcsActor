@@ -393,7 +393,9 @@ int main(int argc, char *argv[]){
 		}
     }
 	
-	ret=pthread_create(&id,NULL,(void *) OpenShutterTime, (void *)&exptime);
+    if (exptime > 0){
+    		ret=pthread_create(&id,NULL,(void *) OpenShutterTime, (void *)&exptime);
+    }
 
 	(void) edt_dtime();		/* init time for check */
 	pdv_start_images(pdv_p, loops);
@@ -405,8 +407,9 @@ int main(int argc, char *argv[]){
     printf("Image reading finished with %f frames/sec\n",(double) (loops) / dtime);
 	
 	/* Finishing the shutter thread */
-	pthread_join(id,NULL);
-
+    if (exptime > 0){
+    		pthread_join(id,NULL);
+    }
 	/* Stacking frames if the flag is set */
 	if (coadd){
 		if (verbose) printf("Coadding all frames.\n");
