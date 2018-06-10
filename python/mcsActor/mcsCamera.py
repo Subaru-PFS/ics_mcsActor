@@ -70,10 +70,9 @@ class mcsCamera(Camera):
             t1=time.time()
        
             # Command camera to do exposure sequence
-            slicename=filename[0:32]+'_'
+            slicename=filename[0:33]+'_'
             cmd.inform('text="slice name: %s"' % (slicename))
-            p = sub.Popen(['canonexp -e ', expType, '-f', slicename, '-t', str(expTime), '-c'],
-                          bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            p = sub.Popen(['canonexp', '-e', expType, '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
             output, errors = p.communicate()
             t2=time.time()
            
@@ -82,7 +81,7 @@ class mcsCamera(Camera):
             t1=time.time()
        
             # Command camera to do exposure sequence
-            slicename=filename[0:32]+'_'
+            slicename=filename[0:33]+'_'
             cmd.inform('text="slice name: %s"' % (slicename))
             p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
             output, errors = p.communicate()
