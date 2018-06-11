@@ -2,7 +2,8 @@
 
 import numpy as np
 import pylab as py
-import centroid as centroid
+
+import mcsActor.mpfitCentroid.centroid as centroid
 from heapq import nsmallest
 import cv2
 from matplotlib.cm import plasma
