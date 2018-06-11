@@ -15,34 +15,7 @@
 
 
 
-
-double *get_homes(int *image,int n_x, int n_y, int *np,int hmin, double fwhm, int boxsize)
-{
-
-  /* get the home positions from the first frame. */
-
-  int i; // counter
-
-  
-  int fittype=1; //set the fit time (1D fits)
-  int verbose=1; //suppress debugging output
-
-  //call the centroiding
-  centroids *positions=centroid(image,n_x, n_y,hmin,fwhm,boxsize,np,verbose,fittype);
-
-  //assign to the variables 
-  double *homes=malloc(np[0]*2*sizeof(double));
-
-  for (i=0;i<np[0];i++)
-    {
-      homes[i]=positions[i].x;
-      homes[np[0]+i]=positions[i].y;
-    }
-  return homes;
-
-}
-
-fibreid *centroid_coarse(int *image, int *arc_image,double *homes,int n_x,int n_y,int hmin, double fwhm, int boxsize,int nhome)
+fibreid *centroid_coarse(int *image, int *arc_image,double *homes,int n_x,int n_y,int hmin, double fwhm, int boxsize,int nhome, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh, int verbose)
 { 
 
   /* call the centroiding and finding for a large move*/
@@ -62,13 +35,11 @@ fibreid *centroid_coarse(int *image, int *arc_image,double *homes,int n_x,int n_
 
   //now the centroiding of the current position
 
-  int fittype=0; //fast but low accuracy
-  int verbose=0; //suppress debugging output
   int np1[1];    //number of points detected
   int npval;     //size of spiral
 
   //call the centroiding
-  centroids *positions=centroid(image,n_x, n_y,hmin,fwhm,boxsize,np1,verbose,fittype);
+  centroids *positions=centroid(image,n_x, n_y,hmin,fwhm,boxsize,np1,fittype,sharpLow,sharpHigh,roundLow,roundHigh,verbose);
 
   //assign the values to the currentpos array
 
@@ -96,7 +67,7 @@ fibreid *centroid_coarse(int *image, int *arc_image,double *homes,int n_x,int n_
 
 }
 
-fibreid *centroid_fine(int *image, double *homes,double *xp,double *yp,int n_x,int n_y,int hmin, double fwhm, int boxsize,int nhome)
+fibreid *centroid_fine(int *image, double *homes,double *xp,double *yp,int n_x,int n_y,int hmin, double fwhm, int boxsize,int nhome, int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,  int verbose)
 { 
 
   /* call the centroiding and finding for a small move. Here we need the previous positions from the previous iteration.*/
@@ -117,11 +88,9 @@ fibreid *centroid_fine(int *image, double *homes,double *xp,double *yp,int n_x,i
     }
 
   //now the centroiding of the current position
-  int fittype=1;
-  int verbose=0;
   int np1[1];
 
-  centroids *positions=centroid(image,n_x, n_y,hmin,fwhm,boxsize,np1,verbose,fittype);
+  centroids *positions=centroid(image,n_x, n_y,hmin,fwhm,boxsize,np1,fittype, sharpLow, sharpHigh, roundLow, roundHigh, verbose);
 
   fibreid *currentpos=malloc(sizeof(fibreid)*np1[0]);
   for (i=0;i<np1[0];i++)

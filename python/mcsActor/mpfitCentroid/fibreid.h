@@ -64,8 +64,8 @@ void  confused_fibres(struct id_list **as_fibre,struct id_list **un_fibre,struct
 
 double *get_homes(int *image,int n_x, int n_y, int *np,int hmin, double fwhm, int boxsize);
 
-fibreid *centroid_coarse(int *image, int *arc_image,double *homes,int n_x,int n_y,int hmin, double fwhm, int boxsize,int nhome);
+fibreid *centroid_coarse(int *image, int *arc_image,double *homes,int n_x,int n_y,int hmin, double fwhm, int boxsize,int nhome,  int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose);
 
-fibreid *centroid_fine(int *image, double *homes,double *xp,double *yp,int n_x,int n_y,int hmin, double fwhm, int boxsize,int nhome);
+fibreid *centroid_fine(int *image, double *homes,double *xp,double *yp,int n_x,int n_y,int hmin, double fwhm, int boxsize,int nhome,  int fittype, double sharpLow, double sharpHigh, double roundLow, double roundHigh,int verbose);
 
 #endif // fibreid_H_

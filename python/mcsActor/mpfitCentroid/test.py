@@ -2,8 +2,7 @@ from builtins import range
 from centroid import get_homes_call
 from centroid import centroid_coarse_call
 from centroid import centroid_fine_call
-import astropy.io.fits as pyfits
-
+import pyfits
 import numpy as np
 import pylab as py
 
