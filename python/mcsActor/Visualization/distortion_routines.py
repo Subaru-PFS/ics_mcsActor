@@ -1,7 +1,7 @@
 
 
 import numpy as np
-import pylab as py
+import matplotlib.pyplot as plt
 
 import mcsActor.mpfitCentroid.centroid as centroid
 from heapq import nsmallest
@@ -226,12 +226,12 @@ def checkCentroids(xc,yc,cutrange,prefix):
     """
 
     #set figuresize
-    py.clf()
-    fig=py.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
+    plt.clf()
+    fig=plt.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
 
     #scatter plot
     
-    py.scatter(xc,yc)
+    plt.scatter(xc,yc)
 
     #set limit if desired
     if(cutrange==1):
@@ -239,8 +239,8 @@ def checkCentroids(xc,yc,cutrange,prefix):
         np.ylim([-8,344])
 
     #display and save
-    py.show()
-    py.savefig(prefix+"_checkpoints.jpg")
+    plt.show()
+    plt.savefig(prefix+"_checkpoints.pdf")
         
 def matchPoints(xc,yc,xx,yy,fx,fy,peak):    
 
@@ -298,17 +298,17 @@ def checkMatched(xx,yy,xs,ys,prefix):
 
     
     #set image size
-    py.clf()
-    fig=py.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
+    plt.clf()
+    fig=plt.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
 
     #scatter plot: centroids in circles, mask in red dots
     
-    py.scatter(xs,ys)
-    py.scatter(xx,yy,s=20,color='r')
+    plt.scatter(xs,ys)
+    plt.scatter(xx,yy,s=20,color='r')
 
     #save and show
-    py.savefig(prefix+"_checkpoints1.jpg")
-    py.show()
+    plt.savefig(prefix+"_checkpoints1.pdf")
+    plt.show()
 
 def simpleDistortion(xx,yy,xs,ys):    
 
@@ -411,42 +411,42 @@ def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix):
         
     #quiver plot
     
-    py.clf()
-    fig=py.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
+    plt.clf()
+    fig=plt.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
 
-    py.quiver(pts1[0,ind,0],pts1[0,ind,1],-diffx[ind],-diffy[ind])
-    py.xlabel("x (mm)",fontsize=40)
-    py.ylabel("y (mm)",fontsize=40)
-    py.title("Distortion")
-    py.show()
-    py.savefig(prefix+"_distortion.jpg")
+    plt.quiver(pts1[0,ind,0],pts1[0,ind,1],-diffx[ind],-diffy[ind])
+    plt.xlabel("x (mm)",fontsize=40)
+    plt.ylabel("y (mm)",fontsize=40)
+    plt.title("Distortion")
+    plt.show()
+    plt.savefig(prefix+"_distortion.pdf")
 
     #t1=np.partition(c.flatten(), -2)[-2]
     #t2=np.partition(c1.flatten(), -2)[-2]
     
     #plot map in mm
-    py.clf()
-    fig=py.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
-    py.scatter(pts2[0,ind,0],pts2[0,ind,1],marker='s',c=c[ind],cmap='plasma',s=200)
-    py.colorbar()
-    py.title("Distortion (mm)")
-    py.xlabel("x (mm)",fontsize=40)
-    py.ylabel("y (mm)",fontsize=40)
-    py.show()
-    py.savefig(prefix+"_distortion_col.jpg")
+    plt.clf()
+    fig=plt.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
+    plt.scatter(pts2[0,ind,0],pts2[0,ind,1],marker='s',c=c[ind],cmap='plasma',s=200)
+    plt.colorbar()
+    plt.title("Distortion (mm)")
+    plt.xlabel("x (mm)",fontsize=40)
+    plt.ylabel("y (mm)",fontsize=40)
+    plt.show()
+    plt.savefig(prefix+"_distortion_col.pdf")
 
     #plot map in %
-    py.clf()
-    fig=py.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
-    py.scatter(pts2[0,ind,0],pts2[0,ind,1],marker='s',c=c1[ind]*4,cmap='plasma',s=200)
-    py.colorbar()
-    py.title("Distortion (% of field size)")
-    py.xlabel("x (mm)",fontsize=40)
-    py.ylabel("y (mm)",fontsize=40)
-    py.show()
-    py.savefig(prefix+"_distortion_col1.jpg")
+    plt.clf()
+    fig=plt.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
+    plt.scatter(pts2[0,ind,0],pts2[0,ind,1],marker='s',c=c1[ind]*4,cmap='plasma',s=200)
+    plt.colorbar()
+    plt.title("Distortion (% of field size)")
+    plt.xlabel("x (mm)",fontsize=40)
+    plt.ylabel("y (mm)",fontsize=40)
+    plt.show()
+    plt.savefig(prefix+"_distortion_col1.pdf")
 
-    py.clf()
+    plt.clf()
 
 def plotVal(xs,ys,val,limit,plotrange,titl,prefix,suffix):
 
@@ -480,21 +480,21 @@ def plotVal(xs,ys,val,limit,plotrange,titl,prefix,suffix):
 
     #scatter plot, with or without ragne limit
     
-    py.clf()
-    fig=py.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
+    plt.clf()
+    fig=plt.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
 
     if(plotrange != None):
-        sc=py.scatter(xs[ind],ys[ind],c=val[ind],marker="s",cmap='Purples',lw=0,s=200,vmin=plotrange[0],vmax=plotrange[1])
+        sc=plt.scatter(xs[ind],ys[ind],c=val[ind],marker="s",cmap='Purples',lw=0,s=200,vmin=plotrange[0],vmax=plotrange[1])
 
     else:
-        sc=py.scatter(xs[ind],ys[ind],c=val[ind],marker="s",cmap='Purples',lw=0,s=200)
+        sc=plt.scatter(xs[ind],ys[ind],c=val[ind],marker="s",cmap='Purples',lw=0,s=200)
 
-    py.colorbar(sc)
-    py.title(titl,fontsize=40)
-    py.xlabel("X (mm)",fontsize=40)
-    py.ylabel("Y (mm)",fontsize=40)
-    py.show()
-    py.savefig(prefix+suffix+".jpg")
+    plt.colorbar(sc)
+    plt.title(titl,fontsize=40)
+    plt.xlabel("X (mm)",fontsize=40)
+    plt.ylabel("Y (mm)",fontsize=40)
+    plt.show()
+    plt.savefig(prefix+suffix+".pdf")
 
     
 def to_fits(filename):
