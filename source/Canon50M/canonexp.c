@@ -384,7 +384,6 @@ int main(int argc, char *argv[]){
 	//pdv_start_image(pdv_p);
 	
 		
-	
 	bufs = (u_char **)malloc(loops * sizeof(u_char *));
     for (i=0; i<loops; i++){
 		if ((bufs[i] = edt_alloc(imagesize)) == NULL){

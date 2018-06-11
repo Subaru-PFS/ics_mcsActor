@@ -42,7 +42,7 @@ import pylab as py
 
 class McsCmd(object):
     # Setting the default exposure time.
-    dummy_filename = None
+    simulationImageIndex = 0
 
     def __init__(self, actor):
         # This lets us access the rest of the actor.
@@ -59,8 +59,6 @@ class McsCmd(object):
         self.vocab = [
             ('ping', '', self.ping),
             ('status', '', self.status),
-            ('mockexpose', '@(bias|test)', self.mockexpose),
-            ('mockexpose', '@(dark|object) <expTime>', self.mockexpose),
             ('expose', '@(bias|test)', self.expose),
             ('expose', '@(dark|object) <expTime>', self.expose),
             ('centroidOnly', '<expTime>', self.centroidOnly),
@@ -70,7 +68,6 @@ class McsCmd(object):
             ('reconnect', '', self.reconnect),
             ('imageStats', '', self.imageStats),
             ('quickPlot', '', self.quickPlot),
-            #('timeTest','',self.timeTest),
             ('timeTestFull','',self.timeTestFull),
             ('seeingTest','',self.seeingTest),
             ('simulate', '<path>', self.simulateOn),
@@ -131,16 +128,17 @@ class McsCmd(object):
 
         path, idx = self.simulationPath
         files = sorted(glob.glob(os.path.join(path, '*.fits')))
+        cmd.debug('text="%i of %i files in %s..."' % (idx, len(files), path))
         if len(files) == 0:
             raise RuntimeError(f"no .fits files in {path}")
 
-        if len(files) > idx+1:
+        if  idx+1 > len(files):
             idx = 0
 
         imagePath = files[idx]
         image = pyfits.getdata(imagePath, 0)
         self.simulationPath = (path, idx+1)
-
+        cmd.debug('text="returning simulation file %s"' % (imagePath))
         return image
 
     def getNextFilename(self, cmd):
@@ -217,21 +215,6 @@ class McsCmd(object):
             cmd.warn(f'text="FAILED to gather MEB cards: {e}"')
 
         return hdr
-
-    def getNextDummyFilename(self, cmd):
-        """ Fetch next image filename. 
-
-        In real life, we will instantiate a Subaru-compliant image pathname generating object.  
-
-        """
-
-        path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs')
-        path = os.path.expandvars(os.path.expanduser(path))
-
-        if not os.path.isdir(path):
-            os.makedirs(path, 0o755)
-            
-        return os.path.join(path, 'dummy_MCSA%010d.fits' % (self.actor.exposureID))
     
     def dumpCentroidtoDB(self, cmd):
         """Connect to database and return json string to an attribute."""
@@ -249,20 +232,7 @@ class McsCmd(object):
             cmd.warn('text="I am unable to connect to the database."')
         #pass
         #cur = conn.cursor()
-    
-    def _doMockExpose(self, cmd, expTime, expType):
-        """ Take an exposure and save it to disk. """
 
-        filename = self.getNextFilename(cmd)
-        #dummy_filename = self.getNextDummyFilename(cmd)
-
-        f = pyfits.open('/home/chyan/mhs/data/mcs/schmidt_fiber_snr400_rmod71.fits')      
-        image = f[0].data
-        #image = self.actor.camera.expose(cmd, expTime, expType, filename)
-        pyfits.writeto(filename, image, checksum=False, clobber=True)
-        cmd.inform("filename=%s " % (filename))
-
-        return filename, image
 
     def _doExpose(self, cmd, expTime, expType):
         """ Take an exposure and save it to disk. """
@@ -285,26 +255,6 @@ class McsCmd(object):
         cmd.inform('filename="%s"' % (filename))
 
         return filename, image
-
-
-    def mockexpose(self, cmd):
-        """ Take an exposure and return mock image. Does not centroid. """
-
-        expType = cmd.cmd.keywords[0].name
-        if expType in ('bias', 'test'):
-            expTime = self.expTime
-        else:
-            expTime = cmd.cmd.keywords["expTime"].values[0]
-
-        #if (expTime != self.expTime):
-            #self.actor.camera.setExposureTime(cmd,expTime)
-    
-
-        cmd.diag('text="Exposure time now is %d ms." '% (expTime))    
-        
-
-        filename, image = self._doMockExpose(cmd, expTime, expType)
-        cmd.finish('exposureState=done')
            
     def expose(self, cmd):
         """ Take an exposure. Does not centroid. """
@@ -323,15 +273,6 @@ class McsCmd(object):
         filename, image = self._doExpose(cmd, expTime, expType)
         self.actor.image = image
         
-        #import pdb; pdb.set_trace()
-        #plt.ion()
-        #plt.hist(self.actor.image.ravel())
-        #plt.savefig('foo.pdf')
-        #plt.show()
-        basename=filename[0:37]
-        #self.imageStats(cmd, basename, doFinish=False)
-        
-        #self.dumpCentroidtoDB(cmd)
         cmd.finish('exposureState=done')
 
 
