@@ -12,8 +12,7 @@ setup(
   ext_modules=[
     Extension('centroid',
               sources=['centroid_wrapper.pyx',"mpfit.c","centroid_tidy.c","centroid_routines.c","fibreid_all.c","calling_wrappers.c"],
-              include_dirs=[np.get_include(),
-                            "libcentroid"])
+              include_dirs=[np.get_include()])
     ],
   cmdclass = {'build_ext': build_ext}
 )
