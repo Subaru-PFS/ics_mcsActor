@@ -20,7 +20,7 @@ def getImage(filename):
 
     """
     
-    image=astropy.io.fits.getdata("MCST_010_001.fits")
+    image=astropy.io.fits.getdata(filename)
 
     return image
 
