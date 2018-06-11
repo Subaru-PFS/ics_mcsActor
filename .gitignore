@@ -7,4 +7,3 @@ build/
 /.pydevproject
 /.project
 
-python/mcsActor/mpfitCentroid/centroid_wrapper.c
