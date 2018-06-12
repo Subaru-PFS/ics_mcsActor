@@ -384,7 +384,7 @@ def simpleDistortion(xx,yy,xs,ys):
 
     return c,c1,pts1,pts2,diffx,diffy,
 
-def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix):
+def plotDistortion(cc,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix):
 
     """
 
@@ -405,9 +405,9 @@ def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix):
     #a quick kludge to filter out bad quality points in poorly focussed images
     
     if(limit > 0):
-        ind=np.where((c < limit) & (fxs < 10) & (fys < 10) & (fxs > 0) & (fys > 0) & (peaks != 0))
+        ind=np.where((cc < limit) & (fxs < 10) & (fys < 10) & (fxs > 0) & (fys > 0) & (peaks != 0))
     else:
-        ind=np.arange(len(c))
+        ind=np.arange(len(cc))
         
     #quiver plot
     
@@ -427,7 +427,7 @@ def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix):
     #plot map in mm
     plt.clf()
     fig=plt.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
-    plt.scatter(pts2[0,ind,0],pts2[0,ind,1],marker='s',c=c[ind],cmap='plasma',s=200)
+    plt.scatter(np.ravel(pts2[0,ind,0]),np.ravel(pts2[0,ind,1]),marker='s',c=cc[ind],cmap='plasma',s=200)
     plt.colorbar()
     plt.title("Distortion (mm)")
     plt.xlabel("x (mm)",fontsize=40)
@@ -438,7 +438,7 @@ def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix):
     #plot map in %
     plt.clf()
     fig=plt.figure(figsize=(18, 16), dpi= 80, facecolor='w', edgecolor='k')
-    plt.scatter(pts2[0,ind,0],pts2[0,ind,1],marker='s',c=c1[ind]*4,cmap='plasma',s=200)
+    plt.scatter(np.ravel(pts2[0,ind,0]),np.ravel(pts2[0,ind,1]),marker='s',c=c1[ind]*4,cmap='plasma',s=200)
     plt.colorbar()
     plt.title("Distortion (% of field size)")
     plt.xlabel("x (mm)",fontsize=40)
