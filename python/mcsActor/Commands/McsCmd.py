@@ -285,44 +285,7 @@ class McsCmd(object):
 
         pass
 
-        
-    def fakeExpose(self,cmd):
-        
-        cmdKeys = cmd.cmd.keywords
-
-        expTime = cmdKeys['expTime'].values[0]
-        expType = cmdKeys['expType'].values[0]
-        filename = cmdKeys['filename'].values[0]
-        getArc = cmdKeys['getArc'].values[0]
-
-        if(getArc==1):
-            image, arc_image=self._doFakeExpose(cmd,expTime,expType,filename,getArc)
-        else:
-            image = self._doFakeExpose(cmd,expTime,expType,filename,getArc)
-
-        self.actor.image = image
-
-        cmd.finish('exposureState=done')
-            
-    def _doFakeExpose(self, cmd,expTime,expType,filename,getArc):
-        
-        
-        """ Fake exposure, returns either image, or image + arc image. """
-
-        # Actually, we want dtype,naxis,axNlen,base64(array)
-        return base64.b64encode(array.tostring())
-        
-
-        image=pyfits.getdata(filename+".fits",0).astype('<i4')
-        
-        #if needed, read the arc file
-        
-        if(getArc==1):
-            arc_image=pyfits.getdata(filename+"_arc.fits",0).astype('<i4')
-            return image, arc_image
-        else:
-            return image
- 
+         
     def _encodeArray(self, array):
         """ Temporarily wrap a binary array transfer encoding. """
 
