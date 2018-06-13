@@ -81,14 +81,18 @@ class mcsCamera(Camera):
             t1=time.time()
             slicename=filename[0:33]+'_'
             cmd.inform('text="slice name: %s"' % (slicename))
+            cmd.inform('text="open shutter"')
             p = sub.Popen(['shutter', '-o'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
             output, errors = p.communicate()
             
-            p = sub.Popen(['canonexp', '-e dark', '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            expType = 'flat'
+            p = sub.Popen(['canonexp', '-e',expType, '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
             output, errors = p.communicate()
+            cmd.inform('text="taking exposure"')
             
             p = sub.Popen(['shutter', '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
             output, errors = p.communicate()
+            cmd.inform('text="shutter closed"')
             t2=time.time()
         
         if expType in ('test','object') and expTime > 0:

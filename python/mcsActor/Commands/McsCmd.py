@@ -60,7 +60,7 @@ class McsCmd(object):
             ('ping', '', self.ping),
             ('status', '', self.status),
             ('expose', '@(bias|test)', self.expose),
-            ('expose', '@(dark|object) <expTime>', self.expose),
+            ('expose', '@(dark|object|flat) <expTime>', self.expose),
             ('runCentroid', '<newTable>', self.runCentroid),
             ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
             ('test_centroid', '', self.test_centroid),
