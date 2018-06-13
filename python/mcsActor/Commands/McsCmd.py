@@ -10,6 +10,7 @@ import ast
 import matplotlib
 import matplotlib.pyplot as plt
 import time
+import datetime
 import io
 
 import os
@@ -30,7 +31,7 @@ import psycopg2.extras
 from xml.etree.ElementTree import dump
 
 try:
-    import mpfitCentroid.centroid as centroid
+    import mcsActor.mpfitCentroid.centroid as centroid
 except:
     pass
 
@@ -38,19 +39,18 @@ import numpy as np
 import pylab as py
 
 # matplotlib.use('Agg')
-
+Bool=bool
 
 class McsCmd(object):
-    # Setting the default exposure time.
-    simulationImageIndex = 0
 
     def __init__(self, actor):
         # This lets us access the rest of the actor.
         self.actor = actor
         self.expTime = 1000
-
+        self.centroids = None
+        self.newTable = None
         self.simulationPath = None
-
+        
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -61,10 +61,9 @@ class McsCmd(object):
             ('status', '', self.status),
             ('expose', '@(bias|test)', self.expose),
             ('expose', '@(dark|object) <expTime>', self.expose),
-            ('centroidOnly', '<expTime>', self.centroidOnly),
+            ('runCentroid', '<newTable>', self.runCentroid),
             ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
             ('test_centroid', '', self.test_centroid),
-            ('fakeExpose','<expTime> <expType> <filename> <getArc>', self.fakeExpose),
             ('reconnect', '', self.reconnect),
             ('imageStats', '', self.imageStats),
             ('quickPlot', '', self.quickPlot),
@@ -80,7 +79,8 @@ class McsCmd(object):
                                         keys.Key("expType", types.String(), help="The exposure type"),
                                         keys.Key("filename", types.String(), help="Image filename"),
                                         keys.Key("path", types.String(), help="Simulated image directory"),
-                                        keys.Key("getArc", types.Int(), help="flag for arc image")
+                                        keys.Key("getArc", types.Int(), help="flag for arc image"),
+                                        keys.Key("newTable", types.Bool(False, True), help="flag for arc image")
                                         )
 
     def ping(self, cmd):
@@ -218,10 +218,13 @@ class McsCmd(object):
     
     def dumpCentroidtoDB(self, cmd):
         """Connect to database and return json string to an attribute."""
+        
+        pwpath=os.environ['ICS_MCSACTOR_DIR']+'/etc/'
+        
         try:
-            file = open("/home/pfs/mhs/devel/ics_mcsActor/etc/dbpasswd.cfg", "r")
+            file = open(pwpath+"dbpasswd.cfg", "r")
             passstring = file.read()
-            cmd.inform('text="Connected to FPS database with pw %s."'%(passstring))
+            cmd.inform('text="Password reading OK. value = %s."'%(passstring))
         except:
             cmd.warn('text="could not get db password"')
             return
@@ -230,9 +233,21 @@ class McsCmd(object):
             cmd.diag('text="Connected to FPS database."')
         except:
             cmd.warn('text="I am unable to connect to the database."')
+        
+        cmd.debug('text="Value from self.newTable = %s"' % (self.newTable))
+
+        if bool(self.newTable) is True:
+            self._makeTables(conn, doDrop=True)
+            cmd.inform('text="Centroid table created. "')
+        else:
+            #self._makeTables(conn, doDrop=False)
+            cmd.inform('text="Attaching centroid to exsiting table. "')
+        
+        frameID=self.actor.exposureID
+        buf = self._writeCentroids(self.centroids,1,frameID,1,conn)
         #pass
         #cur = conn.cursor()
-
+        cmd.inform('text="Centroids of exposure ID %06d00 dummped. "'%(frameID))
 
     def _doExpose(self, cmd, expTime, expType):
         """ Take an exposure and save it to disk. """
@@ -341,43 +356,68 @@ class McsCmd(object):
 
         cmd.inform('state="finished"')
  
-    def centroidOnly(self, cmd):
+    def runCentroid(self, cmd):
         """ Take an exposure and measure centroids. """
+        #cmdKeys = cmd.cmd.keywords
         
-        expTime = cmd.cmd.keywords["expTime"].values[0]
-        expType = 'object' 
-        print(centroid.__file__)
-
-        #cmd.inform('state="taking exposure"')
-                
-        #filename, image = self._doExpose(cmd, expTime, expType)
+        self.newTable = cmd.cmd.keywords["newTable"].values[0]
+            
+        cmd.debug('text="newTable value = %s"' % (self.newTable))
         
-        #image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
-        
-        # The encoding scheme is temporary, and will become encapsulated.
-        cmd.inform('state="measuring"')
+        if self.simulationPath is None:
+            
+    
+            #cmd.inform('state="taking exposure"')
+                    
+            #filename, image = self._doExpose(cmd, expTime, expType)
+            
+            #image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
+            
+            # The encoding scheme is temporary, and will become encapsulated.
+            cmd.inform('state="measuring"')
+    
+            #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
+            #self.dumpCentroidtoDB(cmd, centroids)
+    
+            cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
+    
+            a = centroid.get_homes_call(self.actor.image.astype('<i4'))
+            
+            #a=get_homes_call(self.actor.image.astype('<i4'))
+            homes=np.frombuffer(a,dtype='<f8')
+    
+            #centroidsStr = self._encodeArray(centroids)
+            #cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
+            #
+            cmd.inform('text="size = %d." '% (homes.shape))
+            cmd.inform('state="centroids measured"')
+            self.actor.homes=homes
+            npoint=len(self.actor.homes)//2
+            for i in range(0,npoint):
+                print(self.actor.homes[i],self.actor.homes[i+npoint],'dg')
+                cmd.inform('text="size = %f %f." '% (self.actor.homes[i],self.actor.homes[i+npoint]))
 
-        #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
-        #self.dumpCentroidtoDB(cmd, centroids)
+        else:
+            fwhm=3        
+            boxsize=9
+            thresh=2500
+            
+            rl=-2.5
+            rh=1.3
+            sl=0.05
+            sh=0.5
 
-        cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
 
-        a = centroid.get_homes_call(self.actor.image.astype('<i4'))
-        
-        #a=get_homes_call(self.actor.image.astype('<i4'))
-        homes=np.frombuffer(a,dtype='<f8')
-
-        #centroidsStr = self._encodeArray(centroids)
-        #cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
-        #
-        cmd.inform('text="size = %d." '% (homes.shape))
-        cmd.inform('state="centroids measured"')
-        self.actor.homes=homes
-        npoint=len(self.actor.homes)//2
-        for i in range(0,npoint):
-            print(self.actor.homes[i],self.actor.homes[i+npoint],'dg')
-            cmd.inform('text="size = %f %f." '% (self.actor.homes[i],self.actor.homes[i+npoint]))
-
+            a=centroid.centroid_only(self.actor.image.astype('<i4'),fwhm,thresh,boxsize,2,sl,sh,rl,rh,0)
+            centroids=np.frombuffer(a,dtype='<f8')
+            npoint=len(centroids)//7
+            centroids=np.reshape(centroids,(npoint,7))
+            centroids=centroids[:,0:6]
+            
+            self.centroids=centroids
+                        
+        self.dumpCentroidtoDB(cmd)
+            
         cmd.finish('exposureState=done')
         
     def test_centroid(self, cmd):
@@ -470,70 +510,138 @@ class McsCmd(object):
         homepos=np.frombuffer(c,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
 
     def _makeTables(self, conn, doDrop=False):
-        """ Create test tables. Someone said 20 measured things. """
+        """ Create MCS tables. Someone said 20 measured things. """
         
-        cmd = '''create table mcsPerFiber (
-        id SERIAL PRIMARY KEY,
-        frameId integer,
-        moveId smallint,
-        fiberId smallint,
+        if self.simulationPath is None:
+       
+            cmd = '''create table mcsPerFiber (
+            id SERIAL PRIMARY KEY,
+            frameId integer,
+            moveId smallint,
+            fiberId smallint,
+            
+            centroidX real, centroidY real,
+            f1x real, f1y real,
+            f2x real, f2y real,
+            f3x real, f3y real,
+            f4x real, f4y real,
+            f5x real, f5y real,
+            f6x real, f6y real,
+            f7x real, f7y real,
+            f8x real, f8y real,
+            f9x real, f9y real
+            );'''
         
-        centroidX real, centroidY real,
-        f1x real, f1y real,
-        f2x real, f2y real,
-        f3x real, f3y real,
-        f4x real, f4y real,
-        f5x real, f5y real,
-        f6x real, f6y real,
-        f7x real, f7y real,
-        f8x real, f8y real,
-        f9x real, f9y real
-        );'''
-    
-        
-        with conn.cursor() as curs:
-            if doDrop:
-                curs.execute('drop table mcsPerFiber')
-                pass
-            curs.execute(cmd)
+            
+            with conn.cursor() as curs:
+                if doDrop:
+                    curs.execute('drop table mcsPerFiber')
+                    pass
+                curs.execute(cmd)
+        else:
+            
+            cmd = '''create table mcsEngTable (
+                id SERIAL PRIMARY KEY,
+                datatime timestamp,
+                frameId integer,
+                moveId smallint,
+                fiberId smallint,
+                
+                centroidX real, centroidY real,
+                fwhmX real, fwhmY real,
+                bgValue real, peakValue real
+                );'''
+                
+                    
+            with conn.cursor() as curs:
+                if doDrop:
+                    curs.execute('drop table mcsEngTable')
+                curs.execute(cmd)
+  
         conn.commit()
         
     def _writeCentroids(self, centArr, nextRowId, frameId, moveId, conn=None):
         """ Write all measurements for a given (frameId, moveId) """
-    
-        # Save measurements to a CSV buffer
-        measBuf = io.StringIO()
-        np.savetxt(measBuf, centArr, delimiter=',', fmt='%0.6g')
-        measBuf.seek(0,0)
-        
-        buf = io.StringIO()
-        for l_i in range(len(centArr)):
-            line = '%d,%d,%d,%d,%s' % (nextRowId + l_i, frameId, moveId, l_i,
-                                       measBuf.readline())
-            buf.write(line)
-        buf.seek(0,0)
-        
-        if conn is not None:
-            with conn.cursor() as curs:
-                curs.copy_from(buf,'mcsPerFiber',',')
-            conn.commit()
+        if self.simulationPath is None:
+
+            # Save measurements to a CSV buffer
+            measBuf = io.StringIO()
+            np.savetxt(measBuf, centArr, delimiter=',', fmt='%0.6g')
+            measBuf.seek(0,0)
+            
+            buf = io.StringIO()
+            for l_i in range(len(centArr)):
+                line = '%d,%d,%d,%d,%s' % (nextRowId + l_i, frameId, moveId, l_i,
+                                           measBuf.readline())
+                buf.write(line)
             buf.seek(0,0)
             
+            if conn is not None:
+                with conn.cursor() as curs:
+                    curs.copy_from(buf,'mcsPerFiber',',')
+                conn.commit()
+                buf.seek(0,0)
+            
+        else:
+            now = datetime.datetime.now()
+            now.strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Save measurements to a CSV buffer
+            measBuf = io.StringIO()
+            np.savetxt(measBuf, centArr, delimiter=',', fmt='%0.6g')
+            measBuf.seek(0,0)
+            
+            if bool(self.newTable) is False:
+                cmd_string='''select max(id) from mcsengtable;'''
+                with conn.cursor() as curs:
+                    curs.execute(cmd_string)
+                    data = curs.fetchall()
+                        
+                nextRowId=np.max(np.array(data))+1        
+            
+            buf = io.StringIO()
+            for l_i in range(len(centArr)):
+                line = '%d,%s,%d,%d,%d,%s' % (nextRowId + l_i,now.strftime("%Y-%m-%d %H:%M:%S"), 
+                                              frameId, moveId, l_i, measBuf.readline())
+                buf.write(line)
+            buf.seek(0,0)
+            
+            if conn is not None:
+                with conn.cursor() as curs:
+                    curs.copy_from(buf,'mcsEngTable',',')
+                conn.commit()
+                buf.seek(0,0)
+        
         return buf
 
     def _readCentroids(self, conn, frameId, moveId):
         """ Read all measurements for a given (frameId, moveId)"""
-        buf = io.StringIO()
-    
-        cmd = """copy (select * from mcsPerFiber where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
-        with conn.cursor() as curs:
-            curs.copy_expert(cmd, buf)
-        conn.commit()
-        buf.seek(0,0)
-    
-        # Skip the frameId, etc. columns.
-        arr = np.genfromtxt(buf, dtype='f4',
-                            delimiter=',',usecols=range(4,24))
+        
+        if self.simulationPath is None:
+            buf = io.StringIO()
+        
+            cmd = """copy (select * from mcsPerFiber where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
+            with conn.cursor() as curs:
+                curs.copy_expert(cmd, buf)
+            conn.commit()
+            buf.seek(0,0)
+        
+            # Skip the frameId, etc. columns.
+            arr = np.genfromtxt(buf, dtype='f4',
+                                delimiter=',',usecols=range(4,24))
+        else:
+            buf = io.StringIO()
+
+            cmd = f"""copy (select * from mcsEngTable where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
+            with conn.cursor() as curs:
+                curs.copy_expert(cmd, buf)
+            conn.commit()
+            buf.seek(0,0)
+
+            # Skip the frameId, etc. columns.
+            arr = np.genfromtxt(buf, dtype='f4',
+                                delimiter=',',usecols=range(4,8))
+        
         return arr
 
     def _writeDBtable(self):
