@@ -76,8 +76,22 @@ class mcsCamera(Camera):
             output, errors = p.communicate()
             t2=time.time()
            
+        if expType in ('flat') and expTime > 0:
+            cmd.inform('text="ETYPE: %s"' % (expType))
+            t1=time.time()
+            slicename=filename[0:33]+'_'
+            cmd.inform('text="slice name: %s"' % (slicename))
+            p = sub.Popen(['shutter', '-o'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            output, errors = p.communicate()
+            
+            p = sub.Popen(['canonexp', '-e dark', '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            output, errors = p.communicate()
+            
+            p = sub.Popen(['shutter', '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            output, errors = p.communicate()
+            t2=time.time()
         
-        if expType in ('test','flat','object') and expTime > 0:
+        if expType in ('test','object') and expTime > 0:
             t1=time.time()
        
             # Command camera to do exposure sequence
