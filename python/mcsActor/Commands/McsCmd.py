@@ -231,7 +231,7 @@ class McsCmd(object):
             cmd.warn('text="could not get db password"')
             return
         try:
-            conn = psycopg2.connect("dbname='fps' user='pfs' host='"+self.db+"' password='"+passstring)
+            conn = psycopg2.connect("dbname='pfs' user='pfs' host="+self.db+" password="+passstring)
             cmd.diag('text="Connected to FPS database."')
         except:
             cmd.warn('text="I am unable to connect to the database."')
