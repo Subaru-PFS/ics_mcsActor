@@ -190,24 +190,26 @@ def matchPoints(xc,yc,xx,yy,fx,fy,peak):
     fxs=np.zeros((len(xx)))
     fys=np.zeros((len(xx)))
     peaks=np.zeros((len(xx)))
-    
-    #match points between two sets (nearest neighbour)
-    for i in range(len(xx)):
-        for j in range(len(xc)):
 
-            rr=np.sqrt((xx[i]-xc[j])**2+(yy[i]-yc[j])**2)
-            if(rr < 5):
-                xs[i]=xc[j]
-                ys[i]=yc[j]
-                fxs[i]=fx[j]
-                fys[i]=fy[j]
-                peaks[i]=peak[j]
+    for j in range(len(xx)):
+        dd=np.sqrt((xx[j]-xc)*(xx[j]-xc)+(yy[j]-yc)*(yy[j]-yc))
+
+        ind=np.where(dd==dd.min())
+
+        #need to filter in case points are missing
+        if(dd.min() < 5):
+
+            xs[j]=xc[ind]
+            ys[j]=yc[ind]
+            fxs[j]=fx[ind]
+            fys[j]=fy[ind]
+            peaks[j]=peak[ind]
 
     return xs,ys,fxs,fys,peaks
 
 
 
-def getApproximateTransform(xx,yy):
+def getApproximateTransform(xx,yy,close):
 
     """
 
@@ -226,7 +228,7 @@ def getApproximateTransform(xx,yy):
     """
 
     #get mask coordinates, centred at origin
-    x,y=maskinMM(1)
+    x,y=maskinMM(close)
     x=x-168
     y=y-168
     

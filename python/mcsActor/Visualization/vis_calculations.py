@@ -7,8 +7,11 @@ import vis_plotting as visplot
 import vis_coordinates as viscoords
 import cv2
 
-import mcsActor.mpfitCentroid.centroid as centroid
-
+try:
+    import mcsActor.mpfitCentroid.centroid as centroid
+except:
+    import centroid as centroid
+    
 def getCentroids(image,fwhm,boxsize,thresh,rl,rh,sl,sh):
 
     """
@@ -31,7 +34,7 @@ def getCentroids(image,fwhm,boxsize,thresh,rl,rh,sl,sh):
     """
     
     #centroid 
-    a=centroid_only(image.astype('<i4'),fwhm,thresh,boxsize,2,sl,sh,rl,rh,0)
+    a=centroid.centroid_only(image.astype('<i4'),fwhm,thresh,boxsize,2,sl,sh,rl,rh,0)
     centroids=np.frombuffer(a,dtype='<f8')
     npoint=len(centroids)//7
     centroids=np.reshape(centroids,(npoint,7))

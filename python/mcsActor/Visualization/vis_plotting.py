@@ -120,8 +120,8 @@ def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix,units):
     fig,ax = plt.subplots(facecolor='g')
 
     ax.quiver(pts1[0,ind,0],pts1[0,ind,1],-diffx[ind],-diffy[ind])
-    plt.xlabel("x ("+units+")",fontsize=40)
-    plt.ylabel("y ("+units+")",fontsize=40)
+    plt.xlabel("x ("+units+")")
+    plt.ylabel("y ("+units+")")
     plt.title("Distortion")
     plt.show()
     plt.savefig(prefix+"_distortion.jpg")
@@ -134,8 +134,8 @@ def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix,units):
     sc=ax.scatter(pts2[0,ind,0],pts2[0,ind,1],marker='s',c=c[ind],cmap='plasma',s=200)
     fig.colorbar(sc)
     plt.title("Distortion ("+units+")")
-    plt.xlabel("x ("+units+")",fontsize=40)
-    plt.ylabel("y ("+units+")",fontsize=40)
+    plt.xlabel("x ("+units+")")
+    plt.ylabel("y ("+units+")")
     plt.show()
     plt.savefig(prefix+"_distortion_col.jpg")
 
@@ -144,8 +144,8 @@ def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix,units):
     sc=ax.scatter(pts2[0,ind,0],pts2[0,ind,1],marker='s',c=c1[ind]*4,cmap='plasma',s=200)
     fig.colorbar(sc)
     plt.title("Distortion (% of field size)")
-    plt.xlabel("x ("+units+")",fontsize=40)
-    plt.ylabel("y ("+units+")",fontsize=40)
+    plt.xlabel("x ("+units+")")
+    plt.ylabel("y ("+units+")")
     plt.show()
     plt.savefig(prefix+"_distortion_col1.jpg")
 
