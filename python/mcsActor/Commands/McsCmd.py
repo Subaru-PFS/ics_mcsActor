@@ -416,6 +416,8 @@ class McsCmd(object):
             self.sh = cmd.cmd.keywords["sh"].values[0]
         except:
             self.sh = 0.5
+            
+        cmd.finish('parameters=set')
 
         
     def runCentroid(self, cmd):
