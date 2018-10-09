@@ -47,11 +47,8 @@ class McsCmd(object):
         # This lets us access the rest of the actor.
         self.actor = actor
         self.expTime = 1000
-thresh=image.mean()+20*image.std()
-        self.centroids = None
         self.newTable = None
         self.simulationPath = None
-        self.threshold = None
         
         self.db='133.40.164.87'
         
@@ -396,9 +393,9 @@ thresh=image.mean()+20*image.std()
             self.fhwm = cmd.cmd.keywords["thresh"].values[0]
         except:
             try:
-                thresh = self.actor.image.mean()+20*self.actor.image.std()
+                self.thresh = self.actor.image.mean()+20*self.actor.image.std()
             except:
-                thresh=2000
+                self.thresh=2000
             
         try:
             self.rl = cmd.cmd.keywords["rl"].values[0]
