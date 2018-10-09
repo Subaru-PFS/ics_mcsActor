@@ -82,14 +82,14 @@ class McsCmd(object):
                                         keys.Key("filename", types.String(), help="Image filename"),
                                         keys.Key("path", types.String(), help="Simulated image directory"),
                                         keys.Key("getArc", types.Int(), help="flag for arc image"),
-                                        keys.Key("newTable", types.Bool(False, True), help="flag for arc image")
+                                        keys.Key("newTable", types.Bool(False, True), help="flag for arc image"),
                                         keys.Key("fwhm", types.Float(), help="fwhm for centroid routine"),
                                         keys.Key("boxsize", types.Int(), help="boxsize for centroid routine"),
                                         keys.Key("thresh", types.Int(), help="thresh for centroid routine"),
                                         keys.Key("rl", types.Float(), help="rl for centroid routine"),
                                         keys.Key("rh", types.Float(), help="rh for centroid routine"),
                                         keys.Key("sl", types.Float(), help="sh for centroid routine"),
-                                        keys.Key("sh", types.Float(), help="sh for centroid routine"),
+                                        keys.Key("sh", types.Float(), help="sh for centroid routine")
                                         )
 
     def ping(self, cmd):
