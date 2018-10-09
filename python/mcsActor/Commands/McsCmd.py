@@ -73,6 +73,7 @@ thresh=image.mean()+20*image.std()
             ('quickPlot', '', self.quickPlot),
             ('timeTestFull','',self.timeTestFull),
             ('seeingTest','',self.seeingTest),
+            ('setCentroidParams','',self.setCentroidParams),
             ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
         ]
