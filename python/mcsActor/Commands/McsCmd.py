@@ -47,9 +47,11 @@ class McsCmd(object):
         # This lets us access the rest of the actor.
         self.actor = actor
         self.expTime = 1000
+thresh=image.mean()+20*image.std()
         self.centroids = None
         self.newTable = None
         self.simulationPath = None
+        self.threshold = None
         
         self.db='133.40.164.87'
         
@@ -83,6 +85,13 @@ class McsCmd(object):
                                         keys.Key("path", types.String(), help="Simulated image directory"),
                                         keys.Key("getArc", types.Int(), help="flag for arc image"),
                                         keys.Key("newTable", types.Bool(False, True), help="flag for arc image")
+                                        keys.Key("fwhm", types.Float(), help="fwhm for centroid routine"),
+                                        keys.Key("boxsize", types.Int(), help="boxsize for centroid routine"),
+                                        keys.Key("thresh", types.Int(), help="thresh for centroid routine"),
+                                        keys.Key("rl", types.Float(), help="rl for centroid routine"),
+                                        keys.Key("rh", types.Float(), help="rh for centroid routine"),
+                                        keys.Key("sl", types.Float(), help="sh for centroid routine"),
+                                        keys.Key("sh", types.Float(), help="sh for centroid routine"),
                                         )
 
     def ping(self, cmd):
@@ -316,6 +325,7 @@ class McsCmd(object):
         cmd.inform('text="image mean = %d." '% (self.actor.image.mean())) 
         cmd.inform('text="image min = %d." '% (self.actor.image.min())) 
         cmd.inform('text="image max = %d." '% (self.actor.image.max()))
+        cmd.inform('text="image std = %d." '% (self.actor.image.std()))
 
         if doFinish:
             cmd.finish('Statistics Calculated')
@@ -357,7 +367,59 @@ class McsCmd(object):
         self.actor.centroids=centroids
 
         cmd.inform('state="finished"')
- 
+
+    def setCentroidParams(self,cmd):
+
+        """
+
+        Set the parameters for centroiding; placeholder for later routine to read from configuration file. 
+        For each parameter it will check the command for keywords, and if it doesn't work, will go to a default.
+
+        For the threshold, it will first check the command, then calculate from the image, then go to a default
+        that won't crash the system. 
+
+        """
+
+        
+        try:
+            self.fhwm = cmd.cmd.keywords["fwhm"].values[0]
+        except:
+            self.fwhm = 3
+
+        try:
+            self.fhwm = cmd.cmd.keywords["boxsize"].values[0]
+        except:
+            self.fwhm = 3
+
+        try:
+            self.fhwm = cmd.cmd.keywords["thresh"].values[0]
+        except:
+            try:
+                thresh = self.actor.image.mean()+20*self.actor.image.std()
+            except:
+                thresh=2000
+            
+        try:
+            self.rl = cmd.cmd.keywords["rl"].values[0]
+        except:
+            self.rl = -2.5
+
+        try:
+            self.rh = cmd.cmd.keywords["rh"].values[0]
+        except:
+            self.rh = 1.3
+
+        try:
+            self.sl = cmd.cmd.keywords["sl"].values[0]
+        except:
+            self.sl = 0.05
+
+        try:
+            self.sh = cmd.cmd.keywords["sh"].values[0]
+        except:
+            self.sh = 0.5
+
+        
     def runCentroid(self, cmd):
         """ Take an exposure and measure centroids. """
         #cmdKeys = cmd.cmd.keywords
@@ -365,57 +427,45 @@ class McsCmd(object):
         self.newTable = cmd.cmd.keywords["newTable"].values[0]
             
         cmd.debug('text="newTable value = %s"' % (self.newTable))
+
+        #self.fwhm=3        
+        #self.boxsize=9
+        #self.thresh=2500
+        #    
+        #self.rl=-2.5
+        #self.rh=1.3
+        #self.sl=0.05
+        #self.sh=0.5
         
         if self.simulationPath is None:
             
-    
-            #cmd.inform('state="taking exposure"')
-                    
-            #filename, image = self._doExpose(cmd, expTime, expType)
-            
-            #image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
-            
-            # The encoding scheme is temporary, and will become encapsulated.
             cmd.inform('state="measuring"')
-    
-            #centroids = numpy.random.random(4800).astype('f4').reshape(2400,2)
-            #self.dumpCentroidtoDB(cmd, centroids)
-    
             cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
     
-            a = centroid.get_homes_call(self.actor.image.astype('<i4'))
-            
-            #a=get_homes_call(self.actor.image.astype('<i4'))
-            homes=np.frombuffer(a,dtype='<f8')
-    
-            #centroidsStr = self._encodeArray(centroids)
-            #cmd.inform('state="measured"; centroidsChunk=%s' % (centroidsStr))
-            #
-            cmd.inform('text="size = %d." '% (homes.shape))
-            cmd.inform('state="centroids measured"')
-            self.actor.homes=homes
-            npoint=len(self.actor.homes)//2
-            for i in range(0,npoint):
-                print(self.actor.homes[i],self.actor.homes[i+npoint],'dg')
-                cmd.inform('text="size = %f %f." '% (self.actor.homes[i],self.actor.homes[i+npoint]))
-
-        else:
-            fwhm=3        
-            boxsize=9
-            thresh=2500
-            
-            rl=-2.5
-            rh=1.3
-            sl=0.05
-            sh=0.5
-
-
-            a=centroid.centroid_only(self.actor.image.astype('<i4'),fwhm,thresh,boxsize,2,sl,sh,rl,rh,0)
+            a=centroid.centroid_only(self.actor.image.astype('<i4'),self.fwhm,self.thresh,self.boxsize,2,self.sl,self.sh,self.rl,self.rh,0)
             centroids=np.frombuffer(a,dtype='<f8')
             npoint=len(centroids)//7
             centroids=np.reshape(centroids,(npoint,7))
             centroids=centroids[:,0:6]
+
+            self.centroids=centroids
             
+            cmd.inform('text="size = %d." '% (centroids.shape))
+            cmd.inform('state="centroids measured"')
+
+        else:
+
+            cmd.inform('state="measuring"')
+            cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
+            a=centroid.centroid_only(self.actor.image.astype('<i4'),self.fwhm,self.thresh,self.boxsize,2,self.sl,self.sh,self.rl,self.rh,0)
+
+            centroids=np.frombuffer(a,dtype='<f8')
+            npoint=len(centroids)//7
+            centroids=np.reshape(centroids,(npoint,7))
+            centroids=centroids[:,0:6]
+            cmd.inform('text="size = %d." '% (centroids.shape))
+            cmd.inform('state="centroids measured"')
+
             self.centroids=centroids
                         
         self.dumpCentroidtoDB(cmd)
