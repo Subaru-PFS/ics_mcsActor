@@ -3,8 +3,19 @@
 import numpy as np
 import numpy.ma as ma
 from scipy.stats import sigmaclip
-import vis_plotting as visplot
-import vis_coordinates as viscoords
+
+
+try:
+    import mcsActor.Visualization.vis_plotting as visplot
+except:
+    import vis_plotting as visplot
+
+try:
+    import mcsActor.Visualization.vis_coordinates as viscoords
+except:
+    import vis_coordinates as viscoords
+
+
 import cv2
 import astropy
 from scipy.optimize import curve_fit
@@ -14,6 +25,8 @@ try:
     import mcsActor.mpfitCentroid.centroid as centroid
 except:
     import centroid as centroid
+
+
     
 def getCentroids(image,fwhm,boxsize,thresh,rl,rh,sl,sh):
 
