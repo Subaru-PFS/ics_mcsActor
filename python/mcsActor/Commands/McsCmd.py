@@ -395,7 +395,7 @@ class McsCmd(object):
             self.fwhm = 3
 
         try:
-            self.fhwm = cmd.cmd.keywords["thresh"].values[0]
+            self.thresh = cmd.cmd.keywords["thresh"].values[0]
         except:
             try:
                 self.thresh = self.actor.image.mean()+20*self.actor.image.std()
