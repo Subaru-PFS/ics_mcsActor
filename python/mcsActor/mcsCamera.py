@@ -33,7 +33,8 @@ class mcsCamera(Camera):
         """ Initial the MCS camera. """
 
         cmd.inform('text="Starting camera initialization."')
-        p = sub.Popen(['/opt/EDTpdv/initcam', '-f', '/home/chyan/Canon50M/canon-8960x5778.cfg'],stdout=sub.PIPE,stderr=sub.PIPE)
+        p = sub.Popen(['/opt/EDTpdv/initcam', '-f', '/home/chyan/Canon50M/canon-8960x5778.cfg'],
+                      stdout=sub.PIPE, stderr=sub.PIPE)
         output, errors = p.communicate()
         string=errors[23:-1]
         if (string == 'done'):
@@ -72,7 +73,8 @@ class mcsCamera(Camera):
             # Command camera to do exposure sequence
             slicename=filename[0:33]+'_'
             cmd.inform('text="slice name: %s"' % (slicename))
-            p = sub.Popen(['canonexp', '-e', expType, '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            p = sub.Popen(['canonexp', '-e', expType, '-f', slicename, '-t', str(expTime), '-c'],
+                          cwd='/tmp', bufsize=1, stdout=sub.PIPE, stderr=sub.PIPE)
             output, errors = p.communicate()
             t2=time.time()
            
@@ -86,7 +88,8 @@ class mcsCamera(Camera):
             output, errors = p.communicate()
             
             expType = 'flat'
-            p = sub.Popen(['canonexp', '-e',expType, '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            p = sub.Popen(['canonexp', '-e',expType, '-f', slicename, '-t', str(expTime), '-c'],
+                          cmd='/tmp', bufsize=1, stdout=sub.PIPE, stderr=sub.PIPE)
             output, errors = p.communicate()
             cmd.inform('text="taking exposure"')
             
@@ -101,7 +104,8 @@ class mcsCamera(Camera):
             # Command camera to do exposure sequence
             slicename=filename[0:33]+'_'
             cmd.inform('text="slice name: %s"' % (slicename))
-            p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],
+                          bufsize=1, stdout=sub.PIPE, stderr=sub.PIPE)
             output, errors = p.communicate()
             t2=time.time()
         
@@ -111,13 +115,13 @@ class mcsCamera(Camera):
         if cmd:
             cmd.inform('exposureState="reading"')
 
-        coaddpath=os.environ['ICS_MCSACTOR_DIR']
-        shutil.copy(coaddpath+'/coadd.fits', filename)
-        f = pyfits.open(coaddpath+'/coadd.fits')
+        coaddpath=os.path.join('/tmp', 'coadd.fits')
+        shutil.copy(coaddpath, filename)
+        f = pyfits.open(coaddpath)
         
         # Remove the temporary file
         try:
-            os.remove(coaddpath+'/coadd.fits')
+            os.remove(coaddpath)
         except OSError:
             pass
         
