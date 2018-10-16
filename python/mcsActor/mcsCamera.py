@@ -17,6 +17,7 @@ class mcsCamera(Camera):
         self.readNoise = 5.0
         self.name = 'Canon_50M'
         self.expTime = 0
+        self.coaddDir = '/tmp'
         
     def _readoutTime(self):
         return 0.5
@@ -33,7 +34,8 @@ class mcsCamera(Camera):
         """ Initial the MCS camera. """
 
         cmd.inform('text="Starting camera initialization."')
-        p = sub.Popen(['/opt/EDTpdv/initcam', '-f', '/home/chyan/Canon50M/canon-8960x5778.cfg'],stdout=sub.PIPE,stderr=sub.PIPE)
+        p = sub.Popen(['/opt/EDTpdv/initcam', '-f', '/home/chyan/Canon50M/canon-8960x5778.cfg'],
+                      stdout=sub.PIPE, stderr=sub.PIPE)
         output, errors = p.communicate()
         string=errors[23:-1]
         if (string == 'done'):
@@ -44,7 +46,7 @@ class mcsCamera(Camera):
         self.expTime = expTime
         cmd.inform('expTime=%f ms' % (expTime))
         
-    def expose(self, cmd, expTime, expType, filename):
+    def expose(self, cmd, expTime, expType, filename, doCopy=True):
         """ Generate an 'exposure' image. We don't have an actual camera, so generate some 
         plausible image. 
 
@@ -52,7 +54,9 @@ class mcsCamera(Camera):
            cmd     - a Command object to report to. Ignored if None.
            expTime - the fake exposure time. 
            expType - ("bias", "dark", "object", "flat", "test")
-           
+           filename - the template filename
+           doCopy  - if True, copy coadd into filename
+
         Returns:
            - the image.
 
@@ -72,7 +76,8 @@ class mcsCamera(Camera):
             # Command camera to do exposure sequence
             slicename=filename[0:33]+'_'
             cmd.inform('text="slice name: %s"' % (slicename))
-            p = sub.Popen(['canonexp', '-e', expType, '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            p = sub.Popen(['canonexp', '-e', expType, '-f', slicename, '-t', str(expTime), '-c'],
+                          cwd=self.coaddDir, bufsize=1, stdout=sub.PIPE, stderr=sub.PIPE)
             output, errors = p.communicate()
             t2=time.time()
            
@@ -86,7 +91,8 @@ class mcsCamera(Camera):
             output, errors = p.communicate()
             
             expType = 'flat'
-            p = sub.Popen(['canonexp', '-e',expType, '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            p = sub.Popen(['canonexp', '-e',expType, '-f', slicename, '-t', str(expTime), '-c'],
+                          cmd=self.coaddDir, bufsize=1, stdout=sub.PIPE, stderr=sub.PIPE)
             output, errors = p.communicate()
             cmd.inform('text="taking exposure"')
             
@@ -101,7 +107,8 @@ class mcsCamera(Camera):
             # Command camera to do exposure sequence
             slicename=filename[0:33]+'_'
             cmd.inform('text="slice name: %s"' % (slicename))
-            p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],bufsize=1,stdout=sub.PIPE,stderr=sub.PIPE)
+            p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],
+                          cwd=self.coaddDir, bufsize=1, stdout=sub.PIPE, stderr=sub.PIPE)
             output, errors = p.communicate()
             t2=time.time()
         
@@ -111,17 +118,21 @@ class mcsCamera(Camera):
         if cmd:
             cmd.inform('exposureState="reading"')
 
-        coaddpath=os.environ['ICS_MCSACTOR_DIR']
-        shutil.copy(coaddpath+'/coadd.fits', filename)
-        f = pyfits.open(coaddpath+'/coadd.fits')
+        coaddpath=os.path.join(self.coaddDir, 'coadd.fits')
+        if doCopy:
+            try:	
+                shutil.copy(coaddpath, filename)
+            except Exception as e:
+                cmd.warn(f'text="failed to copy coadd {coaddpath} to {filename}: {e}"')
+                
+        f = pyfits.open(coaddpath)
         
         # Remove the temporary file
         try:
-            os.remove(coaddpath+'/coadd.fits')
+            os.remove(coaddpath)
         except OSError:
             pass
-        
-              
+
         image = f[0].data
         t3=time.time()
         cmd.inform('text="Time for exposure = %f." '% ((t2-t1)/1.))

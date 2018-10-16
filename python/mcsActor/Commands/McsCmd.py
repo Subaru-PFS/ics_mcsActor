@@ -206,25 +206,30 @@ class McsCmd(object):
         if ret.didFail:
             raise RuntimeError("getFitsCards failed!")
 
-        # This is total crap. 
         hdrString = self.actor.models['gen2'].keyVarDict['header'].valueList[0]
-        hdrString = hdrString.replace(r'\\\\', r'\\')
-        hdrString = hdrString.replace(r'\"', r'"')
-        hdrString = "\'" + hdrString + "\'"
         try:
-            hdr = pyfits.Header.fromstring(ast.literal_eval(hdrString))
-        except Exception as e:
-            cmd.warn('text="FAILED to fetch gen2 cards: %s"' % (e))
-            hdr = []
-        
+            hdr = pyfits.Header.fromstring(hdrString)
+        except:
+            # This is total crap. Horrible workaround for INSTRM-383
+            try:
+                hdrString = hdrString.replace(r'\\\\', r'\\')
+                hdrString = hdrString.replace(r'\"', r'"')
+                hdrString = "\'" + hdrString + "\'"
+                hdr = pyfits.Header.fromstring(ast.literal_eval(hdrString))
+            except Exception as e:
+                cmd.warn('text="FAILED to fetch gen2 cards: %s"' % (e))
+                hdr = pyfits.Header()
+
         try:
+            hdr.append(('DET-ID', 1))
             instCards = self._getInstHeader(cmd)
+            hdr.add_comment('Subaru Device Dependent Header Block for PFS-MCS')
             hdr.extend(instCards, bottom=True)
         except Exception as e:
-            cmd.warn(f'text="FAILED to gather MEB cards: {e}"')
+            cmd.warn(f'text="FAILED to gather instrument cards: {e}"')
 
         return hdr
-    
+
     def dumpCentroidtoDB(self, cmd):
         """Connect to database and return json string to an attribute."""
         
@@ -390,7 +395,7 @@ class McsCmd(object):
             self.fwhm = 3
 
         try:
-            self.fhwm = cmd.cmd.keywords["thresh"].values[0]
+            self.thresh = cmd.cmd.keywords["thresh"].values[0]
         except:
             try:
                 self.thresh = self.actor.image.mean()+20*self.actor.image.std()

@@ -451,7 +451,7 @@ int main(int argc, char *argv[]){
 	pdv_close(pdv_p);
 
 
-	printf("done\n");
+	printf("Exposure sequence is done\n");
 	return EXIT_SUCCESS;
 
 }
