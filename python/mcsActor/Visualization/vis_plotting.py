@@ -137,7 +137,7 @@ def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix,units,i
     
     fig,ax = plt.subplots()
     #plot map in mm
-    sc=ax.scatter(pts2[0,ind,0],pts2[0,ind,1],marker='s',c=c[ind],cmap='plasma',s=200)
+    sc=ax.scatter(pts2[0,ind,0].ravel(),pts2[0,ind,1].ravel(),marker='o',c=c[ind],cmap='plasma',s=25)
     fig.colorbar(sc)
     plt.title("Distortion ("+units+")")
     plt.xlabel("x ("+units+")")
@@ -148,7 +148,7 @@ def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix,units,i
 
     fig,ax = plt.subplots()
     #plot map in %
-    sc=ax.scatter(pts2[0,ind,0],pts2[0,ind,1],marker='s',c=c1[ind]*4,cmap='plasma',s=200)
+    sc=ax.scatter(pts2[0,ind,0].ravel(),pts2[0,ind,1].ravel(),marker='o',c=c1[ind]*4,cmap='plasma',s=25)
     fig.colorbar(sc)
     plt.title("Distortion (% of field size)")
     plt.xlabel("x ("+units+")")

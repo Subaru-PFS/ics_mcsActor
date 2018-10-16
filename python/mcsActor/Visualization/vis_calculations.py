@@ -154,7 +154,8 @@ def simpleDistortion(xx,yy,xs,ys):
     #uses opencv library
     
     transformation = cv2.estimateRigidTransform(pts1, pts2, False)
- 
+    transformFull = transformation.copy()
+
     #calculate the scaling from the result
     sx=np.sqrt(transformation[0,0]**2+transformation[0,1]**2)
     sy=np.sqrt(transformation[1,0]**2+transformation[1,1]**2)
@@ -179,7 +180,7 @@ def simpleDistortion(xx,yy,xs,ys):
     c=np.sqrt(diffx*diffx+diffy*diffy)
     c1=np.sqrt(diffx*diffx+diffy*diffy)/336.*100
 
-    return c,c1,pts1,pts2,diffx,diffy
+    return c,c1,pts1,pts2,diffx,diffy,transformFull
 
 
 def total_flux(xs,ys,image,x1,y1,scale):
@@ -402,7 +403,7 @@ def getTransByFrame(xArray,yArray,fxArray,fyArray,peakArray,xm,ym):
     peakFrameAv=[]
     rotAll=[]
 
-
+    allTrans=[]
     
     for i in range(nframes):
 
@@ -420,6 +421,8 @@ def getTransByFrame(xArray,yArray,fxArray,fyArray,peakArray,xm,ym):
         fyFrameAv.append(fyArray[:,i].mean())
         peakFrameAv.append(peakArray[:,i].mean())
 
+        allTrans.append(transform)
+        
     #convert data to numpy arrays
     xdAll=np.array(xdAll)
     ydAll=np.array(ydAll)
@@ -430,9 +433,7 @@ def getTransByFrame(xArray,yArray,fxArray,fyArray,peakArray,xm,ym):
     syAll=np.array(syAll)
     rotAll=np.array(rotAll)
     
-    return xdAll,ydAll,sxAll,syAll,rotAll,fxFrameAv,fyFrameAv,peakFrameAv
-
-
+    return xdAll,ydAll,sxAll,syAll,rotAll,fxFrameAv,fyFrameAv,peakFrameAv,allTrans
 
 
 def rotFunc(coords,xt,yt,rot):
@@ -506,3 +507,28 @@ def rotatePoints(x,y,xc,yc,theta):
     y_rot=(x-xc)*np.sin(theta)+(y-yc)*np.cos(theta)+yc
 
     return x_rot,y_rot
+
+
+
+def getCentre(transformation):
+
+    """
+
+    Extract the centre of rotation from the transformation matrix. 
+
+    """
+
+    
+    a=1-transformation[0,0]
+    b=transformation[0,1]
+    xt=transformation[0,2]
+    yt=transformation[1,2]
+
+    vv=np.array([[a,b],[-b,a]])
+    off=np.array([xt,yt])
+
+    cen=np.matmul(vv,off)/2/a
+
+    print(cen)
+    return cen[0],cen[1]
+

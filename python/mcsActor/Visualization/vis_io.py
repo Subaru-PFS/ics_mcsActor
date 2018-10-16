@@ -1,60 +1,83 @@
 
 import numpy as np
 import os
+import yaml
 
-def incrementFileName(prefix):
+
+def incrementFileName(prefix,suffix):
 
     #find the next increment for a file name
 
     i = 0
-    while os.path.exists('{0}_{1:0d})_saved.dat'.format(prefix,i)):
+    while os.path.exists('{0}_{1:0d})_{2}.yaml'.format(prefix,i,suffix)):
         i += 1
 
-    return '{0}_{1:0d}_saved.dat'.format(name,i)
+    return '{0}_{1:0d}_{2}.yaml'.format(prefix,i,suffix)
         
 
-def imageQualitySave(prefix,filename,cenParams,cenOut,distOut):
+def imageQualitySave(prefix,filename,xs,ys,fxs,fys,peaks,c,diffx,diffy,pts):
 
-    outFile=incrementFileName(prefix)
-    ff=open(outfile,"w")
+    outStruct={}
 
-    npoints=len(cenOut[0])
-
+    outStruct['filename']=filename
+    outStruct['x']=xs
+    outStruct['y']=ys
+    outStruct['fx']=fxs
+    outStruct['fy']=fys
+    outStruct['peak']=peaks
+    outStruct['dist']=c
+    outStruct['dist_x']=diffx
+    outStruct['dist_y']=diffy
+    outStruct['pts']=pts
     
-    print("#Input Filename")
-    print("#FWHM,boxsize,thresh,rl,rh,sl,sh")
-    print("#npoints x  [x,y,fx,fy,peak,back,c,c1,diffx,diffy,pts1,pts2"])
-    print(filename)
-    print(cenParams[0],cenParams[1],cenParams[2],cenParams[3],cenParams[4],cenParams[5],cenParams[6],cenParams[7])
-    for i in range(npoints):
+    outFile=incrementFileName(prefix,"image")
 
-        for j in range(6):
-            print(cenOut[j][i])
-        for j in range(6):
-            print(cenOut[j][i])
+    yaml.dump(outStruct,open(outFile,"w"))      
 
-    print()
+def imageQualityLoad(prefix,i):
 
-    ff.close()
+    outFile='{0}_{1:0d}_image.yaml'.format(prefix,i)
 
-def seeingSave(prefix,filename,cenParams,cenOut,distOut):
+    outStruct=yaml.load(open(outFile))
+   
+    return outStruct
 
+def seeingSave(prefix,filenames,frameIDs,xArray,yArray,fxArray,fyArray,peakArray,backArray,xm,ym,xAv,yAv,fxAv,fyAv,peakAv,backAv,rmsVal,nMatch,fxFrameAv,fyFrameAv,peakFrameAv,allTrans):
 
-    #nframes, npoints
+    outStruct={}
+
+    outStruct['filenames']=filenames
+    outStruct['frameIDs']=frameIDs
+    outStruct['xArray']=xArray
+    outStruct['yArray']=yArray
+    outStruct['fxArray']=fxArray
+    outStruct['fyArray']=fyArray
+    outStruct['peakArray']=peakArray
+    outStruct['backArray']=backArray
+    outStruct['xm']=xm
+    outStruct['ym']=ym
+    outStruct['xAv']=xAv
+    outStruct['yAv']=yAv
+    outStruct['fxAv']=fxAv
+    outStruct['fyAv']=fyAv
+    outStruct['peakAv']=peakAv
+    outStruct['backAv']=backAv
+    outStruct['rmsVal']=rmsVal
+    outStruct['nMatch']=nMatch
+    outStruct['fxFrameAv']=fxFrameAv
+    outStruct['fyFrameAv']=fyFrameAv
+    outStruct['peakFrameAv']=peakFrameAv
+    outStruct['allTrans']=allTrans
+    outStruct['rms']=rmsVal.mean()
     
-    #registered centroids
-    xArray,yArray,fxArray,fyArray,backArray,peakArray
+    outFile=incrementFileName(prefix,"seeing")
 
-    #averages by frame
-    xAv,yAv,fxAv,fyAv,peakAv,backAv,rmsVal,nMatch
+    yaml.dump(outStruct,open(outFile,"w"))      
 
-    #averages by frame
-    xdAll,ydAll,sxAll,syAll,rotAll,fxFrameAv,fyFrameAv,peakFrameAv
-
-    print("#Input Filenames")
-    print("#FWHM,boxsize,thresh,rl,rh,sl,sh")
-
-
-def rotationSave():
-
+def seeingLoad(prefix):
     
+    outFile='{0}_{1:0d}_seeing.yaml'.format(prefix,i)
+
+    outStruct=yaml.load(open(outFile))
+   
+    return outStruct
