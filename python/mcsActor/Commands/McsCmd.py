@@ -27,6 +27,7 @@ from actorcore.utility import fits as fitsUtils
 from opscore.utility.qstr import qstr
 
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
+# import pfs.utils.config as pfsConfig
 
 import psycopg2
 import psycopg2.extras
@@ -205,6 +206,10 @@ class McsCmd(object):
     def _constructHeader(self, cmd, expType, expTime):
         if expType == 'bias':
             expTime = 0.0
+
+        # Subaru rules
+        if expType == 'object':
+            expType = 'acquisition'
         ret = self.actor.cmdr.call(actor='gen2',
                                    cmdStr=f'getFitsCards \
                                             frameid={self.actor.exposureID} \
@@ -226,9 +231,19 @@ class McsCmd(object):
             except Exception as e:
                 cmd.warn('text="FAILED to fetch gen2 cards: %s"' % (e))
                 hdr = pyfits.Header()
-
         try:
-            hdr.append(('DET-ID', 1))
+            config = pfsConfig.getConfigDict('mcs')
+            detectorId = config['serial']
+            gain = config['gain']
+        except Exception as e:
+            cmd.warn('text="FAILED to fetch config cards: %s"' % (e))
+            detectorId = 'MCS cam#1'
+            gain = 2.24
+            
+        hdr.append(('DETECTOR', detectorId, 'Name of the detector/CCD'))
+        hdr.append(('GAIN', gain, '[e-/ADU] AD conversion factor'))
+        hdr.append(('DET-TMP', 'NaN', '[K] Detector temperature'))
+        try:
             instCards = self._getInstHeader(cmd)
             hdr.add_comment('Subaru Device Dependent Header Block for PFS-MCS')
             hdr.extend(instCards, bottom=True)
@@ -324,6 +339,18 @@ class McsCmd(object):
         imgHdu = pyfits.CompImageHDU(image, name='IMAGE', compression_type='RICE_1')
         imgHdu.header.extend(imgHdr)
         hduList = pyfits.HDUList([phdu, imgHdu])
+
+        # Patch core FITS card comments to match Subaru requirements.
+        imgHdr = imgHdu.header
+        imgHdr.set('BZERO', comment='Real=fits-value*BSCALE+BZERO')
+        imgHdr.set('BSCALE', comment='Real=fits-value*BSCALE+BZERO')
+        imgHdr.append(('BUNIT', 'ADU', 'Unit of original pixel values'))
+        imgHdr.append(('BLANK', 32767, 'Value used for NULL pixels'))  # 12-bit camera
+        imgHdr.append(('BIN-FCT1', 1, '[pixel] Binning factor of X axis'))
+        imgHdr.append(('BIN-FCT2', 1, '[pixel] Binning factor of X axis'))
+
+        pHdr =  phdu.header
+        pHdr.set('EXTEND', comment='Presence of FITS Extension')
 
         hduList.writeto(filename, checksum=False, overwrite=True)
         cmd.inform('filename="%s"' % (filename))
