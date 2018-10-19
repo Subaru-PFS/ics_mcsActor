@@ -73,7 +73,8 @@ class McsCmd(object):
             ('quickPlot', '', self.quickPlot),
             ('timeTestFull','',self.timeTestFull),
             ('seeingTest','',self.seeingTest),
-            ('setCentroidParams','',self.setCentroidParams),
+            ('setCentroidParams','[<fwhm>] [<thresh>] [<rl>] [<rh>] [<sl>] [<sh>] [<boxsize>]',
+             self.setCentroidParams),
             ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
         ]
