@@ -65,7 +65,7 @@ class McsCmd(object):
             ('status', '', self.status),
             ('expose', '@(bias|test)', self.expose),
             ('expose', '@(dark|object|flat) <expTime>', self.expose),
-            ('runCentroid', '<newTable>', self.runCentroid),
+            ('runCentroid', '[@newTable]', self.runCentroid),
             ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
             ('test_centroid', '', self.test_centroid),
             ('reconnect', '', self.reconnect),
@@ -85,7 +85,6 @@ class McsCmd(object):
                                         keys.Key("filename", types.String(), help="Image filename"),
                                         keys.Key("path", types.String(), help="Simulated image directory"),
                                         keys.Key("getArc", types.Int(), help="flag for arc image"),
-                                        keys.Key("newTable", types.Bool(False, True), help="flag for arc image"),
                                         keys.Key("fwhm", types.Float(), help="fwhm for centroid routine"),
                                         keys.Key("boxsize", types.Int(), help="boxsize for centroid routine"),
                                         keys.Key("thresh", types.Int(), help="thresh for centroid routine"),
@@ -267,13 +266,13 @@ class McsCmd(object):
             return
         try:
             conn = psycopg2.connect("dbname='pfs' user='pfs' host="+self.db+" password="+passstring)
-            cmd.diag('text="Connected to FPS database."')
+            cmd.diag('text="Connected to FPS database on host ."')
         except:
             cmd.warn('text="I am unable to connect to the database."')
         
         cmd.debug('text="Value from self.newTable = %s"' % (self.newTable))
 
-        if bool(self.newTable) is True:
+        if self.newTable:
             self._makeTables(conn, doDrop=True)
             cmd.inform('text="Centroid table created. "')
         else:
@@ -500,9 +499,9 @@ class McsCmd(object):
         
     def runCentroid(self, cmd):
         """ Take an exposure and measure centroids. """
-        #cmdKeys = cmd.cmd.keywords
-        
-        self.newTable = cmd.cmd.keywords["newTable"].values[0]
+
+        cmdKeys = cmd.cmd.keywords
+        self.newTable = "newTable" in cmdKeys
             
         cmd.debug('text="newTable value = %s"' % (self.newTable))
 
