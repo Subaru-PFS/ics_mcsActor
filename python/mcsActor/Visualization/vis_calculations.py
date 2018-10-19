@@ -2,8 +2,14 @@
 
 import numpy as np
 import numpy.ma as ma
+import cv2
+import astropy
 from scipy.stats import sigmaclip
+from scipy.optimize import curve_fit
 
+
+#this is so that you can run the code in a MHS environment, or stand
+#alone
 
 try:
     import mcsActor.Visualization.vis_plotting as visplot
@@ -15,17 +21,10 @@ try:
 except:
     import vis_coordinates as viscoords
 
-
-import cv2
-import astropy
-from scipy.optimize import curve_fit
-
-
 try:
     import mcsActor.mpfitCentroid.centroid as centroid
 except:
     import centroid as centroid
-
 
     
 def getCentroids(image,fwhm,boxsize,thresh,rl,rh,sl,sh):
@@ -110,7 +109,7 @@ def getAllCentroids(files,fwhm,boxsize,thresh,rl,rh,sl,sh,outfile):
     ff.close()
     return x,y
 
-def simpleDistortion(xx,yy,xs,ys):
+def simpleDistortion(xx,yy,xs,ys,removeScale):
 
     """
 
@@ -140,10 +139,101 @@ def simpleDistortion(xx,yy,xs,ys):
     yav2=yy.mean()
 
     for i in range(len(xs)):
-        pts1[0,i,0]=xs[i]-xav1
-        pts1[0,i,1]=ys[i]-yav1
-        pts2[0,i,0]=xx[i]-xav2
-        pts2[0,i,1]=yy[i]-yav2
+        #pts1[0,i,0]=xs[i]-xav1
+        #pts1[0,i,1]=ys[i]-yav1
+        #pts2[0,i,0]=xx[i]-xav2
+        #pts2[0,i,1]=yy[i]-yav2
+        pts1[0,i,0]=xs[i]
+        pts1[0,i,1]=ys[i]
+        pts2[0,i,0]=xx[i]
+        pts2[0,i,1]=yy[i]
+
+    #cv2 needs float32
+    
+    pts1=np.float32(pts1)
+    pts2=np.float32(pts2)
+
+    #get the affine transformation - translation, rotation, scaling
+    #uses opencv library
+    transformation = cv2.estimateRigidTransform(pts1, pts2, False)
+    
+    visplot.checkMatched(pts1[0,:,0],pts1[0,:,1],pts2[0,:,0],pts2[0,:,1],"test",1)
+
+    transformFull = transformation.copy()
+    
+    #calculate the scaling from the result
+    sx=np.sqrt(transformation[0,0]**2+transformation[0,1]**2)
+    sy=np.sqrt(transformation[1,0]**2+transformation[1,1]**2)
+    
+    print("sx=",sx," sy=",sy)
+
+    if(removeScale==1):
+        #remove the scaling from the transformation matrix
+        transformation[0,0]/=sx
+        transformation[0,1]/=sx
+        transformation[1,0]/=sy
+        transformation[1,1]/=sy
+
+    #calculate the transformed points
+    points=cv2.transform(pts1,transformation)
+    visplot.checkMatched(points[0,:,0],points[0,:,1],pts2[0,:,0],pts2[0,:,1],"test",1)
+
+    #difference between expected and actual point positions
+    diffx=(pts2[0,:,0]-points[0,:,0])
+    diffy=(pts2[0,:,1]-points[0,:,1])
+
+    #in mm and in % of field
+    
+    c=np.sqrt(diffx*diffx+diffy*diffy)
+    c1=np.sqrt(diffx*diffx+diffy*diffy)/336.*100
+
+    pts1[:,:,0]=ma.masked_values(pts1[:,:,0],0)
+    pts1[:,:,1]=ma.masked_values(pts1[:,:,1],0)
+    pts2[:,:,0]=ma.masked_values(pts2[:,:,0],0)
+    pts2[:,:,1]=ma.masked_values(pts2[:,:,1],0)
+    pts1=ma.masked_invalid(pts1)
+    pts2=ma.masked_invalid(pts2)
+    
+    return c,c1,pts1,pts2,diffx,diffy,transformFull
+
+def simpleDistortionBack(xx,yy,xs,ys,x1,y1):
+
+    """
+
+    Calculate the distortion map using opencv library
+
+    input: 
+
+    xx,yy mask  coordinates
+    xs,ys: spot coordinates
+
+    returns:
+
+    c,c1: distortion magnitude in mm and % of field
+    pts1,pts2: points with average removed
+    diffx,diffy: difference between pts2 and pts with translation/rotation removed
+
+    """
+    
+    #subtract average to align
+
+    nn=len(xs)
+    pts1=np.zeros((1,nn,2))
+    pts2=np.zeros((1,nn,2))
+    xav1=xs.mean()
+    yav1=ys.mean()
+    xav2=xx.mean()
+    yav2=yy.mean()
+
+    for i in range(len(xs)):
+        #pts1[0,i,0]=xs[i]-xav1
+        #pts1[0,i,1]=ys[i]-yav1
+        #pts2[0,i,0]=xx[i]-xav2
+        #pts2[0,i,1]=yy[i]-yav2
+        pts1[0,i,0]=xs[i]
+        pts1[0,i,1]=ys[i]
+        pts2[0,i,0]=xx[i]
+        pts2[0,i,1]=yy[i]
 
     #cv2 needs float32
     
@@ -155,7 +245,7 @@ def simpleDistortion(xx,yy,xs,ys):
     
     transformation = cv2.estimateRigidTransform(pts1, pts2, False)
     transformFull = transformation.copy()
-
+        
     #calculate the scaling from the result
     sx=np.sqrt(transformation[0,0]**2+transformation[0,1]**2)
     sy=np.sqrt(transformation[1,0]**2+transformation[1,1]**2)
@@ -180,10 +270,17 @@ def simpleDistortion(xx,yy,xs,ys):
     c=np.sqrt(diffx*diffx+diffy*diffy)
     c1=np.sqrt(diffx*diffx+diffy*diffy)/336.*100
 
+    pts1[:,:,0]=ma.masked_values(pts1[:,:,0],0)
+    pts1[:,:,1]=ma.masked_values(pts1[:,:,1],0)
+    pts2[:,:,0]=ma.masked_values(pts2[:,:,0],0)
+    pts2[:,:,1]=ma.masked_values(pts2[:,:,1],0)
+    pts1=ma.masked_invalid(pts1)
+    pts2=ma.masked_invalid(pts2)
+    
     return c,c1,pts1,pts2,diffx,diffy,transformFull
 
 
-def total_flux(xs,ys,image,x1,y1,scale):
+def totalFlux(xs,ys,image):
 
     """
 
@@ -192,21 +289,13 @@ def total_flux(xs,ys,image,x1,y1,scale):
 
     input: 
 
-    xs,ys: coords of spots
+    xs,ys: coords of spots (pixel)
     image: image array
-    x1,y1: lower left spot coordinates
-    sclae: from pixel to mm at mask
 
     returns: array of fluxes
 
     """
 
-    
-    #back to pixel coordinates???
-    xc=xs*scale+x1
-    yc=ys*scale+y1
-
-    #estimate background
     
     ind=np.where(image > 0)
     
@@ -216,7 +305,7 @@ def total_flux(xs,ys,image,x1,y1,scale):
 
     #initialize array
     
-    flux=np.zeros((len(xc)))
+    flux=np.zeros((len(xs)))
 
     #cycle through the points, do a very simple aperture photometry
     #summing values in box
@@ -352,7 +441,7 @@ def makeFakeCentroids(nframes,rms,avShift,avRot,avScale):
         print(xshift,yshift,scalevar,rotvar)
         
         #transform the mask to the data
-        xm,ym=viscoords.transformMask(x,y,xd+xshift,yd+yshift,rotvar,scalevar)
+        xm,ym=viscoords.transformPoints(x,y,xd+xshift,yd+yshift,rotvar,scalevar)
 
         #and Gaussian noise for seeing (and in other variables)
         xArray[:,i]=xm+np.random.normal(0,rms,npoints)
@@ -465,8 +554,19 @@ def matchRot(x1,y1,x2,y2,xc,yc,theta):
 
     
     #rotate second set of points to match first, based on guess of centre
-    x_adj=(x1-xc)*np.cos(theta)-(y1-yc)*np.sin(theta)+xc
-    y_adj=(x1-xc)*np.sin(theta)+(y1-yc)*np.cos(theta)+yc
+
+    x_adj,y_adj=viscoords.transformGeneral(x1,y1,0,0,theta,1,xc,yc)
+
+    #plt.clf()
+    #plt.plot(x_adj,y_adj,'dg')
+    #plt.plot(x2,y2,'ob')
+    #plt.title("Check")
+    #plt.show()
+
+    
+    #x_adj=(x1-xc)*np.cos(theta)-(y1-yc)*np.sin(theta)+xc
+    #y_adj=(x1-xc)*np.sin(theta)+(y1-yc)*np.cos(theta)+yc
+    
     npoints1=len(x1)
     npoints2=len(x2)
 
@@ -474,33 +574,60 @@ def matchRot(x1,y1,x2,y2,xc,yc,theta):
     ya=np.zeros((len(x1)))
     xb=np.zeros((len(x1)))
     yb=np.zeros((len(x1)))
+    xx=np.zeros((len(x1)))
+    yy=np.zeros((len(y1)))
     dval=np.zeros((len(x1)))
 
     for i in range(npoints1):
 
-        dd=100
-        ind=0
+        #dd=100
+        #ind=0
+
+        dd=(x2-x_adj[i])**2+(y2-y_adj[i])**2
+        ind=np.argmin(dd)
+        dval[i]=dd[ind]
         
-        for j in range(npoints2):
+        #for j in range(npoints2):
+        #
+        #    nd=(x2[j]-x_adj[i])**2+(y2[j]-y_adj[i])**2
+        #    if(nd < dd):
+        #        dd=nd
+        #        ind=j
 
-            nd=(x2[j]-x_adj[i])**2+(y2[j]-y_adj[i])**2
-            if(nd < dd):
-                dd=nd
-                ind=j
-
-        dval[i]=dd
+        #dval[i]=dd
         xa[i]=x1[i]
         ya[i]=y1[i]
         xb[i]=x2[ind]
         yb[i]=y2[ind]
+        xx[i]=x_adj[i]
+        yy[i]=y_adj[i]
 
+    plt.clf()
+    plt.plot(xx,xb,'dg')
+    plt.plot(yy,yb,'ob')
+    plt.title("Check")
+    plt.show()
+
+    #mask outliers/unmatched points
+    print(dval)
     back,a,b=sigmaclip(dval)
     mn=back.mean()
     st=back.std()
-    print(mn,st)
-    return rotationParams(xa,ya,xb,yb,xc,yc,theta)
+    print("stats",mn,st,max(dval))
 
+    ind=np.where(abs(dval-mn) > 1*st)
+    ma.masked_where(abs(dval-mn) > 1*st,xa)
+    ma.masked_where(abs(dval-mn) > 1*st,xb)
+    ma.masked_where(abs(dval-mn) > 1*st,ya)
+    ma.masked_where(abs(dval-mn) > 1*st,yb)
     
+    visplot.checkMatched(x2,y2,x_adj,y_adj,"aaa",0)
+
+    transformation,xd,yd,sx,sy,rotation = viscoords.getTransform(xa,ya,xb,yb,1)
+    
+    #xc1,yc1,theta1=rotationParams(xa,ya,xb,yb,xc,yc,theta)
+    return transformation,xd,yd,sx,sy,rotation
+
 def rotatePoints(x,y,xc,yc,theta):
 
     x_rot=(x-xc)*np.cos(theta)-(y-yc)*np.sin(theta)+xc
@@ -510,25 +637,4 @@ def rotatePoints(x,y,xc,yc,theta):
 
 
 
-def getCentre(transformation):
-
-    """
-
-    Extract the centre of rotation from the transformation matrix. 
-
-    """
-
-    
-    a=1-transformation[0,0]
-    b=transformation[0,1]
-    xt=transformation[0,2]
-    yt=transformation[1,2]
-
-    vv=np.array([[a,b],[-b,a]])
-    off=np.array([xt,yt])
-
-    cen=np.matmul(vv,off)/2/a
-
-    print(cen)
-    return cen[0],cen[1]
 

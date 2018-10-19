@@ -3,7 +3,7 @@ import matplotlib.pylab as plt
 
 
 import numpy as np
-import pylab as py
+import numpy.ma as ma
 from matplotlib.cm import plasma
 from scipy.stats import sigmaclip
 import astropy
@@ -23,7 +23,7 @@ def getImage(filename):
 
     return image
     
-def to_fits(filename):
+def toFits(filename):
 
     #quick routine to convert raw to FITS
 
@@ -95,7 +95,7 @@ def checkMatched(xx,yy,xs,ys,prefix,inter):
     if(inter == 1):
         plt.show()
 
-def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix,units,inter):
+def plotDistortion(c,c1,pts1,pts2,x1,y1,diffx,diffy,fxs,fys,peaks,limit,prefix,units,inter,inst_scale):
 
     """
 
@@ -124,10 +124,17 @@ def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix,units,i
     
     fig,ax = plt.subplots(facecolor='g')
 
-    ax.quiver(pts1[0,ind,0],pts1[0,ind,1],-diffx[ind],-diffy[ind])
+    x1=ma.masked_values(x1,0)
+    y1=ma.masked_values(y1,0)
+
+    print(x1.min(),y1.min())
+   
+    ax.quiver(pts1[:,ind,0].ravel(),pts1[:,ind,1].ravel(),-diffx[ind],-diffy[ind])
+    #ax.quiver(x1,y1,-diffx[ind],-diffy[ind])
     plt.xlabel("x ("+units+")")
     plt.ylabel("y ("+units+")")
     plt.title("Distortion")
+    plt.axis('equal')
     if(inter == 1):
         plt.show()
     plt.savefig(prefix+"_distortion.png")
@@ -137,7 +144,8 @@ def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix,units,i
     
     fig,ax = plt.subplots()
     #plot map in mm
-    sc=ax.scatter(pts2[0,ind,0].ravel(),pts2[0,ind,1].ravel(),marker='o',c=c[ind],cmap='plasma',s=25)
+    #sc=ax.scatter(pts1[:,ind,0].ravel(),pts1[:,ind,1].ravel(),marker='o',c=c[ind],cmap='plasma',s=25)
+    sc=ax.scatter(pts1[:,ind,0].ravel(),pts1[:,ind,1].ravel(),marker='o',c=c[ind]/inst_scale,cmap='plasma',s=25)
     fig.colorbar(sc)
     plt.title("Distortion ("+units+")")
     plt.xlabel("x ("+units+")")
@@ -148,7 +156,7 @@ def plotDistortion(c,c1,pts1,pts2,diffx,diffy,fxs,fys,peaks,limit,prefix,units,i
 
     fig,ax = plt.subplots()
     #plot map in %
-    sc=ax.scatter(pts2[0,ind,0].ravel(),pts2[0,ind,1].ravel(),marker='o',c=c1[ind]*4,cmap='plasma',s=25)
+    sc=ax.scatter(pts1[:,ind,0].ravel(),pts1[:,ind,1].ravel(),marker='o',c=c1[ind]/inst_scale,cmap='plasma',s=25)
     fig.colorbar(sc)
     plt.title("Distortion (% of field size)")
     plt.xlabel("x ("+units+")")
@@ -321,6 +329,39 @@ def plotTransByFrame(fxFrameAv,fyFrameAv,peakFrameAv,sxAll,syAll,xdAll,ydAll,rot
     if(inter == 1):
          fig.show()
 
+def plotCentroidStats(fx,fy,peaks,prefix,inter):
+    
+    fig,ax = plt.subplots()
+    ax.hist(fx)
+    plt.title("Histogram of FWHM(x)")
+    plt.xlabel("FWHM(x) [pixels]")
+    plt.ylabel("N")
+    plt.savefig(prefix+"_fxstats.png")
+
+    if(inter == 1):
+        fig.show()
+
+    fig,ax = plt.subplots()
+    ax.hist(fy)
+    plt.title("Histogram of FWHM(y)")
+    plt.xlabel("FWHM(y) [pixels]")
+    plt.ylabel("N")
+    plt.savefig(prefix+"_fystats.png")
+
+    if(inter == 1):
+        fig.show()
+
+    fig,ax = plt.subplots()
+    ax.hist(peaks)
+    plt.title("Histogram of peak")
+    plt.xlabel("Peak")
+    plt.ylabel("N")
+    plt.savefig(prefix+"_peakstats.png")
+
+    if(inter == 1):
+        fig.show()
+
+         
 def plotImageStats(image,prefix,inter):
 
 
@@ -343,3 +384,26 @@ def plotImageStats(image,prefix,inter):
         fig.show()
 
     return backImage,rmsImage
+
+def maskOutliers(x,y,roi):
+
+    """
+
+    routine to mask out points beyone a particular region. Useful for masking 
+    any crap at the edge of the image that is contaiminating the centroid list.
+
+    input:
+
+    x,y: coordinates
+
+    roi
+
+    region to keep, in format [x1,y1,x2,y2]
+
+    """
+
+    x=ma.masked_where((x < roi[0]) | (x > roi[2]) | (y < roi[1]) | (y > roi[3]),x)
+    y=ma.masked_where((x < roi[0]) | (x > roi[2]) | (y < roi[1]) | (y > roi[3]),y)
+
+    return x,y
+

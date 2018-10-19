@@ -2,18 +2,33 @@
 import numpy as np
 import os
 import yaml
+import glob
 
 
 def incrementFileName(prefix,suffix):
 
-    #find the next increment for a file name
+    #find the next increment for a file name - highest index + 1
 
-    i = 0
-    while os.path.exists('{0}_{1:0d})_{2}.yaml'.format(prefix,i,suffix)):
-        i += 1
 
-    return '{0}_{1:0d}_{2}.yaml'.format(prefix,i,suffix)
-        
+    flist=glob.glob('{0}_*_{1}.yaml'.format(prefix,suffix))
+    flist.sort()
+
+    if(flist == []):
+        i=0
+    else:
+        lastFile=flist[-1]
+        print(lastFile)
+        aa=lastFile.split("_")
+        print(aa)
+        i=np.int(aa[1])+1
+    return '{0}_{1:02d}_{2}.yaml'.format(prefix,i,suffix)
+
+def getLastFile(prefix,suffix):
+
+    flist=glob.glob('{0}_*_{1}.yaml'.format(prefix,suffix))
+    flist.sort()
+
+    return flist[-1]
 
 def imageQualitySave(prefix,filename,xs,ys,fxs,fys,peaks,c,diffx,diffy,pts):
 
@@ -36,8 +51,11 @@ def imageQualitySave(prefix,filename,xs,ys,fxs,fys,peaks,c,diffx,diffy,pts):
 
 def imageQualityLoad(prefix,i):
 
-    outFile='{0}_{1:0d}_image.yaml'.format(prefix,i)
-
+    if(i < 0):
+        outFile=getLastFile(prefix,"image")
+    else:
+        outFile='{0}_{1:02d}_image.yaml'.format(prefix,i)
+    print(outFile)
     outStruct=yaml.load(open(outFile))
    
     return outStruct
@@ -74,9 +92,13 @@ def seeingSave(prefix,filenames,frameIDs,xArray,yArray,fxArray,fyArray,peakArray
 
     yaml.dump(outStruct,open(outFile,"w"))      
 
-def seeingLoad(prefix):
-    
-    outFile='{0}_{1:0d}_seeing.yaml'.format(prefix,i)
+def seeingLoad(prefix,i):
+    if(i < 0):
+        outFile=getLastFile(prefix,"seeing")
+    else:
+        outFile='{0}_{1:02d}_seeing.yaml'.format(prefix,i)
+
+
 
     outStruct=yaml.load(open(outFile))
    

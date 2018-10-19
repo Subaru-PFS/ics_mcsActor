@@ -3,40 +3,6 @@ import cv2
 import numpy.ma as ma
 
 
-def approximateCoords(x,y,region):
-
-    """
-
-    Get lower left position and rotation angle from a set of pin-hole mask
-    centroids.  This will likely break if the rotation angle is too high. 
-    
-    input
-
-    x,y: 1D numpy arrays of coordinates (pixel)
-
-    region: 4 element array with of the region of interest [x1,x2,y1,y2]
-
-    returns: x1,y1 of lower left corner, angle in radians
-
-    """
-
-    #find points in the ergion
-    
-    ind=np.where((x > region[0]) & (x < region[1]) & (y > region[2]) & (y < region[3]))
-
-    #find the minimum and maximum distance from the origin
-    
-    dd=x*x+y*y
-
-    ind1=np.where(dd == dd.max())
-    ind2=np.where(dd == dd.min())
-
-    #calculate the angle of rotation wrt Y axis
-    
-    angle=np.arctan2((y[ind1]-y[ind2]),(x[ind1]-x[ind2]))-np.pi/4.
-
-    return x[ind2],y[ind2],angle
-
 def maskinMM(smallBox):
 
     """
@@ -109,68 +75,58 @@ def maskinMM(smallBox):
 
     return np.array(xx),np.array(yy)
 
-def scaleCentroids(x,y,x1,y1,scale):
+def matchPointsRot(x1c,y1c,x2c,y2c,x1_rot,y1_rot,x2_rot,y2_rot,tol):    
 
     """
 
-    scale the centroids to mm at mask, and shift to the origin
+    match the image spots to the mask holes. Assumes that the mask points
+    have been transformed to match the image points. 
 
     input
 
-    x1,y1: lower left spot
-    x,y: coordinates of centroids
-    scale: scale factor
+    xc,yc: centroids
+    xx,yy: hole coordinates
+    fx,fy: fwhms
+    peak: peak values
 
-    returns: transformed x,y
-
-    """
-    
-    xc=(x-x1)/scale
-    yc=(y-y1)/scale
-
-    return xc,yc
- 
-def scaleMask(xx,yy,angle,flip):
+    returns: xs,ys,fxs,fyx,peaks: measured variables matched to the hole positions
 
     """
 
-    rotate the mask as needed
-
-    input
-
-    xx,yy: hole positions
-    angle: rotation angle
-    flip: set to 1 to rotate by 90 degrees
-
-    returns: transformed x,y
-
-    """
+    #create arrays
     
-    #apply any rotation (for matching purposes only)
+    x1r=np.zeros((len(x1c)))
+    y1r=np.zeros((len(x1c)))
+    x2r=np.zeros((len(x2c)))
+    y2r=np.zeros((len(x2c)))
 
-    #add 90 degrees to rotation
-    
-    if(flip==1):
-        angle=angle+np.pi/2
+    for j in range(len(x1c)):
+        dd=np.sqrt((x2c[j]-x1c)**2+(y2c[j]-y1c)**2)
 
-    #shift to centre, rotate, shift back
-    xx=xx-168
-    yy=yy-168
-        
-    xnew=xx*np.cos(angle)-yy*np.sin(angle)
-    ynew=xx*np.sin(angle)+yy*np.cos(angle)
-    
-    xx=xnew+168
-    yy=ynew+168
+        ind=np.where(dd==dd.min())
 
-    return xx,yy
+        #need to filter in case points are missing
+        if(dd.min() < tol):
+            x1r[j]=x1_rot[ind]
+            y1r[j]=y1_rot[ind]
+            x2r[j]=x2_rot[j]
+            y2r[j]=y2_rot[j]
+
+    #mask unmatched values
+    ma.masked_where(x1r==0,x1r)
+    ma.masked_where(y1r==0,y1r)
+    ma.masked_where(x2r==0,x2r)
+    ma.masked_where(y2r==0,y2r)
+
+    return x1r,y1r,x2r,y2r
 
 
-def matchPoints(xc,yc,xx,yy,fx,fy,peak):    
+def matchPoints(xc,yc,xx,yy,fx,fy,peak,x,y,tol):    
 
     """
 
-    match the image spots to the mask holes
+    match the image spots to the mask holes. Assumes that the mask points
+    have been transformed to match the image points. 
 
     input
 
@@ -190,6 +146,8 @@ def matchPoints(xc,yc,xx,yy,fx,fy,peak):
     fxs=np.zeros((len(xx)))
     fys=np.zeros((len(xx)))
     peaks=np.zeros((len(xx)))
+    x1=np.zeros((len(xx)))
+    y1=np.zeros((len(xx)))
 
     for j in range(len(xx)):
         dd=np.sqrt((xx[j]-xc)*(xx[j]-xc)+(yy[j]-yc)*(yy[j]-yc))
@@ -197,182 +155,30 @@ def matchPoints(xc,yc,xx,yy,fx,fy,peak):
         ind=np.where(dd==dd.min())
 
         #need to filter in case points are missing
-        if(dd.min() < 5):
+        if(dd.min() < tol):
 
+            x1[j]=x[ind]
+            y1[j]=y[ind]
             xs[j]=xc[ind]
             ys[j]=yc[ind]
+            
             fxs[j]=fx[ind]
             fys[j]=fy[ind]
             peaks[j]=peak[ind]
 
-    return xs,ys,fxs,fys,peaks
+
+    x1=ma.masked_values(x1,0)
+    y1=ma.masked_values(y1,0)
+    xs=ma.masked_values(xs,0)
+    ys=ma.masked_values(ys,0)
+    fxs=ma.masked_values(fxs,0)
+    fys=ma.masked_values(fys,0)
+    peaks=ma.masked_values(peaks,0)
+
+    return xs,ys,x1,y1,fxs,fys,peaks
 
 
-
-def getApproximateTransform(xx,yy,close):
-
-    """
-
-    Routine to take two sets of pinhole mask spots, and figure out the 
-    transformation between them. Requires reasonably clean set of positions. 
-
-    input: 
-    xx,yy: spot positions
-
-    output: 
-    xm,ym: transformed mask coordinates
-    xd1,yd1: x and y translations
-    angle: rotation
-    scale: scaling factor
-
-    """
-
-    #get mask coordinates, centred at origin
-    x,y=maskinMM(close)
-    x=x-168
-    y=y-168
-    
-    #true mean values for mask
-
-    mask_xm=x.mean()
-    mask_ym=y.mean()
-
-    #fine the maximum distance from the mask centre to a point (ie corner)
-    dd=np.sqrt((x-mask_xm)**2+(y-mask_ym)**2)
-    mask_s=dd.max()
-
-    #get mean value of measured points
-    
-    cent_xm=xx.mean()
-    cent_ym=yy.mean()
-
-    #find the point farthest from the mean for the measured points (ie, corner)
-    
-    dd=np.sqrt((xx-cent_xm)**2+(yy-cent_ym)**2)
-    ind1=np.where(dd==dd.max())
-    cent_s=dd.max()
-
-    #there are two equal values in the exact case, pick one at random
-    
-    x1=xx[ind1[0][0]]
-    y1=yy[ind1[0][0]]
-
-    #estimate the translaiton by subtracting the two sets of mean values
-    
-    xd1=cent_xm-mask_xm
-    yd1=cent_ym-mask_ym
-
-    #use the corner points to estimate the rotation. This has a 4 quadrant
-    #uncertainty because we don't know the orientation yet. 
-    
-    cent_angle=np.arctan2(x1-cent_xm,y1-cent_ym)
-    mask_angle=np.arctan2(x[0]-mask_xm,y[0]-mask_ym)
-
-    angle=np.pi-cent_angle-mask_angle
-
-    #get the scaling factor by comparing the two maximum distances
-
-    scale=cent_s/mask_s
-
-    #now transform the data to match the mask. 
-    xa,ya=transformMask(xx,yy,-xd1,-yd1,0,1)
-    x1,y1=transformMask(xa,ya,0,0,np.pi-angle,1/scale)
-
-    #subtract any remaining translation using the minimum values of transformed
-    #points
-    
-    xv=-x1.min()+x.min()
-    yv=-y1.min()+y.min()
-    
-    x1=x1-xv
-    y1=y1-yv
-
-
-    #now we can break the degeneracy in quadrant using the fact that the
-    #mask is not symmetric, and the average position in the y direction is
-    #offset by 6.4 mm from the mask centre. 
-
-    if(y1.mean() < -3):
-        #we're good
-        pass
-    elif (y1.mean() > 3):
-        x1,y1=transformMask(x1,y1,0,0,np.pi,1)
-        angle=angle+np.pi
-    elif (x1.mean() > 3):
-        x1,y1=transformMask(x1,y1,0,0,-np.pi/2,1)
-        angle=angle-np.pi/2
-    elif (x1.mean() < -3):
-        x1,y1=transformMask(x1,y1,0,0,np.pi/2,1)
-        angle=angle+np.pi/2
-
-    #now we're going to get the reverse transformation (mask to points)
-    #so we can work in pixel coordinates from now on.
-    
-    xd1=xd1+xv*scale
-    yd1=yd1+yv*scale
-
-    xm,ym=transformMask(x,y,xd1,yd1,angle-np.pi,scale)
-
-    return xm,ym,xd1,yd1,angle-np.pi,scale
-
-
-def mask_image(infile,outfile,x1,y1,x2,y2):
-
-
-    image=pf.getdata(infile)
-    image[0:x1,:]=0
-    image[x2:,:]=0
-    image[:,0:y1]=0
-    image[:,y2:]=0
-    pf.writeto(outfile,image,clobber=True)
-
-
-def transformMask(x,y,xd,yd,theta,s):
-
-    """
-    Apply a rigid transformation to the mask (trans, scale, rot). Mostly bookkeeping
-    stuff. 
-
-    input:
-    x,y: mask positions
-    xd,yd: translation
-    theta: rotation (radians)
-    s: scale
-
-    output: transformed x,y
-
-    """
-    
-
-    
-    #create transformation matrix
-    matrix=np.zeros((2,3))
-    matrix[0,0]=np.cos(theta)*s
-    matrix[0,1]=-np.sin(theta)*s
-    matrix[1,0]=np.sin(theta)*s
-    matrix[1,1]=np.cos(theta)*s
-    matrix[0,2]=xd
-    matrix[1,2]=yd
-
-    #bookkeeping for coordinate format
-    pts=np.zeros((1,len(x),2))
-
-    pts[0,:,0]=x
-    pts[0,:,1]=y
-
-    pts=np.float32(pts)
-
-    #do the transform
-    pts1=cv2.transform(pts,matrix)
-
-    #more bookkeeping
-    xx=pts1[0,:,0]
-    yy=pts1[0,:,1]
-
-    return xx,yy
-
-
-def matchAllPoints(centroids,xx,yy):
+def matchAllPoints(centroids,xx,yy,tol):
 
     """
 
@@ -436,7 +242,7 @@ def matchAllPoints(centroids,xx,yy):
             ind=np.where(dd==dd.min())
 
             #need to filter in case points are missing
-            if(dd.min() < 30):
+            if(dd.min() < tol):
 
                 xArray[j,i]=x[ind]
                 yArray[j,i]=y[ind]
@@ -455,6 +261,112 @@ def matchAllPoints(centroids,xx,yy):
     
     return xArray,yArray,fxArray,fyArray,backArray,peakArray
 
+
+
+def getApproximateTransform(xx,yy,close):
+
+    """
+
+    Routine to take two sets of pinhole mask spots, and figure out the 
+    transformation between them. Requires reasonably clean set of positions. 
+
+    input: 
+    xx,yy: spot positions
+
+    output: 
+    xm,ym: transformed mask coordinates
+    xd1,yd1: x and y translations
+    angle: rotation
+    scale: scaling factor
+
+    """
+
+    #get mask coordinates, centred at origin
+    x,y=maskinMM(close)
+    x=x-168
+    y=y-168
+    
+    #true mean values for mask
+
+    mask_xm=x.mean()
+    mask_ym=y.mean()
+
+    #find the maximum distance from the mask centre to a point (ie corner)
+    dd=np.sqrt((x-mask_xm)**2+(y-mask_ym)**2)
+    mask_s=dd.max()
+
+    #get mean value of measured points
+    
+    cent_xm=xx.mean()
+    cent_ym=yy.mean()
+
+    #find the point farthest from the mean for the measured points (ie, corner)
+    
+    dd=np.sqrt((xx-cent_xm)**2+(yy-cent_ym)**2)
+    ind1=np.where(dd==dd.max())
+    cent_s=dd.max()
+
+    #there are two equal values in the exact case, pick one at random
+    
+    x1=xx[ind1[0][0]]
+    y1=yy[ind1[0][0]]
+
+    #estimate the translaiton by subtracting the two sets of mean values
+    
+    xd1=cent_xm-mask_xm
+    yd1=cent_ym-mask_ym
+
+    #use the corner points to estimate the rotation. This has a 4 quadrant
+    #uncertainty because we don't know the orientation yet. 
+    
+    cent_angle=np.arctan2(x1-cent_xm,y1-cent_ym)
+    mask_angle=np.arctan2(x[0]-mask_xm,y[0]-mask_ym)
+
+    angle=np.pi-cent_angle-mask_angle
+
+    #get the scaling factor by comparing the two maximum distances
+
+    scale=cent_s/mask_s
+
+    #now transform the data to match the mask. 
+    xa,ya=transformPoints(xx,yy,-xd1,-yd1,0,1)
+    x1,y1=transformPoints(xa,ya,0,0,np.pi-angle,1/scale)
+
+    #subtract any remaining translation using the minimum values of transformed
+    #points
+    
+    xv=-x1.min()+x.min()
+    yv=-y1.min()+y.min()
+    
+    x1=x1-xv
+    y1=y1-yv
+
+    #now we can break the degeneracy in quadrant using the fact that the
+    #mask is not symmetric, and the average position in the y direction is
+    #offset by 6.4 mm from the mask centre. 
+
+    if(y1.mean() < -3):
+        #we're good
+        pass
+    elif (y1.mean() > 3):
+        x1,y1=transformPoints(x1,y1,0,0,np.pi,1)
+        angle=angle+np.pi
+    elif (x1.mean() > 3):
+        x1,y1=transformPoints(x1,y1,0,0,-np.pi/2,1)
+        angle=angle-np.pi/2
+    elif (x1.mean() < -3):
+        x1,y1=transformPoints(x1,y1,0,0,np.pi/2,1)
+        angle=angle+np.pi/2
+
+    #now we're going to get the reverse transformation (mask to points)
+    #so we can work in pixel coordinates from now on.
+    
+    xd1=xd1+xv*scale
+    yd1=yd1+yv*scale
+
+    xm,ym=transformPoints(x,y,xd1,yd1,angle-np.pi,scale)
+
+    return xm,ym,xd1,yd1,angle-np.pi,scale
 
 def getTransform(x,y,xx,yy,getVals):
 
@@ -477,7 +389,8 @@ def getTransform(x,y,xx,yy,getVals):
     rotation: rotation (radians)
 
     """
-    
+
+    #turn data into right form
     pts1=np.zeros((1,len(x),2))
     pts2=np.zeros((1,len(x),2))
 
@@ -487,16 +400,19 @@ def getTransform(x,y,xx,yy,getVals):
     pts2[0,:,0]=xx
     pts2[0,:,1]=yy
 
-    
+    #float32 is needed
     pts1=np.float32(pts1)
     pts2=np.float32(pts2)
 
+    #calculate the transformation
     transformation = cv2.estimateRigidTransform(pts1, pts2, False)
 
     if(getVals == 0):
         return transformation
+    
     if(getVals == 1):
 
+        #extract the parameters
 
         sx=np.sqrt(transformation[0,0]**2+transformation[0,1]**2)
         sy=np.sqrt(transformation[1,0]**2+transformation[1,1]**2)
@@ -507,4 +423,155 @@ def getTransform(x,y,xx,yy,getVals):
         rotation = np.arctan2(transformation[1,0]/sx,transformation[1,1]/sy)
         
         return transformation,xd,yd,sx,sy,rotation
+
+
+    
+def getCentre(transformation):
+
+    """
+
+    Extract the centre of rotation from the transformation matrix. 
+
+    """
+
+    
+    a=1-transformation[0,0]
+    b=transformation[0,1]
+    xt=transformation[0,2]
+    yt=transformation[1,2]
+
+    vv=np.array([[a,b],[-b,a]])
+    off=np.array([xt,yt])
+
+    cen=np.matmul(vv,off)/2/a
+
+    print(cen)
+    return cen[0],cen[1]
+
+def transformPointsMatrix(x,y,matrix):
+
+    pts=np.zeros((1,len(x),2))
+    
+    pts[0,:,0]=x
+    pts[0,:,1]=y
+
+    pts=np.float32(pts)
+
+    pts1=cv2.transform(pts,matrix)
+
+    xx=pts1[0,:,0]
+    yy=pts1[0,:,1]
+
+
+    return xx,yy
+
+def transformPoints(x,y,xd,yd,theta,s):
+
+    """
+    Apply a rigid transformation to the mask (trans, scale, rot). Mostly bookkeeping
+    stuff. 
+
+    input:
+    x,y: mask positions
+    xd,yd: translation
+    theta: rotation (radians)
+    s: scale
+
+    output: transformed x,y
+
+    """
+    
+    #create transformation matrix
+    matrix=np.zeros((2,3))
+    matrix[0,0]=np.cos(theta)*s
+    matrix[0,1]=-np.sin(theta)*s
+    matrix[1,0]=np.sin(theta)*s
+    matrix[1,1]=np.cos(theta)*s
+    matrix[0,2]=xd
+    matrix[1,2]=yd
+
+    #bookkeeping for coordinate format
+    pts=np.zeros((1,len(x),2))
+
+    pts[0,:,0]=x
+    pts[0,:,1]=y
+
+    pts=np.float32(pts)
+
+    #do the transform
+    pts1=cv2.transform(pts,matrix)
+
+    #more bookkeeping
+    xx=pts1[0,:,0]
+    yy=pts1[0,:,1]
+
+    return xx,yy
+
+
+    
+def transformGeneral(x,y,xd,yd,theta,s,xc,yc):
+
+    """
+    Apply a rigid transformation to the mask (trans, scale, rot). Mostly bookkeeping
+    stuff. 
+
+    input:
+    x,y: mask positions
+    xd,yd: translation
+    theta: rotation (radians)
+    s: scale
+
+    output: transformed x,y
+
+    """
+    
+    #create transformation matrix
+    matrix=np.zeros((2,3))
+    matrix[0,0]=np.cos(theta)*s
+    matrix[0,1]=-np.sin(theta)*s
+    matrix[1,0]=np.sin(theta)*s
+    matrix[1,1]=np.cos(theta)*s
+    matrix[0,2]=xd+xc-np.cos(theta)*xc + np.sin(theta)*yc
+    matrix[1,2]=yd+yc-np.sin(theta)*yc - np.cos(theta)*xc
+    matrix[0,2]=xd
+    matrix[1,2]=yd
+
+    
+    #bookkeeping for coordinate format
+    pts=np.zeros((1,len(x),2))
+
+    pts[0,:,0]=x-xc
+    pts[0,:,1]=y-yc
+
+    pts=np.float32(pts)
+
+    #do the transform
+    pts1=cv2.transform(pts,matrix)
+
+    #more bookkeeping
+    xx=pts1[0,:,0]
+    yy=pts1[0,:,1]
+
+    return xx+xc,yy+yc
+
+def elementsToMatrix(sx,sy,xd,yd,theta,tp):
+
+    if (tp==3):
+        matrix=np.zeros((3,3))
+    else:
+        matrix=np.zeros((2,3))
+
+    matrix[0,0]=np.cos(theta)*sx
+    matrix[0,1]=-np.sin(theta)*sy
+    matrix[1,0]=np.sin(theta)*sx
+    matrix[1,1]=np.cos(theta)*sy
+    matrix[0,2]=xd
+    matrix[1,2]=yd
+
+    if(tp==3):
+        matrix[2,0]=0
+        matrix[2,1]=0
+        matrix[2,2]=1
+    
+    return matrix
 
