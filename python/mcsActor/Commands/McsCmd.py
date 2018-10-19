@@ -527,7 +527,7 @@ class McsCmd(object):
 
             self.centroids=centroids
             
-            cmd.inform('text="size = %d." '% (centroids.shape))
+            cmd.inform('text="size = %d." '% (len(centroids)))
             cmd.inform('state="centroids measured"')
 
         else:
@@ -540,7 +540,7 @@ class McsCmd(object):
             npoint=len(centroids)//7
             centroids=np.reshape(centroids,(npoint,7))
             centroids=centroids[:,0:6]
-            cmd.inform('text="size = %d." '% (centroids.shape))
+            cmd.inform('text="size = %d." '% (len(centroids)))
             cmd.inform('state="centroids measured"')
 
             self.centroids=centroids
