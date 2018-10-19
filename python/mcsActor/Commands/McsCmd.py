@@ -219,18 +219,19 @@ class McsCmd(object):
             raise RuntimeError("getFitsCards failed!")
 
         hdrString = self.actor.models['gen2'].keyVarDict['header'].valueList[0]
+        hdrString = base64.b64decode(hdrString).decode('latin-1')
         try:
             hdr = pyfits.Header.fromstring(hdrString)
-        except:
-            # This is total crap. Horrible workaround for INSTRM-383
-            try:
-                hdrString = hdrString.replace(r'\\\\', r'\\')
-                hdrString = hdrString.replace(r'\"', r'"')
-                hdrString = "\'" + hdrString + "\'"
-                hdr = pyfits.Header.fromstring(ast.literal_eval(hdrString))
-            except Exception as e:
-                cmd.warn('text="FAILED to fetch gen2 cards: %s"' % (e))
-                hdr = pyfits.Header()
+        except Exception as e:
+            cmd.warn('text="FAILED to fetch gen2 cards: %s"' % (e))
+            hdr = pyfits.Header()
+
+        try:
+            detectorTemp = self.actor.models['meb'].keyVarDict['temps'].valueList[1]
+        except Exception as e:
+            cmd.warn('text="FAILED to fetch MEB cards: %s"' % (e))
+            detectorTemp = str(np.nan)
+
         try:
             config = pfsConfig.getConfigDict('mcs')
             detectorId = config['serial']
@@ -242,7 +243,7 @@ class McsCmd(object):
             
         hdr.append(('DETECTOR', detectorId, 'Name of the detector/CCD'))
         hdr.append(('GAIN', gain, '[e-/ADU] AD conversion factor'))
-        hdr.append(('DET-TMP', 'NaN', '[K] Detector temperature'))
+        hdr.append(('DET-TMP', detectorTemp, '[degC] Detector temperature'))
         try:
             instCards = self._getInstHeader(cmd)
             hdr.add_comment('Subaru Device Dependent Header Block for PFS-MCS')
