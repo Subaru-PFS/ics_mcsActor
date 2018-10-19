@@ -462,9 +462,9 @@ class McsCmd(object):
             self.fwhm = 3
 
         try:
-            self.fhwm = cmd.cmd.keywords["boxsize"].values[0]
+            self.boxsize = cmd.cmd.keywords["boxsize"].values[0]
         except:
-            self.fwhm = 3
+            self.boxsize = 3
 
         try:
             self.thresh = cmd.cmd.keywords["thresh"].values[0]
