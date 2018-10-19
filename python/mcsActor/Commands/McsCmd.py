@@ -26,6 +26,9 @@ import opscore.protocols.types as types
 from actorcore.utility import fits as fitsUtils
 from opscore.utility.qstr import qstr
 
+import pfs.utils.coordinates.MakeWCSCards as pfsWcs
+# import pfs.utils.config as pfsConfig
+
 import psycopg2
 import psycopg2.extras
 from xml.etree.ElementTree import dump
@@ -50,7 +53,7 @@ class McsCmd(object):
         self.newTable = None
         self.simulationPath = None
         
-        self.db='133.40.164.87'
+        self.db='db-ics'
         
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -179,8 +182,13 @@ class McsCmd(object):
     def _getInstHeader(self, cmd):
         """ Gather FITS cards from all actors we are interested in. """
 
-        cmd.debug('text="fetching MHS cards..."')
-        cards = fitsUtils.gatherHeaderCards(cmd, self.actor, shortNames=True)
+        # For now, do _not_ add gen2 cards, since we still have the gen2Actor generate them.
+        modelNames = set(self.actor.models.keys())
+        modelNames.discard("gen2")
+        
+        cmd.debug('text="fetching MHS cards for %s..."' % (modelNames))
+        cards = fitsUtils.gatherHeaderCards(cmd, self.actor,
+                                            modelNames=modelNames, shortNames=True)
         cmd.debug('text="fetched %d MHS cards..."' % (len(cards)))
 
         # Until we convert to fitsio, convert cards to pyfits
@@ -198,6 +206,10 @@ class McsCmd(object):
     def _constructHeader(self, cmd, expType, expTime):
         if expType == 'bias':
             expTime = 0.0
+
+        # Subaru rules
+        if expType == 'object':
+            expType = 'acquisition'
         ret = self.actor.cmdr.call(actor='gen2',
                                    cmdStr=f'getFitsCards \
                                             frameid={self.actor.exposureID} \
@@ -207,21 +219,32 @@ class McsCmd(object):
             raise RuntimeError("getFitsCards failed!")
 
         hdrString = self.actor.models['gen2'].keyVarDict['header'].valueList[0]
+        hdrString = base64.b64decode(hdrString).decode('latin-1')
         try:
             hdr = pyfits.Header.fromstring(hdrString)
-        except:
-            # This is total crap. Horrible workaround for INSTRM-383
-            try:
-                hdrString = hdrString.replace(r'\\\\', r'\\')
-                hdrString = hdrString.replace(r'\"', r'"')
-                hdrString = "\'" + hdrString + "\'"
-                hdr = pyfits.Header.fromstring(ast.literal_eval(hdrString))
-            except Exception as e:
-                cmd.warn('text="FAILED to fetch gen2 cards: %s"' % (e))
-                hdr = pyfits.Header()
+        except Exception as e:
+            cmd.warn('text="FAILED to fetch gen2 cards: %s"' % (e))
+            hdr = pyfits.Header()
 
         try:
-            hdr.append(('DET-ID', 1))
+            detectorTemp = self.actor.models['meb'].keyVarDict['temps'].valueList[1]
+        except Exception as e:
+            cmd.warn('text="FAILED to fetch MEB cards: %s"' % (e))
+            detectorTemp = str(np.nan)
+
+        try:
+            config = pfsConfig.getConfigDict('mcs')
+            detectorId = config['serial']
+            gain = config['gain']
+        except Exception as e:
+            cmd.warn('text="FAILED to fetch config cards: %s"' % (e))
+            detectorId = 'MCS cam#1'
+            gain = 2.24
+            
+        hdr.append(('DETECTOR', detectorId, 'Name of the detector/CCD'))
+        hdr.append(('GAIN', gain, '[e-/ADU] AD conversion factor'))
+        hdr.append(('DET-TMP', detectorTemp, '[degC] Detector temperature'))
+        try:
             instCards = self._getInstHeader(cmd)
             hdr.add_comment('Subaru Device Dependent Header Block for PFS-MCS')
             hdr.extend(instCards, bottom=True)
@@ -263,13 +286,43 @@ class McsCmd(object):
         #cur = conn.cursor()
         cmd.inform('text="Centroids of exposure ID %06d00 dummped. "'%(frameID))
 
+    def _makeImageHeader(self, cmd):
+        """ Create a complete WCS header.
+
+        Notes
+        ----
+        - We need to get image center from config file.
+        - So far, just spit out MCS-to-PFI linear conversion. Later, add SIP terms, and MCS-to-sky.
+        - Needs to be pulled out into actorcore or pfs_utils.
+
+        Returns
+        -------
+        hdr : pyfits.Header instance.
+
+        """
+
+        gen2Keys = self.actor.models['gen2'].keyVarDict
+
+        imageCenter = (8960//2, 5778//2)
+        rot = gen2Keys['tel_rot'][1]
+        alt = gen2Keys['tel_axes'][1]
+        az = gen2Keys['tel_axes'][0]
+
+        cmd.debug(f'text="center={imageCenter} axes={az},{alt},{rot}"')
+
+        hdr = None
+        wcs, sip = pfsWcs.WCSParameters('mcs_pfi', imageCenter, rot, alt, az)
+        hdr = wcs.to_header()
+
+        return hdr
+
     def _doExpose(self, cmd, expTime, expType):
         """ Take an exposure and save it to disk. """
 
         filename = self.getNextFilename(cmd)
         cmd.diag(f'text="new expose: {filename}"')
         if self.simulationPath is None:
-            image = self.actor.camera.expose(cmd, expTime, expType, filename)
+            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
         else:
             image = self.getNextSimulationImage(cmd)
         cmd.diag(f'text="done: {image.shape}"')
@@ -277,8 +330,28 @@ class McsCmd(object):
         hdr = self._constructHeader(cmd, expType, expTime)
         cmd.diag(f'text="hdr done: {len(hdr)}"')
         phdu = pyfits.PrimaryHDU(header=hdr)
-        imgHdu = pyfits.CompImageHDU(image, compression_type='RICE_1')
+
+        try:
+            imgHdr = self._makeImageHeader(cmd)
+        except Exception as e:
+            cmd.warn(f'text="FAILED to generate WCS header: {e}"')
+            imgHdr = pyfits.Header()
+
+        imgHdu = pyfits.CompImageHDU(image, name='IMAGE', compression_type='RICE_1')
+        imgHdu.header.extend(imgHdr)
         hduList = pyfits.HDUList([phdu, imgHdu])
+
+        # Patch core FITS card comments to match Subaru requirements.
+        imgHdr = imgHdu.header
+        imgHdr.set('BZERO', comment='Real=fits-value*BSCALE+BZERO')
+        imgHdr.set('BSCALE', comment='Real=fits-value*BSCALE+BZERO')
+        imgHdr.append(('BUNIT', 'ADU', 'Unit of original pixel values'))
+        imgHdr.append(('BLANK', 32767, 'Value used for NULL pixels'))  # 12-bit camera
+        imgHdr.append(('BIN-FCT1', 1, '[pixel] Binning factor of X axis'))
+        imgHdr.append(('BIN-FCT2', 1, '[pixel] Binning factor of X axis'))
+
+        pHdr =  phdu.header
+        pHdr.set('EXTEND', comment='Presence of FITS Extension')
 
         hduList.writeto(filename, checksum=False, overwrite=True)
         cmd.inform('filename="%s"' % (filename))
