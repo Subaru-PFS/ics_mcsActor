@@ -679,7 +679,7 @@ class McsCmd(object):
             
             with conn.cursor() as curs:
                 if doDrop:
-                    curs.execute('drop table mcsPerFiber')
+                    curs.execute('drop table if exists mcsPerFiber')
                     pass
                 curs.execute(cmd)
         else:
@@ -699,7 +699,7 @@ class McsCmd(object):
                     
             with conn.cursor() as curs:
                 if doDrop:
-                    curs.execute('drop table mcsEngTable')
+                    curs.execute('drop table if exists mcsEngTable')
                 curs.execute(cmd)
   
         conn.commit()
