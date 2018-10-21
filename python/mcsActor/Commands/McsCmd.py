@@ -52,6 +52,7 @@ class McsCmd(object):
         self.expTime = 1000
         self.newTable = None
         self.simulationPath = None
+        self.exposureID = None
         
         self.db='db-ics'
         
@@ -153,6 +154,22 @@ class McsCmd(object):
         cmd.debug('text="returning simulation file %s"' % (imagePath))
         return image
 
+    def requestNextFilename(self, cmd):
+        """ Return a queue which will eventually contain a filename. """
+
+        q = queue.Queue()
+
+        def worker(q=q, cmd=cmd):
+            filename = self.getNextFilename(cmd)
+            q.put(filename)
+            q.task_done()
+
+        task = threading.Thread(target=worker,
+                                name='visitFetcher', daemon=True)
+        task.start()
+
+        return q
+
     def getNextFilename(self, cmd):
         """ Fetch next image filename. 
 
@@ -160,25 +177,22 @@ class McsCmd(object):
 
         """
 
-        ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit', timeLim=10.0)
-        if ret.didFail:
-            raise RuntimeError("getNextFilename failed!")
+        if self.exposureID is None:
+            ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit', timeLim=10.0)
+            if ret.didFail:
+                raise RuntimeError("getNextFilename failed getting a visit number in 10s!")
 
-        self.actor.exposureID = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
+            self.actor.exposureID = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
 
-        # Commissioning hack:
-        #
-        if True:
-            path = os.path.join("/data/mcs", time.strftime('%Y-%m-%d'))
-        else:
-            path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d'))
-            path = os.path.expandvars(os.path.expanduser(path))
-
+        path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d'))
+        path = os.path.expandvars(os.path.expanduser(path))
         if not os.path.isdir(path):
             os.makedirs(path, 0o755)
             
-        return os.path.join(path, 'PFSC%06d00.fits' % (self.actor.exposureID))
+        newpath = os.path.join(path, 'PFSC%06d00.fits' % (self.actor.exposureID))
 
+        return newpath
+    
     def _getInstHeader(self, cmd):
         """ Gather FITS cards from all actors we are interested in. """
 
@@ -203,16 +217,18 @@ class McsCmd(object):
 
         return pycards
 
-    def _constructHeader(self, cmd, expType, expTime):
+    def _constructHeader(self, cmd, filename, expType, expTime):
         if expType == 'bias':
             expTime = 0.0
 
         # Subaru rules
         if expType == 'object':
             expType = 'acquisition'
+
+        frameId = os.path.splitext(os.path.basename(filename))[0]
         ret = self.actor.cmdr.call(actor='gen2',
                                    cmdStr=f'getFitsCards \
-                                            frameid={self.actor.exposureID} \
+                                            frameid={frameId} \
                                             expType={expType} expTime={expTime/1000.0}',
                                    timeLim=3.0)
         if ret.didFail:
@@ -319,15 +335,24 @@ class McsCmd(object):
     def _doExpose(self, cmd, expTime, expType):
         """ Take an exposure and save it to disk. """
 
-        filename = self.getNextFilename(cmd)
-        cmd.diag(f'text="new expose: {filename}"')
+        nameQ = self.requestNextFilename(cmd)
+        cmd.diag(f'text="new exposure"')
         if self.simulationPath is None:
+            filename = 'scratchFile'
             image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
         else:
             image = self.getNextSimulationImage(cmd)
         cmd.diag(f'text="done: {image.shape}"')
 
-        hdr = self._constructHeader(cmd, expType, expTime)
+        cmd.diag('text="reading filename"')
+        try:
+            filename = nameQ.get(timeout=5.0)
+        except queue.Empty:
+            cmd.warn('text="failed to get a new filename in time"')
+            raise
+        cmd.diag(f'text="read filename: {filename}"')
+
+        hdr = self._constructHeader(cmd, filename, expType, expTime)
         cmd.diag(f'text="hdr done: {len(hdr)}"')
         phdu = pyfits.PrimaryHDU(header=hdr)
 
