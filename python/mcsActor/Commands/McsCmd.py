@@ -543,49 +543,26 @@ class McsCmd(object):
             
         cmd.debug('text="newTable value = %s"' % (self.newTable))
 
-        #self.fwhm=3        
-        #self.boxsize=9
-        #self.thresh=2500
-        #    
-        #self.rl=-2.5
-        #self.rh=1.3
-        #self.sl=0.05
-        #self.sh=0.5
+        image = self.actor.image
         
-        if self.simulationPath is None:
+        cmd.inform(f'state="measuring cached image: {image.shape}"')
+        a = centroid.centroid_only(image.astype('<i4'),
+                                   self.fwhm, self.thresh, self.boxsize,
+                                   2, self.sl, self.sh, self.rl, self.rh, 0)
+        centroids=np.frombuffer(a,dtype='<f8')
+        npoint=len(centroids)//7
+        centroids=np.reshape(centroids,(npoint,7))
+        centroids=centroids[:,0:6]
+
+        self.centroids=centroids
             
-            cmd.inform('state="measuring"')
-            cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
-    
-            a=centroid.centroid_only(self.actor.image.astype('<i4'),self.fwhm,self.thresh,self.boxsize,2,self.sl,self.sh,self.rl,self.rh,0)
-            centroids=np.frombuffer(a,dtype='<f8')
-            npoint=len(centroids)//7
-            centroids=np.reshape(centroids,(npoint,7))
-            centroids=centroids[:,0:6]
-
-            self.centroids=centroids
-            
-            cmd.inform('text="size = %d." '% (len(centroids)))
-            cmd.inform('state="centroids measured"')
-
-        else:
-
-            cmd.inform('state="measuring"')
-            cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
-            a=centroid.centroid_only(self.actor.image.astype('<i4'),self.fwhm,self.thresh,self.boxsize,2,self.sl,self.sh,self.rl,self.rh,0)
-
-            centroids=np.frombuffer(a,dtype='<f8')
-            npoint=len(centroids)//7
-            centroids=np.reshape(centroids,(npoint,7))
-            centroids=centroids[:,0:6]
-            cmd.inform('text="size = %d." '% (len(centroids)))
-            cmd.inform('state="centroids measured"')
-
-            self.centroids=centroids
+        cmd.inform('text="%d centroids"'% (len(centroids)))
+        cmd.inform('state="centroids measured"')
                         
         self.dumpCentroidtoDB(cmd)
-            
-        cmd.finish('exposureState=done')
+
+        if doFinish:
+            cmd.finish('exposureState=done')
         
     def test_centroid(self, cmd):
 
