@@ -12,10 +12,11 @@ import matplotlib.pyplot as plt
 import time
 import datetime
 import io
+import queue
+import threading
 
 import os
 import base64
-import numpy
 import astropy.io.fits as pyfits
 import fitsio
 import sys
@@ -64,8 +65,9 @@ class McsCmd(object):
         self.vocab = [
             ('ping', '', self.ping),
             ('status', '', self.status),
-            ('expose', '@(bias|test)', self.expose),
-            ('expose', '@(dark|object|flat) <expTime>', self.expose),
+            ('expose', '@(bias|test) [<visit>]', self.expose),
+            ('expose', '@(dark|flat) <expTime> [<visit>]', self.expose),
+            ('expose', '@object <expTime> [<visit>] [@doCentroid]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
             ('test_centroid', '', self.test_centroid),
@@ -84,7 +86,7 @@ class McsCmd(object):
         self.keys = keys.KeysDictionary("mcs_mcs", (1, 1),
                                         keys.Key("expTime", types.Float(), help="The exposure time, seconds"),
                                         keys.Key("expType", types.String(), help="The exposure type"),
-                                        keys.Key("filename", types.String(), help="Image filename"),
+                                        keys.Key("visit", types.Int(), help="exposure visit"),
                                         keys.Key("path", types.String(), help="Simulated image directory"),
                                         keys.Key("getArc", types.Int(), help="flag for arc image"),
                                         keys.Key("fwhm", types.Float(), help="fwhm for centroid routine"),
@@ -384,9 +386,16 @@ class McsCmd(object):
         return filename, image
            
     def expose(self, cmd):
-        """ Take an exposure. Does not centroid. """
+        """ Take an exposure. Optionally centroids. """
 
-        expType = cmd.cmd.keywords[0].name
+        cmdKeys = cmd.cmd.keywords
+        doCentroid = 'doCentroid' in cmdKeys
+        expType = cmdKeys[0].name
+        if 'visit' in cmdKeys:
+            self.actor.exposureID = cmdKeys['visit'].values[0]
+        else:
+            self.actor.exposureID = None
+
         if expType in ('bias', 'test'):
             expTime = self.expTime
         else:
@@ -399,7 +408,10 @@ class McsCmd(object):
  
         filename, image = self._doExpose(cmd, expTime, expType)
         self.actor.image = image
-        
+
+        if doCentroid:
+            self.runCentroid(cmd, doFinish=False)
+
         cmd.finish('exposureState=done')
 
 
@@ -523,57 +535,34 @@ class McsCmd(object):
         cmd.finish('parameters=set')
 
         
-    def runCentroid(self, cmd):
-        """ Take an exposure and measure centroids. """
+    def runCentroid(self, cmd, doFinish=True):
+        """ Measure centroids on the last acquired image. """
 
         cmdKeys = cmd.cmd.keywords
         self.newTable = "newTable" in cmdKeys
             
         cmd.debug('text="newTable value = %s"' % (self.newTable))
 
-        #self.fwhm=3        
-        #self.boxsize=9
-        #self.thresh=2500
-        #    
-        #self.rl=-2.5
-        #self.rh=1.3
-        #self.sl=0.05
-        #self.sh=0.5
+        image = self.actor.image
         
-        if self.simulationPath is None:
+        cmd.inform(f'state="measuring cached image: {image.shape}"')
+        a = centroid.centroid_only(image.astype('<i4'),
+                                   self.fwhm, self.thresh, self.boxsize,
+                                   2, self.sl, self.sh, self.rl, self.rh, 0)
+        centroids=np.frombuffer(a,dtype='<f8')
+        npoint=len(centroids)//7
+        centroids=np.reshape(centroids,(npoint,7))
+        centroids=centroids[:,0:6]
+
+        self.centroids=centroids
             
-            cmd.inform('state="measuring"')
-            cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
-    
-            a=centroid.centroid_only(self.actor.image.astype('<i4'),self.fwhm,self.thresh,self.boxsize,2,self.sl,self.sh,self.rl,self.rh,0)
-            centroids=np.frombuffer(a,dtype='<f8')
-            npoint=len(centroids)//7
-            centroids=np.reshape(centroids,(npoint,7))
-            centroids=centroids[:,0:6]
-
-            self.centroids=centroids
-            
-            cmd.inform('text="size = %d." '% (len(centroids)))
-            cmd.inform('state="centroids measured"')
-
-        else:
-
-            cmd.inform('state="measuring"')
-            cmd.inform('text="size = %s." '% (type(self.actor.image.astype('<i4'))))
-            a=centroid.centroid_only(self.actor.image.astype('<i4'),self.fwhm,self.thresh,self.boxsize,2,self.sl,self.sh,self.rl,self.rh,0)
-
-            centroids=np.frombuffer(a,dtype='<f8')
-            npoint=len(centroids)//7
-            centroids=np.reshape(centroids,(npoint,7))
-            centroids=centroids[:,0:6]
-            cmd.inform('text="size = %d." '% (len(centroids)))
-            cmd.inform('state="centroids measured"')
-
-            self.centroids=centroids
+        cmd.inform('text="%d centroids"'% (len(centroids)))
+        cmd.inform('state="centroids measured"')
                         
         self.dumpCentroidtoDB(cmd)
-            
-        cmd.finish('exposureState=done')
+
+        if doFinish:
+            cmd.finish('exposureState=done')
         
     def test_centroid(self, cmd):
 
