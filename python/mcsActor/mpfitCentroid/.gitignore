@@ -1,1 +1,3 @@
 centroid_wrapper.c
+*.so
+build/
