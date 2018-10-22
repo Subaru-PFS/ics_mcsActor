@@ -162,13 +162,13 @@ class McsCmd(object):
             cmd.fail('text="path %s is not a directory"' % (path))
             return
 
-        self.simulationPath = (path, 0)
+        self.simulationPath = (path, 0, '')
         cmd.finish('text="set simulation path to %s"' % str(self.simulationPath))
 
     def getNextSimulationImage(self, cmd):
         import glob
 
-        path, idx = self.simulationPath
+        path, idx, lastname = self.simulationPath
         files = sorted(glob.glob(os.path.join(path, '*.fits')))
         cmd.debug('text="%i of %i files in %s..."' % (idx, len(files), path))
         if len(files) == 0:
@@ -179,7 +179,7 @@ class McsCmd(object):
 
         imagePath = files[idx]
         image = pyfits.getdata(imagePath, 0)
-        self.simulationPath = (path, idx+1)
+        self.simulationPath = (path, idx+1, imagePath)
         cmd.debug('text="returning simulation file %s"' % (imagePath))
         return image
 
@@ -243,6 +243,10 @@ class McsCmd(object):
                 pcard = c['name'], c['value'], c.get('comment', '')
             pycards.append(pcard)
             cmd.debug('text=%s' % (qstr("fetched card: %s" % (str(pcard)))))
+
+        if self.simulationPath is not None:
+            pcard = 'W_MCSMNM', self.simulationPath[-1], 'Simulated file path'
+            pycards.append(pcard)
 
         return pycards
 
