@@ -569,14 +569,13 @@ class McsCmd(object):
                                    fwhmX real, fwhmY real,
                                    bgValue real, peakValue real'''
 
-        conn = self.conn
-
-        with conn.cursor() as curs:
-            for t in tables:
-                tableName = f'{t}{suffix}'
-                if doDrop:
-                    curs.execute(f'drop table if exists {tableName}')
-                createCmd = f'create table {tableName} ({tables[t]});'
+        with self.conn as conn:
+            with conn.cursor() as curs:
+                for t in tables:
+                    tableName = f'{t}{suffix}'
+                    if doDrop:
+                        curs.execute(f'drop table if exists {tableName}')
+                    createCmd = f'create table {tableName} ({tables[t]});'
                 curs.execute(createCmd)
 
         cmd.finish('text="created tables')
@@ -761,12 +760,12 @@ class McsCmd(object):
         np.savetxt(measBuf, centArr, delimiter=',', fmt='%0.6g')
         measBuf.seek(0,0)
 
-        # Let postgres handle the primary key
+        # Let the database handle the primary key
         with conn.cursor() as curs:
-            curs.execute("Select * FROM mcsEngTable where false")
+            curs.execute("select * FROM mcsEngTable where false")
             colnames = [desc[0] for desc in curs.description]
         realcolnames = colnames[1:]
-        
+
         buf = io.StringIO()
         for l_i in range(len(centArr)):
             line = '%s,%d,%d,%d,%s' % (now.strftime("%Y-%m-%d %H:%M:%S"), 
@@ -774,10 +773,11 @@ class McsCmd(object):
             buf.write(line)
         buf.seek(0,0)
             
-        if conn is not None:
+        with conn:
             with conn.cursor() as curs:
                 curs.copy_from(buf,'mcsEngTable',',',
                                columns=realcolnames)
+
         buf.seek(0,0)
         
         return buf
