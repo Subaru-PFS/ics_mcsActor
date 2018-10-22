@@ -560,7 +560,7 @@ class McsCmd(object):
         suffix = cmdKeys['suffix'].values[0] if 'suffix' in cmdKeys else ''
 
         tables = dict()
-        tables['mcsEngTable'] = '''id SERIAL PRIMARY KEY,
+        tables['mcs'] = '''id SERIAL PRIMARY KEY,
                                    datatime timestamp,
                                    frameId integer,
                                    moveId smallint,
@@ -729,7 +729,7 @@ class McsCmd(object):
                 curs.execute(cmd)
         else:
             
-            cmd = '''create table mcsEngTable (
+            cmd = '''create table mcs (
                 id SERIAL PRIMARY KEY,
                 datatime timestamp,
                 frameId integer,
@@ -744,7 +744,7 @@ class McsCmd(object):
                     
             with conn.cursor() as curs:
                 if doDrop:
-                    curs.execute('drop table if exists mcsEngTable')
+                    curs.execute('drop table if exists mcs')
                 curs.execute(cmd)
   
         conn.commit()
@@ -762,7 +762,7 @@ class McsCmd(object):
 
         # Let the database handle the primary key
         with conn.cursor() as curs:
-            curs.execute("select * FROM mcsEngTable where false")
+            curs.execute("select * FROM mcs where false")
             colnames = [desc[0] for desc in curs.description]
         realcolnames = colnames[1:]
 
@@ -775,7 +775,7 @@ class McsCmd(object):
             
         with conn:
             with conn.cursor() as curs:
-                curs.copy_from(buf,'mcsEngTable',',',
+                curs.copy_from(buf,'mcs',',',
                                columns=realcolnames)
 
         buf.seek(0,0)
@@ -800,7 +800,7 @@ class McsCmd(object):
         else:
             buf = io.StringIO()
 
-            cmd = f"""copy (select * from mcsEngTable where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
+            cmd = f"""copy (select * from mcs where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
             with conn.cursor() as curs:
                 curs.copy_expert(cmd, buf)
             conn.commit()

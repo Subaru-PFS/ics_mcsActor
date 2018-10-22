@@ -238,6 +238,8 @@ int main(int argc, char *argv[]){
 
 	char etype_list[5][20]={"DARK","BIAS","FLAT","OBJECT","TEST"};
 
+	FILE *fp;
+
     double shutter_ts,start_ts,save_ts;
     double dtime;
 	/** Check the total number of the arguments */
@@ -298,7 +300,6 @@ int main(int argc, char *argv[]){
 
 	/* Determin the total loops needed if exposure time is set */
 	nloops=ceil(((float)exptime/800.0))+1;
-	//printf("%5.2f\n",nloops);
 	loops = (int)nloops;
 	if (loops > 1){
 		if (verbose) printf("take %i exposures.\n",loops);
@@ -383,7 +384,6 @@ int main(int argc, char *argv[]){
 	pdv_multibuf(pdv_p, 4);
 	//pdv_start_image(pdv_p);
 	
-		
 	bufs = (u_char **)malloc(loops * sizeof(u_char *));
     for (i=0; i<loops; i++){
 		if ((bufs[i] = edt_alloc(imagesize)) == NULL){
@@ -402,6 +402,12 @@ int main(int argc, char *argv[]){
 		image_p = pdv_wait_image(pdv_p);
 		memcpy(bufs[i], image_p, imagesize);
     }
+
+    fp = fopen( "/tmp/cameradump.raw" , "w" );
+    fwrite(bufs[0] , 1 , sizeof(bufs[0]) , fp );
+    fclose(fp);
+
+
     dtime = edt_dtime();
     printf("Image reading finished with %f frames/sec\n",(double) (loops) / dtime);
 	
@@ -413,14 +419,23 @@ int main(int argc, char *argv[]){
 	if (coadd){
 		if (verbose) printf("Coadding all frames.\n");
 
-		coaddframe = (u_char *)malloc(imagesize*sizeof(u_char));
+		u_short *coaddshorts; /* alias. */
+
+
+		coaddframe = (u_char *)calloc(imagesize, sizeof(u_char));
+		coaddshorts= (u_short *)coaddframe;
+
 		sprintf(string,"%s","coadd.fits");
 
 		for(i=0;i<nloops;i++) {
-			for (ii=0;ii<imagesize;ii++){
-				coaddframe[ii]=coaddframe[ii]+bufs[i][ii];
+			for (ii=0;ii<imagesize;ii+=2){
+			  u_short pixel;
+
+			  pixel = bufs[i][ii] | (bufs[i][ii+1] << 8);
+			  coaddshorts[ii/2] += pixel;
 			}
 		}
+
 		WriteFitsImage(string, s_height, s_width, coaddframe);
 	} else {
 
