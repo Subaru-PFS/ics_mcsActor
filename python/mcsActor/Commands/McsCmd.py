@@ -748,55 +748,33 @@ class McsCmd(object):
         
     def _writeCentroids(self, centArr, nextRowId, frameId, moveId, conn=None):
         """ Write all measurements for a given (frameId, moveId) """
-        if self.simulationPath is None:
 
-            # Save measurements to a CSV buffer
-            measBuf = io.StringIO()
-            np.savetxt(measBuf, centArr, delimiter=',', fmt='%0.6g')
-            measBuf.seek(0,0)
+        now = datetime.datetime.now()
+        now.strftime("%Y-%m-%d %H:%M:%S")
             
-            buf = io.StringIO()
-            for l_i in range(len(centArr)):
-                line = '%d,%d,%d,%d,%s' % (nextRowId + l_i, frameId, moveId, l_i,
-                                           measBuf.readline())
-                buf.write(line)
-            buf.seek(0,0)
+        # Save measurements to a CSV buffer
+        measBuf = io.StringIO()
+        np.savetxt(measBuf, centArr, delimiter=',', fmt='%0.6g')
+        measBuf.seek(0,0)
+
+        # Let postgres handle the primary key
+        with conn.cursor() as curs:
+            curs.execute("Select * FROM mcsEngTable where false")
+            colnames = [desc[0] for desc in curs.description]
+        realcolnames = colnames[1:]
+        
+        buf = io.StringIO()
+        for l_i in range(len(centArr)):
+            line = '%s,%d,%d,%d,%s' % (now.strftime("%Y-%m-%d %H:%M:%S"), 
+                                       frameId, moveId, l_i, measBuf.readline())
+            buf.write(line)
+        buf.seek(0,0)
             
-            if conn is not None:
-                with conn.cursor() as curs:
-                    curs.copy_from(buf,'mcsPerFiber',',')
-                conn.commit()
-                buf.seek(0,0)
-            
-        else:
-            now = datetime.datetime.now()
-            now.strftime("%Y-%m-%d %H:%M:%S")
-            
-            # Save measurements to a CSV buffer
-            measBuf = io.StringIO()
-            np.savetxt(measBuf, centArr, delimiter=',', fmt='%0.6g')
-            measBuf.seek(0,0)
-            
-            if bool(self.newTable) is False:
-                cmd_string='''select max(id) from mcsengtable;'''
-                with conn.cursor() as curs:
-                    curs.execute(cmd_string)
-                    data = curs.fetchall()
-                        
-                nextRowId=np.max(np.array(data))+1        
-            
-            buf = io.StringIO()
-            for l_i in range(len(centArr)):
-                line = '%d,%s,%d,%d,%d,%s' % (nextRowId + l_i,now.strftime("%Y-%m-%d %H:%M:%S"), 
-                                              frameId, moveId, l_i, measBuf.readline())
-                buf.write(line)
-            buf.seek(0,0)
-            
-            if conn is not None:
-                with conn.cursor() as curs:
-                    curs.copy_from(buf,'mcsEngTable',',')
-                conn.commit()
-                buf.seek(0,0)
+        if conn is not None:
+            with conn.cursor() as curs:
+                curs.copy_from(buf,'mcsEngTable',',',
+                               columns=realcolnames)
+        buf.seek(0,0)
         
         return buf
 
