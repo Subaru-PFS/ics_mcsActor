@@ -57,6 +57,7 @@ class McsCmd(object):
         
         self.db='db-ics'
         
+        self.setCentroidParams(None, doFinish=False)
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -481,7 +482,7 @@ class McsCmd(object):
 
         cmd.inform('state="finished"')
 
-    def setCentroidParams(self,cmd):
+    def setCentroidParams(self, cmd, doFinish=True):
 
         """
 
