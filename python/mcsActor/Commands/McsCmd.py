@@ -71,6 +71,7 @@ class McsCmd(object):
             ('expose', '@(dark|flat) <expTime> [<visit>]', self.expose),
             ('expose', '@object <expTime> [<visit>] [@doCentroid]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
+            ('createTables', '[@drop]', self.createTables),
             ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
             ('test_centroid', '', self.test_centroid),
             ('reconnect', '', self.reconnect),
@@ -543,10 +544,39 @@ class McsCmd(object):
             self.sh = cmd.cmd.keywords["sh"].values[0]
         except:
             self.sh = 0.5
-            
-        cmd.finish('parameters=set')
 
-        
+        if doFinish:
+            cmd.finish('parameters=set')
+
+    def createTables(self, cmd):
+        """ Create SQL tables. """
+
+        cmdKeys = cmd.cmd.keywords
+        doDrop = 'drop' in cmdKeys
+        suffix = cmdKeys['suffix'].values[0] if 'suffix' in cmdKeys else ''
+
+        tables = dict()
+        tables['mcsEngTable'] = '''id SERIAL PRIMARY KEY,
+                                   datatime timestamp,
+                                   frameId integer,
+                                   moveId smallint,
+                                   fiberId smallint,
+                                   centroidX real, centroidY real,
+                                   fwhmX real, fwhmY real,
+                                   bgValue real, peakValue real'''
+
+        conn = self.conn
+
+        with conn.cursor() as curs:
+            for t in tables:
+                tableName = f'{t}{suffix}'
+                if doDrop:
+                    curs.execute(f'drop table if exists {tableName}')
+                createCmd = f'create table {tableName} ({tables[t]});'
+                curs.execute(createCmd)
+
+        cmd.finish('text="created tables')
+
     def runCentroid(self, cmd, doFinish=True):
         """ Measure centroids on the last acquired image. """
 
