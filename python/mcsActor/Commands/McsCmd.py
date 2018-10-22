@@ -54,10 +54,11 @@ class McsCmd(object):
         self.newTable = None
         self.simulationPath = None
         self.exposureID = None
-        
+        self._conn = None
+
         self.db='db-ics'
-        
         self.setCentroidParams(None, doFinish=False)
+        
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -98,6 +99,30 @@ class McsCmd(object):
                                         keys.Key("sl", types.Float(), help="sh for centroid routine"),
                                         keys.Key("sh", types.Float(), help="sh for centroid routine")
                                         )
+
+    @property
+    def conn(self):
+        if self._conn is not None:
+            return self._conn
+
+        pwpath=os.path.join(os.environ['ICS_MCSACTOR_DIR'],
+                            "etc", "dbpasswd.cfg")
+
+        try:
+            file = open(pwpath, "r")
+            passstring = file.read()
+        except:
+            raise RuntimeError(f"could not get db password from {pwpath}")
+
+        try:
+            connString = "dbname='fps' user='pfs' host="+self.db+" password="+passstring
+            self.actor.logger.info(f'connecting to {connString}')
+            conn = psycopg2.connect(connString)
+            self._conn = conn
+        except Exception as e:
+            raise RuntimeError("unable to connect to the database {connString}: {e}")
+
+        return self._conn
 
     def ping(self, cmd):
         """Query the actor for liveness/happiness."""
@@ -275,23 +300,10 @@ class McsCmd(object):
     def dumpCentroidtoDB(self, cmd):
         """Connect to database and return json string to an attribute."""
         
-        pwpath=os.environ['ICS_MCSACTOR_DIR']+'/etc/'
+        conn = self.conn
+        cmd.diag(f'text="dumping centroids to db {conn}"')
         
-        try:
-            file = open(pwpath+"dbpasswd.cfg", "r")
-            passstring = file.read()
-            cmd.inform('text="Password reading OK. value = %s."'%(passstring))
-        except:
-            cmd.warn('text="could not get db password"')
-            return
-        try:
-            conn = psycopg2.connect("dbname='pfs' user='pfs' host="+self.db+" password="+passstring)
-            cmd.diag('text="Connected to FPS database on host ."')
-        except:
-            cmd.warn('text="I am unable to connect to the database."')
-        
-        cmd.debug('text="Value from self.newTable = %s"' % (self.newTable))
-
+        # The section should be removed, replaced by the createTables command.
         if self.newTable:
             self._makeTables(conn, doDrop=True)
             cmd.inform('text="Centroid table created. "')
@@ -301,8 +313,7 @@ class McsCmd(object):
         
         frameID=self.actor.exposureID
         buf = self._writeCentroids(self.centroids,1,frameID,1,conn)
-        #pass
-        #cur = conn.cursor()
+
         cmd.inform('text="Centroids of exposure ID %06d00 dummped. "'%(frameID))
 
     def _makeImageHeader(self, cmd):
