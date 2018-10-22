@@ -112,7 +112,7 @@ class mcsCamera(Camera):
             output, errors = p.communicate()
             t2=time.time()
         
-        if (output == 'done'):
+        if (output == 'Exposure sequence is done'):
             cmd.inform('exposureState="done"')       
 
         if cmd:
