@@ -54,8 +54,10 @@ class McsCmd(object):
         self.newTable = None
         self.simulationPath = None
         self.exposureID = None
-        
+        self._conn = None
+
         self.db='db-ics'
+        self.setCentroidParams(None, doFinish=False)
         
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -69,6 +71,7 @@ class McsCmd(object):
             ('expose', '@(dark|flat) <expTime> [<visit>]', self.expose),
             ('expose', '@object <expTime> [<visit>] [@doCentroid]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
+            ('createTables', '[@drop]', self.createTables),
             ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
             ('test_centroid', '', self.test_centroid),
             ('reconnect', '', self.reconnect),
@@ -97,6 +100,30 @@ class McsCmd(object):
                                         keys.Key("sl", types.Float(), help="sh for centroid routine"),
                                         keys.Key("sh", types.Float(), help="sh for centroid routine")
                                         )
+
+    @property
+    def conn(self):
+        if self._conn is not None:
+            return self._conn
+
+        pwpath=os.path.join(os.environ['ICS_MCSACTOR_DIR'],
+                            "etc", "dbpasswd.cfg")
+
+        try:
+            file = open(pwpath, "r")
+            passstring = file.read()
+        except:
+            raise RuntimeError(f"could not get db password from {pwpath}")
+
+        try:
+            connString = "dbname='fps' user='pfs' host="+self.db+" password="+passstring
+            self.actor.logger.info(f'connecting to {connString}')
+            conn = psycopg2.connect(connString)
+            self._conn = conn
+        except Exception as e:
+            raise RuntimeError("unable to connect to the database {connString}: {e}")
+
+        return self._conn
 
     def ping(self, cmd):
         """Query the actor for liveness/happiness."""
@@ -274,23 +301,10 @@ class McsCmd(object):
     def dumpCentroidtoDB(self, cmd):
         """Connect to database and return json string to an attribute."""
         
-        pwpath=os.environ['ICS_MCSACTOR_DIR']+'/etc/'
+        conn = self.conn
+        cmd.diag(f'text="dumping centroids to db {conn}"')
         
-        try:
-            file = open(pwpath+"dbpasswd.cfg", "r")
-            passstring = file.read()
-            cmd.inform('text="Password reading OK. value = %s."'%(passstring))
-        except:
-            cmd.warn('text="could not get db password"')
-            return
-        try:
-            conn = psycopg2.connect("dbname='pfs' user='pfs' host="+self.db+" password="+passstring)
-            cmd.diag('text="Connected to FPS database on host ."')
-        except:
-            cmd.warn('text="I am unable to connect to the database."')
-        
-        cmd.debug('text="Value from self.newTable = %s"' % (self.newTable))
-
+        # The section should be removed, replaced by the createTables command.
         if self.newTable:
             self._makeTables(conn, doDrop=True)
             cmd.inform('text="Centroid table created. "')
@@ -300,8 +314,7 @@ class McsCmd(object):
         
         frameID=self.actor.exposureID
         buf = self._writeCentroids(self.centroids,1,frameID,1,conn)
-        #pass
-        #cur = conn.cursor()
+
         cmd.inform('text="Centroids of exposure ID %06d00 dummped. "'%(frameID))
 
     def _makeImageHeader(self, cmd):
@@ -481,7 +494,7 @@ class McsCmd(object):
 
         cmd.inform('state="finished"')
 
-    def setCentroidParams(self,cmd):
+    def setCentroidParams(self, cmd, doFinish=True):
 
         """
 
@@ -531,10 +544,39 @@ class McsCmd(object):
             self.sh = cmd.cmd.keywords["sh"].values[0]
         except:
             self.sh = 0.5
-            
-        cmd.finish('parameters=set')
 
-        
+        if doFinish:
+            cmd.finish('parameters=set')
+
+    def createTables(self, cmd):
+        """ Create SQL tables. """
+
+        cmdKeys = cmd.cmd.keywords
+        doDrop = 'drop' in cmdKeys
+        suffix = cmdKeys['suffix'].values[0] if 'suffix' in cmdKeys else ''
+
+        tables = dict()
+        tables['mcsEngTable'] = '''id SERIAL PRIMARY KEY,
+                                   datatime timestamp,
+                                   frameId integer,
+                                   moveId smallint,
+                                   fiberId smallint,
+                                   centroidX real, centroidY real,
+                                   fwhmX real, fwhmY real,
+                                   bgValue real, peakValue real'''
+
+        conn = self.conn
+
+        with conn.cursor() as curs:
+            for t in tables:
+                tableName = f'{t}{suffix}'
+                if doDrop:
+                    curs.execute(f'drop table if exists {tableName}')
+                createCmd = f'create table {tableName} ({tables[t]});'
+                curs.execute(createCmd)
+
+        cmd.finish('text="created tables')
+
     def runCentroid(self, cmd, doFinish=True):
         """ Measure centroids on the last acquired image. """
 
@@ -706,55 +748,33 @@ class McsCmd(object):
         
     def _writeCentroids(self, centArr, nextRowId, frameId, moveId, conn=None):
         """ Write all measurements for a given (frameId, moveId) """
-        if self.simulationPath is None:
 
-            # Save measurements to a CSV buffer
-            measBuf = io.StringIO()
-            np.savetxt(measBuf, centArr, delimiter=',', fmt='%0.6g')
-            measBuf.seek(0,0)
+        now = datetime.datetime.now()
+        now.strftime("%Y-%m-%d %H:%M:%S")
             
-            buf = io.StringIO()
-            for l_i in range(len(centArr)):
-                line = '%d,%d,%d,%d,%s' % (nextRowId + l_i, frameId, moveId, l_i,
-                                           measBuf.readline())
-                buf.write(line)
-            buf.seek(0,0)
+        # Save measurements to a CSV buffer
+        measBuf = io.StringIO()
+        np.savetxt(measBuf, centArr, delimiter=',', fmt='%0.6g')
+        measBuf.seek(0,0)
+
+        # Let postgres handle the primary key
+        with conn.cursor() as curs:
+            curs.execute("Select * FROM mcsEngTable where false")
+            colnames = [desc[0] for desc in curs.description]
+        realcolnames = colnames[1:]
+        
+        buf = io.StringIO()
+        for l_i in range(len(centArr)):
+            line = '%s,%d,%d,%d,%s' % (now.strftime("%Y-%m-%d %H:%M:%S"), 
+                                       frameId, moveId, l_i, measBuf.readline())
+            buf.write(line)
+        buf.seek(0,0)
             
-            if conn is not None:
-                with conn.cursor() as curs:
-                    curs.copy_from(buf,'mcsPerFiber',',')
-                conn.commit()
-                buf.seek(0,0)
-            
-        else:
-            now = datetime.datetime.now()
-            now.strftime("%Y-%m-%d %H:%M:%S")
-            
-            # Save measurements to a CSV buffer
-            measBuf = io.StringIO()
-            np.savetxt(measBuf, centArr, delimiter=',', fmt='%0.6g')
-            measBuf.seek(0,0)
-            
-            if bool(self.newTable) is False:
-                cmd_string='''select max(id) from mcsengtable;'''
-                with conn.cursor() as curs:
-                    curs.execute(cmd_string)
-                    data = curs.fetchall()
-                        
-                nextRowId=np.max(np.array(data))+1        
-            
-            buf = io.StringIO()
-            for l_i in range(len(centArr)):
-                line = '%d,%s,%d,%d,%d,%s' % (nextRowId + l_i,now.strftime("%Y-%m-%d %H:%M:%S"), 
-                                              frameId, moveId, l_i, measBuf.readline())
-                buf.write(line)
-            buf.seek(0,0)
-            
-            if conn is not None:
-                with conn.cursor() as curs:
-                    curs.copy_from(buf,'mcsEngTable',',')
-                conn.commit()
-                buf.seek(0,0)
+        if conn is not None:
+            with conn.cursor() as curs:
+                curs.copy_from(buf,'mcsEngTable',',',
+                               columns=realcolnames)
+        buf.seek(0,0)
         
         return buf
 
