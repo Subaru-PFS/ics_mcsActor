@@ -761,10 +761,11 @@ class McsCmd(object):
         measBuf.seek(0,0)
 
         # Let the database handle the primary key
-        with conn.cursor() as curs:
-            curs.execute("select * FROM mcs where false")
-            colnames = [desc[0] for desc in curs.description]
-        realcolnames = colnames[1:]
+        with conn:
+            with conn.cursor() as curs:
+                curs.execute("select * FROM mcs where false")
+                colnames = [desc[0] for desc in curs.description]
+            realcolnames = colnames[1:]
 
         buf = io.StringIO()
         for l_i in range(len(centArr)):
