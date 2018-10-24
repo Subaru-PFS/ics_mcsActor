@@ -9,7 +9,7 @@ VER_MINOR=$(shell uname -r | cut -f3 -d.)
 
 CC=gcc
 
-DEBFLAGS = -fPIC -O2 -Wno-format-zero-length -Wno-deprecated-declarations -Wunused-variable
+DEBFLAGS = -g -fPIC -O2 -Wno-format-zero-length -Wno-deprecated-declarations -Wunused-variable
 
 ALL_CFLAGS += $(DEBFLAGS) $(DO_MLOCK) $(BUILDOPTIONS)
 LDFLAGS += $(ALL_CFLAGS) -L. -L/opt/EDTpdv/ -L/usr/local/lib  -I/cfht/include -I. -I/usr/local/include  -I/opt/EDTpdv/
