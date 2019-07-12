@@ -35,9 +35,15 @@ import psycopg2.extras
 from xml.etree.ElementTree import dump
 
 try:
-    import mcsActor.mpfitCentroid.centroid as centroid
+    import mcsActor.windowedCentroid.centroid as centroid
 except:
     pass
+
+try:
+    import mcsActor.mcsRoutines as mcsTools
+except:
+    pass
+
 
 import numpy as np
 import pylab as py
@@ -69,8 +75,9 @@ class McsCmd(object):
             ('status', '', self.status),
             ('expose', '@(bias|test) [<visit>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<visit>]', self.expose),
-            ('expose', '@object <expTime> [<visit>] [@doCentroid]', self.expose),
+            ('expose', '@object <expTime> [<visit>] [@doCentroid] [@doFibreID]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
+            ('runFibreID', '[@newTable]', self.runFibreID),
             ('createTables', '[@drop]', self.createTables),
             ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
             ('test_centroid', '', self.test_centroid),
@@ -79,8 +86,10 @@ class McsCmd(object):
             ('quickPlot', '', self.quickPlot),
             ('timeTestFull','',self.timeTestFull),
             ('seeingTest','',self.seeingTest),
-            ('setCentroidParams','[<fwhm>] [<thresh>] [<rl>] [<rh>] [<sl>] [<sh>] [<boxsize>]',
-             self.setCentroidParams),
+            ('setCentroidParams','[<fwhmx>] [<fwhmy>] [<thresh1>] [<thresh2>] [<boxFind>] [<boxCent>] [<nmin>] [<nmax>] [<maxIt>  [<findRad>]', self.setCentroidParams),
+            ('calcThresh','[<threshMethod>]', '[<threshSigma>]', '[<threshFact>]',self.calcThresh),
+            ('getExpectedFibrePos','[<fieldID>]',self.getExpectedFibrePos),
+            ('getInstParams','[<fieldID>]',self.getInstParams),
             ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
         ]
@@ -92,13 +101,20 @@ class McsCmd(object):
                                         keys.Key("visit", types.Int(), help="exposure visit"),
                                         keys.Key("path", types.String(), help="Simulated image directory"),
                                         keys.Key("getArc", types.Int(), help="flag for arc image"),
-                                        keys.Key("fwhm", types.Float(), help="fwhm for centroid routine"),
-                                        keys.Key("boxsize", types.Int(), help="boxsize for centroid routine"),
-                                        keys.Key("thresh", types.Int(), help="thresh for centroid routine"),
-                                        keys.Key("rl", types.Float(), help="rl for centroid routine"),
-                                        keys.Key("rh", types.Float(), help="rh for centroid routine"),
-                                        keys.Key("sl", types.Float(), help="sh for centroid routine"),
-                                        keys.Key("sh", types.Float(), help="sh for centroid routine")
+                                        keys.Key("fwhmx", types.Float(), help="X fwhm for centroid routine"),
+                                        keys.Key("fwhmy", types.Float(), help="Y fwhm for centroid routine"),
+                                        keys.Key("boxFind", types.Int(), help="box size for finding spots"),
+                                        keys.Key("boxCent", types.Int(), help="box size for centroiding spots"),
+                                        keys.Key("nmin", types.Int(), help="minimum number of points for spot"),
+                                        keys.Key("nmax", types.Int(), help="max number of points for spot"),
+                                        keys.Key("maxIt", types.Int(), help="maximum number of iterations for centroiding"),
+                                        keys.Key("findSigma", types.Float(), help="threshhold for finding spots"),
+                                        keys.Key("centSigma", types.Float(), help="threshhold for calculating moments of spots"),
+                                        keys.Key("matchRad", types.Int(), help="radius in pixels for matching positions").
+                                        keys.Key("threshMethod", types.Str(), help="method for thresholding"),
+                                        keys.Key("threshSigma", types.Float(), help="simga for sigma-clipped RMS of image"),
+                                        keys.Key("threshFact", types.Float(), help="factor for thresholding"),
+                                        keys.Key("fieldID", types.Str(), help="fieldID for getting instrument parameters")
                                         )
 
     @property
@@ -403,10 +419,11 @@ class McsCmd(object):
         return filename, image
            
     def expose(self, cmd):
-        """ Take an exposure. Optionally centroids. """
+        """ Take an exposure. Optionally centroids. Optionally FibreID """
 
         cmdKeys = cmd.cmd.keywords
         doCentroid = 'doCentroid' in cmdKeys
+        doFibreID = 'doFibreID' in cmdKeys
         expType = cmdKeys[0].name
         if 'visit' in cmdKeys:
             self.actor.exposureID = cmdKeys['visit'].values[0]
@@ -426,12 +443,46 @@ class McsCmd(object):
         filename, image = self._doExpose(cmd, expTime, expType)
         self.actor.image = image
 
+        #moved dump to DB here, after FibreID
+
         if doCentroid:
             self.runCentroid(cmd, doFinish=False)
 
+            if doFibreID:
+                self.runFibreID(cmd, doFinish=False)
+            
+            self.dumpCentroidtoDB(cmd)
+        
         cmd.finish('exposureState=done')
 
+    def getExpectedFibrePos(self,cmd,fieldID):
 
+        """  Retrieve expected fibre positions from the database """
+
+        pass
+
+        #I'm assuming the result is two Nx3 arrays (id #, xpos, ypos)???shape
+
+        ##the routine called here needs to be written for DB query
+
+        ###put code in her!!!!!!!
+
+    def getInstParams(self):
+
+        """
+
+        retrieve instrument parameters. rotCent is a 2 element array with the rotation centre in pixels
+        offset is a 2 element array with the offet between the mask centre and rotation centre
+
+        """
+
+        #put code in here!!!!!
+
+        self.rotCent = rotCent
+        self.offset = offset
+
+        
+        
     def doCentroidCoarse(self, cmd):
         
 
@@ -459,15 +510,6 @@ class McsCmd(object):
 
         if doFinish:
             cmd.finish('Statistics Calculated')
-        
-    def quickPlot(self,cmd):
-        py.clf()
-        npoint=len(self.actor.homes)//2
-        for i in range(0,npoint):
-            py.plot([self.actor.homes[i]],self.actor.homes[i+npoint],'dg')
-        py.title("Centroids")
-
-        py.savefig("test1.jpg")
 
     def fakeCentroidOnly(self,cmd):
 
@@ -498,6 +540,66 @@ class McsCmd(object):
 
         cmd.inform('state="finished"')
 
+    def calcThresh(self, cmd, doFinish=True):
+
+        """  Calculate thresholds for finding/centroiding from image 
+
+        3 methods: fieldID uses the known system geometry to figure out the right region
+                   calib is for calibration when the system is not known, calculates from the image characteristics
+                   direct sets teh values manually (backup method)
+
+
+        """
+
+
+
+        #these variables need to be already set
+
+        try:
+            image = self.actor.image
+
+        except:
+            raise RuntimeError(f"no image taken")
+
+        try:
+            findSigma = self.findSigma
+            centSigma = self.centSigma
+        except:
+            raise RuntimeError(f"must run setCentroidParameters first")
+
+        threshMethod = cmd.cmd.keywords["threshMethod"].values[0]
+        
+        try:
+            threshSigma = cmd.cmd.keywords["threshSigma"].values[0]
+        except:
+            threshSigma = 4
+         try:
+            threshFact = cmd.cmd.keywords["threshFact"].values[0]
+        except:
+            threshFact = 2
+
+        if(self.threshMethod == 'fieldID'):
+            try:
+                fibrePos = self.actor.fibrePos
+            except:
+                raise RuntimeError(f"expected fibre positions not set")
+
+            findThresh,centThresh = mcsTools.getThresh(image,threshMethod,threshSigma,threshFact,findSigma,centSigma,fibrePos=fibrePos)
+        elif(self.threshMethod == 'calib'):
+            self.findThresh,self.centThresh = mcsTools.getThresh(image,threshMethod,threshSigma,threshFact,findSigma,centSigma)
+        elif(self.threshMethod == 'direct'):
+            try:
+                self.findThresh = cmd.cmd.keywords["findThresh"].values[0]
+                self.centThresh = cmd.cmd.keywords["centThresh"].values[0]
+            except:
+                raise RuntimeError(f"No Thresholds Set")
+        else:
+            raise RuntimeError(f"Not a valid threshold method")
+
+
+
+
+        
     def setCentroidParams(self, cmd, doFinish=True):
 
         """
@@ -512,42 +614,54 @@ class McsCmd(object):
 
         
         try:
-            self.fhwm = cmd.cmd.keywords["fwhm"].values[0]
+            self.fhwmx = cmd.cmd.keywords["fwhmx"].values[0]
         except:
-            self.fwhm = 3
+            self.fwhmx = 0
 
         try:
-            self.boxsize = cmd.cmd.keywords["boxsize"].values[0]
+            self.fhwmy = cmd.cmd.keywords["fwhmy"].values[0]
         except:
-            self.boxsize = 3
+            self.fwhmy = 0
 
         try:
-            self.thresh = cmd.cmd.keywords["thresh"].values[0]
+            self.boxFind = cmd.cmd.keywords["boxFind"].values[0]
         except:
-            try:
-                self.thresh = self.actor.image.mean()+20*self.actor.image.std()
-            except:
-                self.thresh=2000
+            self.boxFind = 10
             
         try:
-            self.rl = cmd.cmd.keywords["rl"].values[0]
+            self.boxCent = cmd.cmd.keywords["boxCent"].values[0]
         except:
-            self.rl = -2.5
+            self.boxCent = 6
 
         try:
-            self.rh = cmd.cmd.keywords["rh"].values[0]
+            self.findSigma = cmd.cmd.keywords["findSigma"].values[0]
         except:
-            self.rh = 1.3
+            self.findSigma = 60
+            
+        try:
+            self.centSigma = cmd.cmd.keywords["centSigma"].values[0]
+        except:
+            self.centSigma = 15
 
         try:
-            self.sl = cmd.cmd.keywords["sl"].values[0]
+            self.nmin = cmd.cmd.keywords["nmin"].values[0]
         except:
-            self.sl = 0.05
-
+            self.nmin = 10
+            
         try:
-            self.sh = cmd.cmd.keywords["sh"].values[0]
+            self.nmax = cmd.cmd.keywords["nmax"].values[0]
         except:
-            self.sh = 0.5
+            self.nmax = 10
+            
+        try:
+            self.maxIt = cmd.cmd.keywords["maxIt"].values[0]
+        except:
+            self.maxIt = 20
+            
+        try:
+            self.matchRad = cmd.cmd.keywords["matchRad"].values[0]
+        except:
+            self.matchRad = 20
 
         if doFinish:
             cmd.finish('parameters=set')
@@ -580,6 +694,22 @@ class McsCmd(object):
 
         cmd.finish('text="created tables')
 
+    def runFibreID(self,cmd, doFinish=True):
+
+    """ Run Fibre Identification on the last acquired centroids """
+
+    centroids = self.centroids
+
+    fibrePos = self.getExpectedFibrePositions(fieldID):
+
+    idCentroids = mcsTools.findHomes(centroids,fibrePos,matchRad): 
+    
+    self.centroids = idCentroids
+    
+    if doFinish:
+        cmd.finish('exposureState=done')
+    
+        
     def runCentroid(self, cmd, doFinish=True):
         """ Measure centroids on the last acquired image. """
 
@@ -592,19 +722,21 @@ class McsCmd(object):
         
         cmd.inform(f'state="measuring cached image: {image.shape}"')
         a = centroid.centroid_only(image.astype('<i4'),
-                                   self.fwhm, self.thresh, self.boxsize,
-                                   2, self.sl, self.sh, self.rl, self.rh, 0)
+                                   self.fwhmx, self.fwhmy, self.findThresh, self.centThresh, self.boxFind, self.boxCent, 
+                                   self.nmin, self.nmax, self.maxIt, 0)
         centroids=np.frombuffer(a,dtype='<f8')
         npoint=len(centroids)//7
-        centroids=np.reshape(centroids,(npoint,7))
-        centroids=centroids[:,0:6]
+        ##reshaped centroids
+        tCentroids=np.reshape(centroids,(npoint,7))
+
+        centroids = np.zeros((npoint,7))
+        centroids[:,1:]=centroids[:,0:6]
 
         self.centroids=centroids
             
         cmd.inform('text="%d centroids"'% (len(centroids)))
         cmd.inform('state="centroids measured"')
                         
-        self.dumpCentroidtoDB(cmd)
 
         if doFinish:
             cmd.finish('exposureState=done')
@@ -882,3 +1014,27 @@ class McsCmd(object):
             cmd.inform('="expTime = %f. last= %s" '% (expTime,filename))
 
         cmd.finish('exposureState=done')
+
+    def calcRotationCentre(self,cmd):
+
+        ###RETRIEVE A SET OF CENTROIDS HERE
+
+        xCorner=[]
+        yCorner=[]
+
+        for i in range(nSets):
+            ind=np.where(centroids[:,0]==i)
+            x=centroids[ind,1].ravel()
+            y=centroids[ind,2].ravel()
+
+            x0,x1,y0,y1=mcsTools.getCorners(x,y)
+            xCorner.append(x0)
+            yCorner.append(y0)
+
+        xCorner=np.array(xCorner)
+        yCorner=np.array(yCorner)
+
+        coords=[xCorner,yCorner]
+        xc,yc,r,_=mcsTools.least_squares_circle(xCorner,yCorner)
+
+        return xc,yc
