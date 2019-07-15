@@ -10,6 +10,8 @@ import numpy.ma as ma
 
 def dist(x1,y1,x2,y2):
 
+    """Simple distance between two points (or point and array)"""
+    
     dd=np.sqrt((x1-x2)**2+(y1-y2)**2)
     return dd
 
@@ -18,7 +20,9 @@ def findHomes(centroids,fibrePos,tol):
 
     """
 
-    Do nearest neighbour matching on a set of centroids (ie, home position case)
+    Do nearest neighbour matching on a set of centroids (ie, home position case).
+    The routine is flexible with the number of paramters in the centroid array - they 
+    will all be copied to the output array. 
 
     Input: 
        centroids: centroid array in the form
@@ -26,7 +30,8 @@ def findHomes(centroids,fibrePos,tol):
        fibrePos: expected positions, (Nx3) array with first column as index
        tol: maximum separation for match, in pixels
 
-    Returns: sorted array.
+    Returns: sorted array with index in the first column
+
  
     """
 
@@ -51,63 +56,103 @@ def findHomes(centroids,fibrePos,tol):
             outArray[i,:]=np.empty((nparm)).fill(np.nan)
 
         #and assign the index
-        outArray[i,0]=fibrePos[i,1]
+        outArray[i,0]=fibrePos[i,0]
 
     #convert to masked array, masking unfound points
-    outArray=ma.masked_where(outArray==np.nan,outArray)
+    outArray=ma.masked_where(outArray!=outArray,outArray)
 
     return outArray
 
-def getThresh(image,threshMethod,threshSigma,threshFact,findSigma,centSigma,fibrePos=fibrePos):
+def getThresh(image,threshMethod,threshSigma,threshFact,findSigma,centSigma,fibrePos=None):
 
+    """
+
+    Wrapper routine for Threshold calcualaton, toggling beteen calibrarion adn operation mode.
+
+    input: 
+
+    image: image
+    threshMethod: =calib for calibration mode (must be rotated by multple of 90 degrees)
+                  =fieldID for real operation
+
+    threshSigma: threshold for sigma clipping
+    threshFact: a fudge factor for the calib mode which takes into account summer over different sized
+                axes for a square array. 
+    findSigma, centSigma: multiple of RMS for finding and centroiding spots
+    fibrePos = fibrePos array for fieldID, or None for calib
+
+    Returns:
+        thresh1,thresh2: the two thresholds
+        xrange,yrange: outer bounds of region used for calculation. This is a circle for fieldID, 
+        and a square for calib. 
+
+    """
+
+    #toggle between two methods
+    
     if(threshMethod=='fieldID'):
 
         a=getAutoThresh(image,threshSigma,fibrePos)
 
+        #widest points of a circle
+        xrange=[fibrePos[:,1].mean()-1500,fibrePos[:,1].mean()+1500]
+        yrange=[fibrePos[:,2].mean()-1500,fibrePos[:,2].mean()+1500]
+
     elif(threshMethod=='calib'):
 
-        xrange,yrange=mcs.getRegion(image,threshSigma,threshFact)
+        xrange,yrange=getRegion(image,threshSigma,threshFact)
 
-        a=getManualThresh(image,xrange,yrange)
-        
+        a=getManualThresh(image,xrange,yrange,threshSigma)
+
+    #get the thresholds
     thresh1=a.mean()+a.std()*findSigma
     thresh2=a.mean()+a.std()*centSigma
 
-    return thresh1,thresh2
+    return thresh1,thresh2,xrange,yrange
 
-def getManualThresh(image,xrange,yrange,sigma1,sigma2):
+def getManualThresh(image,xrange,yrange,sigmaThresh):
 
     """
 
-    calculate the two thresholds used by the centroiding routine.
-    
-    input:
-       image: image
-       xrange,yrange: upper and lower limit of the region of the mask
-       sigma1: higher sigma multiplier for finding region
-       sigma2: lower sigma multiplier for calculating weighted centroid
+    returns a sigma clipped array. 
 
-    returns:
-       thresh1, thresh2: upper and lower thresholds for finding spots,
-       in pixel flux values.
-    
+    Input: 
+       image: image
+       xrange,yrange: bounds of region 
+       sigmaThresh: threshold for sigma clipping
+
+    Returns:
+       clipped array
+
     """
 
     #sigma clip the image to get rid of the spots
     subIm=image[xrange[0]:xrange[1],yrange[0]:yrange[1]]
-    a,b,c=sigmaclip(subIm.ravel(),4,4)
+    a,b,c=sigmaclip(subIm.ravel(),sigmaThresh,sigmaThresh)
 
-    #sigma clipped mean + rms*factor
-    thresh1=a.mean()+a.std()*sigma1
-    thresh2=a.mean()+a.std()*sigma2
-
-    return thresh1,thresh2,xrange,yrange
+    return a
 
 
 def getRegion(image,high,factor):
 
+    """
+
+    A function to manually find the region of the pinhole mask when it's not known in advance. 
+
+    Input: 
+        Image: image
+        high: factor for sigma clipping
+        factor: fudge factor to take into account that 
+
+    """
+
+    #first a sigmaclip
     im,a,b=sigmaclip(image,high=high)
+
+    #find the boundaries of the region
     xlow,xhigh,ylow,yhigh=getBoundary(image,a,b,0)
+
+    #and a second iteration
     im,a,b=sigmaclip(image[xlow:xhigh,ylow:yhigh],high=high)
     rrms=im.std()/factor
     xlow,xhigh,ylow,yhigh=getBoundary(image,a,b,rrms)
@@ -218,12 +263,12 @@ def getBoundary(image,a,b,rms):
 
     return x1,x2,y1,y2
 
-def getAutoThresh(image,xr,yr,mx,my):
+def getAutoThresh(image,threshSigma,fibrePos):
 
        
     #approximate centre of image
-    mpx=fibrepos[:,1].mean()
-    mpy=fibrepos[:,2].mean()
+    mpx=fibrePos[:,1].mean()
+    mpy=fibrePos[:,2].mean()
 
     #find points in a circle near the centre
     xx,yy=np.meshgrid(np.arange(image.shape[0]),np.arange(image.shape[1]))
@@ -285,3 +330,10 @@ def least_squares_circle(x,y):
     residu   = np.sum((Ri - R)**2)
     return xc, yc, R, residu
 
+def flatField(image,flat):
+
+    return image/flat
+
+
+
+    

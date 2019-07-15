@@ -8,7 +8,7 @@ import cv2
 try:
     import mcsActor.windowedCentroid.centroid as centroid
 except:
-    from centroid import centroid
+    import centroid as centroid
 
 
 

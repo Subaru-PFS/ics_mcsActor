@@ -143,3 +143,9 @@ def getFibrePos(fiducials,scienceFibres,za,inr,rotCent,offset):
     
     return np.array([np.arange(len(xx)),xyout[0,:],xyout[1,:]]).T
 
+def getDiff(centroids,fibrePos):
+
+    dx=centroids[:,1]-fibrePos[:,1]
+    dy=centroids[:,2]-fibrePos[:,2]
+
+    return dx,dy
