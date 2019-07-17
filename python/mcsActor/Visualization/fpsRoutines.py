@@ -10,93 +10,6 @@ import CoordTransp
 
 
 
-def getCorners(x,y):
-
-    """
-    
-    Routine to find the two square corners of the set of pinhole mask spots. This is used when
-    Doing the rotation calculation, and the backup routine for finding fiducial fibres. 
-
-    Input: x,y - positions
-
-    Returns: x0,x1,y0,y1 - x and y positions of points
-
-    Note that this needs a fairly clean set of centroids to work. 
-
-    """
-
-    #call the geometry routine
-    
-    ds,inds=getOrientation(x,y)
-
-    #sort by distance from centre and assign
-    ind=np.argsort(ds)
-
-    x0=x[inds[ind[3]]]
-    x1=x[inds[ind[2]]]
-    y0=y[inds[ind[3]]]
-    y1=y[inds[ind[2]]]
-
-    return x0,x1,y0,y1
-    
-def getOrientation(xlast,ylast):
-
-    """Routine to fine the corners of a set of pinhole mask spots. The
-    definition of 'corner' is the point in each quadrant that is
-    farthest from the mean position. The square corners give the
-    larger distances; the asymmetry of the mask breaks the degenerecy,
-    allowing us to select a specific corner. 
-
-    Input: x,y - positions
-
-    Returns: arrays of indices and distances for the four cornesrs
-
-    """
-    
-    #first, find the mean position. 
-    xm=xlast.mean()
-    ym=ylast.mean()
-
-    #find the four 'corners' by distance from the mean point
-
-    #indices for quadrants (all points not in a quadrant)
-    ind1 = np.where( np.logical_or( xlast-xm > 0, ylast-ym>0) )[0]
-    ind2 = np.where( np.logical_or( xlast-xm > 0, ylast-ym<0) )[0]
-    ind3 = np.where( np.logical_or( xlast-xm < 0, ylast-ym>0) )[0]
-    ind4 = np.where( np.logical_or( xlast-xm < 0, ylast-ym<0) )[0]
-
-    #distances for each
-    d=np.sqrt((xlast-xm)**2+(ylast-ym)**2)
-    d1=d.copy()
-    d2=d.copy()
-    d3=d.copy()
-    d4=d.copy()
-
-    #set irrelevant points to zero
-    d1[ind1]=0
-    d2[ind2]=0
-    d3[ind3]=0
-    d4[ind4]=0
-
-    #max distance
-    dm1=d1.max()
-    dm2=d2.max()
-    dm3=d3.max()
-    dm4=d4.max()
-
-    #index thereof
-    ind1=d1.argmax()
-    ind2=d2.argmax()
-    ind3=d3.argmax()
-    ind4=d4.argmax()
-
-    #now find the two largest. These will be the good corners
-    
-    ds=np.array([dm1,dm2,dm3,dm4])
-    inds=np.array([ind1,ind2,ind3,ind4])
- 
-    return ds,inds
-
 def getFieldDefinition(fieldID):
 
     """
@@ -149,3 +62,158 @@ def getDiff(centroids,fibrePos):
     dy=centroids[:,2]-fibrePos[:,2]
 
     return dx,dy
+
+def calcRotationCentre(centroids,frameIDs):
+
+    """ 
+
+    Calculate the centre of rotation, given an array retrived by getAllCentroidsFromDB.
+
+    Input
+       centroids: Nx9 array of centroid information. Columns 2 and 3 are x and y positions
+       frameIDs: list of frameIDs
+
+    """
+
+    xCorner=[]
+    yCorner=[]
+
+    ###NEED TO RETRIEVE THE SET OF CENTROIDS FROM 
+
+    for i in frameIDs:
+        ind=np.where(allCentroids[:,0]==i)
+        x=centroids[ind,2].ravel()
+        y=centroids[ind,3].ravel()
+
+        x0,x1,y0,y1=getCorners(x,y)
+        xCorner.append(x0)
+        yCorner.append(y0)
+
+    xCorner=np.array(xCorner)
+    yCorner=np.array(yCorner)
+
+    coords=[xCorner,yCorner]
+    xc,yc,r,_=mcs.least_squares_circle(xCorner,yCorner)
+
+    return xc,yc
+            
+def calc_R(x,y, xc, yc):
+    """
+    calculate the distance of each 2D points from the center (xc, yc)
+    """
+    return np.sqrt((x-xc)**2 + (y-yc)**2)
+
+def f(c, x, y):
+    """
+    calculate the algebraic distance between the data points
+    and the mean circle centered at c=(xc, yc)
+    """
+    Ri = calc_R(x, y, *c)
+    return Ri - Ri.mean()
+
+def least_squares_circle(x,y):
+    """
+    Circle fit using least-squares solver.
+    Inputs:
+
+        - coords, list or numpy array with len>2 of the form:
+        [
+    [x_coord, y_coord],
+    ...,
+    [x_coord, y_coord]
+    ]
+
+    Outputs:
+
+        - xc : x-coordinate of solution center (float)
+        - yc : y-coordinate of solution center (float)
+        - R : Radius of solution (float)
+        - residu : MSE of solution against training data (float)
+    """
+    # coordinates of the barycenter
+
+    #x = np.array([x[0] for x in coords])
+    #y = np.array([x[1] for x in coords])
+    x_m = np.mean(x)
+    y_m = np.mean(y)
+    center_estimate = x_m, y_m
+    center, ier = optimize.leastsq(f, center_estimate, args=(x,y))
+    xc, yc = center
+    Ri       = calc_R(x, y, *center)
+    R        = Ri.mean()
+    residu   = np.sum((Ri - R)**2)
+    return xc, yc, R, residu
+
+def getCentroidsDB(conn,frameID,moveID):
+
+    """
+    
+    retrieves a set of centroids from the database, for a sequence of frameIDs
+
+    Input:  
+       conn: database connection
+       frameID: frameID
+
+    """
+
+    ###put code here
+
+    return centroids
+
+
+def getAllCentroidsDB(conn,frameIDs):
+
+    """
+
+    retrieves a set of centroids from the database, for a sequence of frameIDs
+
+    Input:  
+       conn: database connection
+       frameIDs: list of frame id numbers
+
+    """
+    
+    #for commissioning with MCS
+    
+    moveId = 1
+    
+    #make a blank array for the centroid array
+    centroids=np.array([])
+    
+    i=0
+    
+    #cycle through each ID number
+    for id in frameIDs:
+        
+        #SQL for getting a set of centroids
+        #cmd_string = f"""select * from mcsEngTable where frameId={id} and moveId=1"""
+        #cmd_string=""
+        data=np.array([]) 
+        n = 0
+        with conn.cursor() as curs:
+                curs.execute(cmd_string)
+                rows=curs.fetchall()
+                for idx, val in enumerate(rows):
+                    if idx == 0: data = val 
+                    if idx != 0: data = np.vstack([data,val])
+        conn.commit()
+        
+        
+        #some data massaging into the right form. 
+        cen=data[:,5:11]
+        cen1=np.zeros((cen.shape[0],7))
+        
+        #add an index to the first number
+        cen1[:,0]=i
+        
+        #copy over the centroids
+        cen1[:,1:7]=cen
+        
+        #create master array
+        if(i==0):
+            centroids=cen1
+        else:
+            centroids=np.concatenate((centroids,cen1),axis=0)
+
+    return centroids    
+

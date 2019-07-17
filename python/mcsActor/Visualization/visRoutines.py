@@ -11,7 +11,6 @@ except:
     import centroid as centroid
 
 
-
 def getCentroids(image,thresh1,thresh2,fwhmx,fwhmy,boxFind,boxCent,nmin,nmax,maxIt):
 
     """
@@ -53,81 +52,7 @@ def getCentroids(image,thresh1,thresh2,fwhmx,fwhmy,boxFind,boxCent,nmin,nmax,max
 
     return tCentroids
 
-def getCentroidsDB(conn,frameID,moveID):
-
-    """
-    
-    retrieves a set of centroids from the database, for a sequence of frameIDs
-
-    Input:  
-       conn: database connection
-       frameID: frameID
-
-    """
-
-    ###put code here
-
-    return centroids
-
-
-def getAllCentroidsDB(conn,frameIDs):
-
-    """
-
-    retrieves a set of centroids from the database, for a sequence of frameIDs
-
-    Input:  
-       conn: database connection
-       frameIDs: list of frame id numbers
-
-    """
-    
-    #for commissioning with MCS
-    
-    moveId = 1
-    
-    #make a blank array for the centroid array
-    centroids=np.array([])
-    
-    i=0
-    
-    #cycle through each ID number
-    for id in frameIDs:
-        
-        #SQL for getting a set of centroids
-        #cmd_string = f"""select * from mcsEngTable where frameId={id} and moveId=1"""
-        #cmd_string=""
-        data=np.array([]) 
-        n = 0
-        with conn.cursor() as curs:
-                curs.execute(cmd_string)
-                rows=curs.fetchall()
-                for idx, val in enumerate(rows):
-                    if idx == 0: data = val 
-                    if idx != 0: data = np.vstack([data,val])
-        conn.commit()
-        
-        
-        #some data massaging into the right form. 
-        cen=data[:,5:11]
-        cen1=np.zeros((cen.shape[0],7))
-        
-        #add an index to the first number
-        cen1[:,0]=i
-        
-        #copy over the centroids
-        cen1[:,1:7]=cen
-        
-        #create master array
-        if(i==0):
-            centroids=cen1
-        else:
-            centroids=np.concatenate((centroids,cen1),axis=0)
-
-    return centroids    
-
-
-def getAllCentroids(files,outfile,thresh1,thresh2,fwhmx,fwhmy,boxFind,boxCent,nmin,nmax,maxIt):        
+def getAllCentroids(files,outfile,thresh1,thresh2,fwhmx,fwhmy,boxFind,boxCent,nmin,nmax,maxIt,frameIDs):        
 
     """
 
@@ -165,12 +90,12 @@ def getAllCentroids(files,outfile,thresh1,thresh2,fwhmx,fwhmy,boxFind,boxCent,nm
         for i in range(len(centroids[:,0])):
 
             #print(filenum,x[i],y[i],fx[i],fy[i],back[i],peak[i],qual[i],file=ff)
-            print(filenum,centroids[i,1],centroids[i,2],centroids[i,3],centroids[i,4],centroids[i,5],centroids[i,6],centroids[i,7],file=ff)
+            print(frameIDs[filenum],0,centroids[i,1],centroids[i,2],centroids[i,3],centroids[i,4],centroids[i,5],centroids[i,6],centroids[i,7],file=ff)
         filenum+=1
             
     print()
     ff.close()
-    return centroids[:,0],centroids[:,1]
+    
 
     
 def getFileName(frameID,moveID,sourceDir,fPref,dataType):
@@ -313,7 +238,7 @@ def dbConnect(user='pfs',host='133.40.164.208',passwd='psfpass'):
 
 
 
-def matchAllPoints(centroids,xx,yy,tol):
+def matchAllPoints(centroids,xx,yy,tol,frameIDs):
 
     """
 
@@ -339,7 +264,7 @@ def matchAllPoints(centroids,xx,yy,tol):
 
     #size of output array
     npoints=len(xx)
-    nfiles=np.int(centroids[:,0].max())
+    nfiles=len(frameIDs)
     
     xArray=np.zeros((npoints,nfiles))
     yArray=np.zeros((npoints,nfiles))
@@ -359,16 +284,16 @@ def matchAllPoints(centroids,xx,yy,tol):
 
         #get spot positions, etc from a particular image
 
-        ind=np.where(centroids[:,0]==i)
+        ind=np.where(centroids[:,0]==frameIDs[i])
 
         ll=centroids[ind,0].shape[1]
-        x=centroids[ind,1].reshape(ll)
-        y=centroids[ind,2].reshape(ll)
-        fx=centroids[ind,3].reshape(ll)
-        fy=centroids[ind,4].reshape(ll)
-        peak=centroids[ind,5].reshape(ll)
-        back=centroids[ind,6].reshape(ll)
-        qual=centroids[ind,7].reshape(ll)
+        x=centroids[ind,2].reshape(ll)
+        y=centroids[ind,3].reshape(ll)
+        fx=centroids[ind,4].reshape(ll)
+        fy=centroids[ind,5].reshape(ll)
+        peak=centroids[ind,6].reshape(ll)
+        back=centroids[ind,7].reshape(ll)
+        qual=centroids[ind,8].reshape(ll)
 
         #nearest neighbour matching
         for j in range(npoints):

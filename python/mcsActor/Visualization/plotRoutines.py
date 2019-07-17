@@ -7,48 +7,61 @@ import matplotlib.pylab as plt
 
 def pairPlot(xs,    ys,    val1,val2,           plotrange,titl,      prefix, suffix, valtype,   units,   nbins,inter,stitle=""):
 
+    """
+
+    plot a pair of plots, one showing the map, the other the histogram.
+
+    Input: 
+       xs,ys - coordinates of points
+       val1 - value for the map, same dimensions as xs,ys
+       val2 - value for the histogram
+       plotrange - [min,max] for polotting range on both plots
+       titl - title
+       prefix - prefix for output files
+       suffix - suffix for output files
+       valtype - type of variable plotted (e.g., FWHM (x))
+       units - unites (eg pixels)
+       nbins - number of bins for histogram
+       inter - interactive flag
+       stitle - optional subbbtitle.
+
+    REturns
+
+       plots to png files, if inter=1 to screen
+
+    """
+
+
+    #set up plot
     fig,axes=plt.subplots(1,2)
     fig.set_figheight(4)
     fig.set_figwidth(10)
 
-
+    #scatter plot. size of points optimized for file/notebooks
     sc=axes[0].scatter(xs,ys,c=val1,marker="o",cmap='Purples',lw=0,s=20,vmin=plotrange[0],vmax=plotrange[1])
+    #label the axes
     axes[0].set_xlabel("X ("+units+")")
     axes[0].set_ylabel("Y ("+units+")")
-    
+
+    #calculate the bins
     binsize=(plotrange[1]-plotrange[0])/nbins
     bins=np.arange(plotrange[0],plotrange[1]+binsize,binsize)
 
+    #histogram
     hi=axes[1].hist(val2,bins=bins)
 
+    #labels
     axes[1].set_xlabel(valtype)
     axes[1].set_ylabel("N")
 
     plt.suptitle(valtype)
 
+    #show and save
     if(inter == 1):
         plt.show()
     plt.savefig(prefix+suffix+".png")
 
-
-def plotTransFrame(fxFrameAv,fyFrameAv,peakFrameAv,sxAll,syAll,xdAll,ydAll,rotAll,prefix,inter,stitle=""):
-
-    fig,axes=plt.subplots(1,2)
-
-    ax[0].plot(frames,fxFrameAv,marker='d',linestyle="-",color="#1f77b4")
-    ax[0].plot(frames,fxFrameAv,marker='d',linestyle="-",color="#ff7f0e")
-
-    ax[0].set_xlabel("Frame #")
-    ax[0].set_ylabel("FWHM (pixels)")
-
-
-    ax[1].plot(frames,peakFrameAv,marker='d',linestyle="-")
-
-    ax[0].set_xlabel("Frame #")
-    ax[0].set_ylabel("FWHM (pixels)")
-
-
-
+ 
 def checkCentroids(xc,yc,cutrange,prefix,inter):
 
     """
@@ -70,14 +83,8 @@ def checkCentroids(xc,yc,cutrange,prefix,inter):
     #scatter plot
     
     ax.scatter(xc,yc)
-
-    #set limit if desired
-    #if(cutrange==1):
-    #    np.xlim([-8,344])
-    #    np.ylim([-8,344])
-
-    #plt.axes().set_aspect('equal', 'datalim')
     ax.set_aspect('equal')
+    
     #display and save
     if(inter == 1):
         plt.show()
@@ -109,77 +116,6 @@ def checkMatched(xx,yy,xs,ys,prefix,inter):
     plt.savefig(prefix+"_checkpoints1.png")
     if(inter == 1):
         plt.show()
-
-def plotDistortion(c,c1,pts1,pts2,x1,y1,diffx,diffy,fxs,fys,peaks,limit,prefix,units,inter,inst_scale,stitle=""):
-
-    """
-
-    Distortion plots
-
-    input:
-
-    c,c1,pts1,pts2,diffx,diffy: as returned by simpleDistortion
-    fxs,fyx: fwhms
-    peaks: peak values
-
-    limit: upper limit for filtering out bad data (in c units)
-
-    prefix: prefix for output files
-
-    """
-
-    #a quick kludge to filter out bad quality points in poorly focussed images
-    
-    if(limit !=0):
-        ind=np.where((c < limit) & (fxs < 10) & (fys < 10) & (fxs > 0) & (fys > 0) & (peaks != 0))
-    else:
-        ind=np.arange(len(c))
-        
-    #quiver plot
-    
-    fig,ax = plt.subplots(facecolor='g')
-
-    x1=ma.masked_values(x1,0)
-    y1=ma.masked_values(y1,0)
-
-    print(x1.min(),y1.min())
-   
-    ax.quiver(pts1[:,ind,0].ravel(),pts1[:,ind,1].ravel(),-diffx[ind],-diffy[ind])
-    #ax.quiver(x1,y1,-diffx[ind],-diffy[ind])
-    plt.xlabel("x ("+units+")")
-    plt.ylabel("y ("+units+")")
-    plt.title("Distortion"+stitle)
-    plt.axis('equal')
-    if(inter == 1):
-        plt.show()
-    plt.savefig(prefix+"_distortion.png")
-
-    #t1=np.partition(c.flatten(), -2)[-2]
-    #t2=np.partition(c1.flatten(), -2)[-2]
-    
-    fig,ax = plt.subplots()
-    #plot map in mm
-    #sc=ax.scatter(pts1[:,ind,0].ravel(),pts1[:,ind,1].ravel(),marker='o',c=c[ind],cmap='plasma',s=25)
-    sc=ax.scatter(pts1[:,ind,0].ravel(),pts1[:,ind,1].ravel(),marker='o',c=c[ind]/inst_scale,cmap='plasma',s=25)
-    fig.colorbar(sc)
-    plt.title("Distortion ("+units+")"+stitle)
-    plt.xlabel("x ("+units+")")
-    plt.ylabel("y ("+units+")")
-    if(inter == 1):
-        plt.show()
-    plt.savefig(prefix+"_distortion_col.png")
-
-    fig,ax = plt.subplots()
-    #plot map in %
-    sc=ax.scatter(pts1[:,ind,0].ravel(),pts1[:,ind,1].ravel(),marker='o',c=c1[ind]/inst_scale,cmap='plasma',s=25)
-    fig.colorbar(sc)
-    plt.title("Distortion (% of field size)"+stitle)
-    plt.xlabel("x ("+units+")")
-    plt.ylabel("y ("+units+")")
-    if(inter == 1):
-        plt.show()
-    plt.savefig(prefix+"_distortion_col1.png")
-
 
 def plotVal(xs,ys,val,limit,plotrange,titl,prefix,suffix,units,inter,stitle=""):
 
@@ -224,7 +160,7 @@ def plotVal(xs,ys,val,limit,plotrange,titl,prefix,suffix,units,inter,stitle=""):
     if(inter == 1):
         plt.show()
     plt.savefig(prefix+suffix+".png")
-
+ 
 def checkPlots(files,inter,stitle=""):
 
     """
@@ -293,11 +229,11 @@ def plotTransByFrame(fxFrameAv,fyFrameAv,peakFrameAv,sxAll,syAll,xdAll,ydAll,rot
     #get number of frames
     frames=np.arange(len(fxFrameAv))
 
-
+    #first set - fwhms and translation (most useful)
     fig,axes=plt.subplots(1,2)
     fig.set_figheight(4)
     fig.set_figwidth(10)
-    
+
     axes[0].plot(frames,fxFrameAv,marker='d',linestyle="-",color="#1f77b4")
     axes[0].plot(frames,fyFrameAv,marker='s',linestyle="-",color="#ff7f0e")
     axes[0].set_title("FWHM Average by Frame"+stitle)
@@ -314,6 +250,7 @@ def plotTransByFrame(fxFrameAv,fyFrameAv,peakFrameAv,sxAll,syAll,xdAll,ydAll,rot
     if(inter == 1):
         fig.show()
 
+    #second set - peaks and bakcgrounds
     fig,axes=plt.subplots(1,2)
     fig.set_figheight(4)
     fig.set_figwidth(10)
@@ -332,6 +269,7 @@ def plotTransByFrame(fxFrameAv,fyFrameAv,peakFrameAv,sxAll,syAll,xdAll,ydAll,rot
     if(inter == 1):
         fig.show()
 
+    #third set - scale and rotation
     fig,axes=plt.subplots(1,2)
     fig.set_figheight(4)
     fig.set_figwidth(10)
@@ -351,47 +289,18 @@ def plotTransByFrame(fxFrameAv,fyFrameAv,peakFrameAv,sxAll,syAll,xdAll,ydAll,rot
     if(inter == 1):
          fig.show()
 
-def plotFailed(ncent,nqual,ncentR,nqualR,inr,prefix,inter,stitle=""):
-
-    """
-
-    """
-
-    
-    #get number of frames
-    frames=np.arange(len(ncent))
-         
-    fig,ax=plt.subplots()
-    ax.plot(frames,ncent,marker='d',linestyle="-")
-    plt.title("Number of Detected Points by Frame"+stitle)
-    plt.xlabel("Frame #")
-    plt.ylabel("Number of Detected Points")
-
-    if(inr==180):
-        plt.axhline(y=3444,linestyle="-",color="red")
-    else:
-        plt.axhline(y=3542,linestyle="-",color="red")
-
-        plt.savefig(prefix+"_centbyframe.png")
-
-    if(inter == 1):
-         fig.show()
-    
-    fig,ax=plt.subplots()
-    ax.plot(frames,nqual,marker='d',linestyle="-")
-    plt.title("Number of Flagged Fits by Frame"+stitle)
-    plt.xlabel("Frame #")
-    plt.ylabel("Number of Flagged Fits")
-    plt.savefig(prefix+"_flaggbyframe.png")
-
-    if(inter == 1):
-         fig.show()
-    
+    #fourth set - nper frame
          
 def plotImageStats(image,prefix,inter,stitle=""):
 
+    """
 
-    back = sigma_clip(image, sigma=2, iters=2)
+    plot histogram of an image
+    
+    """
+
+    
+    back = sigmaclip(image, sigma=2, iters=2)
     backImage=back.mean()
     rmsImage=back.std()
 
@@ -460,3 +369,88 @@ def movieCutout(files,xc,yc,sz,mmin,mmax,prefix):
 
 
     
+def quiverPlot(x,y,dx,dy):
+
+    """
+
+    plot a distortion map in quiver and colour format
+
+    Input:
+
+      x,y - positions
+      dx,dy - difference from expected
+     
+    returns: plot to file nad screen
+    
+
+    """
+
+    
+    fig,ax=plt.subplots(1,2)
+    fig.set_figheight(4)
+    fig.set_figwidth(10)
+
+    ax[0].quiver(x,y,dx,dy)
+    ax[0].set_xlabel("X (pixels)")
+    ax[0].set_ylabel("Y (pixels)")
+
+    ##map shows the total deviation
+    
+    dist=np.sqrt((dx)**2+(dy)**2)
+    sc=ax[1].scatter(x,y,c=dist)
+    ax[1].set_xlabel("X (pixels)")
+    fig.colorbar(sc,ax=ax[1])
+
+    fig.suptitle("Distortion Map")
+    
+    fig.show()
+    
+def diagPlot(image,mCentroids,dx,dy):
+
+    """
+
+    plot the image wtih the distortion overplotted in images. 
+
+    This needs a (working) functino to get the fibreID by clicking on it a point 
+
+    Input: 
+       iimage - image
+       mCentroids - array with matched centroids
+       dx,dy - distortion
+
+    """
+
+    
+    
+    fig,ax=plt.subplots()
+    x=mCentroids[:,1]
+    y=mCentroids[:,2]
+    print(x.min(),x.max(),y.min(),y.max())
+    ax.imshow(image,origin='lower')
+    ax.set_xlim([x.min(),x.max()])
+    ax.set_ylim([y.min(),y.max()])
+    ax.quiver(x,y,dx,dy,color='white',headlength=0, headaxislength=0)
+
+    #this shoudl read the position, but doesn't work yet.
+    def onM(event):
+        xpos=event.xdata
+        ypos=event.ydata
+        print(xpos,ypos)
+        fig.canvas.draw()
+    
+    fig.canvas.mpl_connect('button_press_event', onM)
+    plt.show()
+
+    
+def checkThreshold(image,xrange,yrange):
+
+    """
+
+    quick polot to show the image and overplot the region for the threshold calculation
+
+    """
+    
+    fig,ax=plt.subplots()
+    ax.imshow(image,origin="lower")
+    ax.scatter([yrange[0],yrange[0],yrange[1],yrange[1]],[xrange[0],xrange[1],xrange[0],xrange[1]])
+    fig.show()
