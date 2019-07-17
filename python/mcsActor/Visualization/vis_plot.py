@@ -39,7 +39,7 @@ def pairPlot(xs,    ys,    val1,val2,           plotrange,titl,      prefix, suf
 
     #scatter plot. size of points optimized for file/notebooks
     sc=axes[0].scatter(xs,ys,c=val1,marker="o",cmap='Purples',lw=0,s=20,vmin=plotrange[0],vmax=plotrange[1])
-    label the axes
+    #label the axes
     axes[0].set_xlabel("X ("+units+")")
     axes[0].set_ylabel("Y ("+units+")")
 
@@ -300,7 +300,7 @@ def plotImageStats(image,prefix,inter,stitle=""):
     """
 
     
-    back = sigma_clip(image, sigma=2, iters=2)
+    back = sigmaclip(image, sigma=2, iters=2)
     backImage=back.mean()
     rmsImage=back.std()
 
