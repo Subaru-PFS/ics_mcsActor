@@ -24,6 +24,19 @@ def getFieldDefinition(fieldID):
 
     return fiducials,scienceFibres
 
+def getInstConfig():
+
+    """
+
+    Routine to retrieve configureation of telescope, including zenith angle and instrument rotation.
+
+    """
+
+    ###PUT CODE HERE!!!
+
+    return za,inr
+
+
 def getFibrePos(fiducials,scienceFibres,za,inr,rotCent,offset):
 
     """

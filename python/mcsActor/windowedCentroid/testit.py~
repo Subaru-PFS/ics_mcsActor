@@ -1,0 +1,5 @@
+from centroid import centroid_only
+from astropy.io.fits import getdata
+image=getdata('/Users/karr/Science/PFS/Firsts/PFSC00366600.fits')
+a=centroid_only(image.astype('<i4'),0,0,2200,1200,10,6,10,90,20,1)
+print(len(a))

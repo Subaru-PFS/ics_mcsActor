@@ -88,7 +88,7 @@ void* subimage_Thread(void *arg)
   if(verbose == 1)
   
     {
-    printf("Finding Pionts\n"); 
+    printf("Finding Points\n"); 
     }
 
   
@@ -111,7 +111,7 @@ void* subimage_Thread(void *arg)
   
   if(verbose == 1)
     {
-      printf("Found %i points\n\n",npoint); 
+      printf("Found %i points\n",np); 
       printf("Starting Centroiding \n"); 
     }
 
@@ -211,13 +211,14 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
   struct cand_point *top_val=NULL;     //top of list
 
   struct cand_point *cand_val;  //List f points
+  struct cand_point *real_top;  //List f points
 
   double x1,y1;  //positions of first value
   double x2,y2;  //positions of first value
   double p1,p2;   //fluxes of first and second avalue
   double rs;     //square o fdistance between x1,y1 and x2,y2
   
-  double rmin=maxValD(fwhmx,fwhmy)*3;  //radius to look for duplicate/false points
+  double rmin=boxFind+1;  //radius to look for duplicate/false points
   int deadfirst=0;    //flag that first node has been deleted, to keep track fo pointers
   int firstval=1;     //flag that we're looking at the first node, to keep track of pointers
   char filename[sizeof "file100.fits"];
@@ -344,30 +345,40 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 
     //First go through the lists and link up each segment. 
     int iii;
+    int inloop=0;
+    cand_val=NULL;
+    iii=0;
+	     
+    
     for(ii=0;ii<NTHREAD-1;ii++)
       {
 
-	iii=0;
-
-	//Set to the first value in the first list.
-	if(ii==0)
+	if(inloop==0)
 	  {
-	cand_val=thread_data_array[ii].cand_list;
+	    cand_val=thread_data_array[ii].cand_list;
 	  }
-
+	
 	if(cand_val != NULL)  //check for empty list
 	  {
+
+	    //mark the start of the list (incase first part is null)
+	    if (inloop==0)
+	      {
+		top_val=cand_val;
+		inloop=1;
+	      }
+	     
+
 
 	    while(cand_val->next != NULL)
 	      {
 
 		if(verbose==1)
 		  {
-		    printf("BB %d %lf %lf\n",ii,cand_val->x,cand_val->y);
+		    //printf("BB %d %lf %lf\n",ii,cand_val->x,cand_val->y);
 		  }
 
 		//Add the offset for that subimage
-		if(iii != 0)
 		  {
 		    cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
 		    cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
@@ -383,25 +394,31 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 
 	    //and get the next list
 	    cand_val->next=thread_data_array[ii+1].cand_list;
+	    cand_val=cand_val->next;
 	  }
       }
+    
     /*and the same for the last segment (or a single segment in the unthreaded case, when
       the above loop is not executed)*/
 
-    cand_val=thread_data_array[NTHREAD-1].cand_list;
-
+    if(NTHREAD==1)
+      {
+	cand_val=thread_data_array[0].cand_list;
+	top_val=cand_val;
+      }
+    
     if(cand_val != NULL)  //Are there items in the list?
       {
+	
 	while(cand_val != NULL)
 	  {
-
 	    if(verbose==1)
 	      {
 		//printf("ZZ %lf %lf\n",cand_val->x,cand_val->y);
 	      }
 	    cand_val->x=cand_val->x+thread_data_array[NTHREAD-1].fpix0-1;
 	    cand_val->y=cand_val->y+thread_data_array[NTHREAD-1].fpix1-1;
-	    
+	    iii=iii+1;
 	    cand_val=cand_val->next;
 	    
 	  }
@@ -409,46 +426,45 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 
     //Now filter out points with badly failed fits (fqual > 5)
 
-    top_val=thread_data_array[0].cand_list;
     curr_val=top_val;
     curr_pre=top_val;
 
     while(curr_val != NULL)
-      {
-
-	if(curr_val->qual > 5)
-	  {
-
-	    //Delete First Node
-	    if(curr_val==top_val)
-	      {
-		top_val=top_val->next;
-		
-		curr_val=curr_val->next;
-		curr_pre=curr_pre->next;
-	      }
-	    //delete non first node
-	    else
-	      
-	      {
-		curr_pre->next=curr_val->next;
-		curr_val=curr_val->next;
-	      }
-
-	  }
-	else
-	  {
-	    curr_pre=curr_pre->next;
-	    curr_val=curr_val->next;
-	  }
-
-      }
+    {
+    
+    	if(curr_val->qual > 5)
+    	  {
+    
+    	    //Delete First Node
+    	    if(curr_val==top_val)
+    	      {
+    		top_val=top_val->next;
+    		
+    		curr_val=curr_val->next;
+    		curr_pre=curr_pre->next;
+    	      }
+    	    //delete non first node
+    	    else
+    	      
+    	      {
+    		curr_pre->next=curr_val->next;
+    		curr_val=curr_val->next;
+    	      }
+    
+    	  }
+    	else
+    	  {
+    	    curr_pre=curr_pre->next;
+    	    curr_val=curr_val->next;
+    	  }
+    
+    }
 
 
     //Now filter out duplicate points
 
     /*Reset to the beginning and set pointers. val and pre point to the same node at this point,
-      as there is no previous node*/
+      as there is no previous nosde*/
     
     //top_val=thread_data_array[0].cand_list;
     curr_val=top_val;
