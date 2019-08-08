@@ -83,11 +83,12 @@ class McsCmd(object):
             ('test_centroid', '', self.test_centroid),
             ('reconnect', '', self.reconnect),
             ('imageStats', '', self.imageStats),
-            ('quickPlot', '', self.quickPlot),
+            # ('quickPlot', '', self.quickPlot),
             ('timeTestFull','',self.timeTestFull),
             ('seeingTest','',self.seeingTest),
-            ('setCentroidParams','[<fwhmx>] [<fwhmy>] [<thresh1>] [<thresh2>] [<boxFind>] [<boxCent>] [<nmin>] [<nmax>] [<maxIt>  [<findRad>]', self.setCentroidParams),
-            ('calcThresh','[<threshMethod>]', '[<threshSigma>]', '[<threshFact>]',self.calcThresh),
+            ('setCentroidParams','[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<nmax>] [<maxIt>]',
+             self.setCentroidParams),
+            ('calcThresh','[<threshMethod>] [<threshSigma>] [<threshFact>]', self.calcThresh),
             ('getExpectedFibrePos','[<fieldID>]',self.getExpectedFibrePos),
             ('getInstParams','[<fieldID>]',self.getInstParams),
             ('simulate', '<path>', self.simulateOn),
@@ -110,11 +111,11 @@ class McsCmd(object):
                                         keys.Key("maxIt", types.Int(), help="maximum number of iterations for centroiding"),
                                         keys.Key("findSigma", types.Float(), help="threshhold for finding spots"),
                                         keys.Key("centSigma", types.Float(), help="threshhold for calculating moments of spots"),
-                                        keys.Key("matchRad", types.Int(), help="radius in pixels for matching positions").
-                                        keys.Key("threshMethod", types.Str(), help="method for thresholding"),
+                                        keys.Key("matchRad", types.Int(), help="radius in pixels for matching positions"),
+                                        keys.Key("threshMethod", types.String(), help="method for thresholding"),
                                         keys.Key("threshSigma", types.Float(), help="simga for sigma-clipped RMS of image"),
                                         keys.Key("threshFact", types.Float(), help="factor for thresholding"),
-                                        keys.Key("fieldID", types.Str(), help="fieldID for getting instrument parameters")
+                                        keys.Key("fieldID", types.String(), help="fieldID for getting instrument parameters")
                                         )
 
     @property
@@ -573,7 +574,7 @@ class McsCmd(object):
             threshSigma = cmd.cmd.keywords["threshSigma"].values[0]
         except:
             threshSigma = 4
-         try:
+        try:
             threshFact = cmd.cmd.keywords["threshFact"].values[0]
         except:
             threshFact = 2
@@ -695,21 +696,17 @@ class McsCmd(object):
         cmd.finish('text="created tables')
 
     def runFibreID(self,cmd, doFinish=True):
+        """ Run Fibre Identification on the last acquired centroids """
 
-    """ Run Fibre Identification on the last acquired centroids """
+        centroids = self.centroids
+        fibrePos = self.getExpectedFibrePositions(fieldID)
+        idCentroids = mcsTools.findHomes(centroids,fibrePos,matchRad)
 
-    centroids = self.centroids
+        self.centroids = idCentroids
 
-    fibrePos = self.getExpectedFibrePositions(fieldID):
+        if doFinish:
+            cmd.finish('exposureState=done')
 
-    idCentroids = mcsTools.findHomes(centroids,fibrePos,matchRad): 
-    
-    self.centroids = idCentroids
-    
-    if doFinish:
-        cmd.finish('exposureState=done')
-    
-        
     def runCentroid(self, cmd, doFinish=True):
         """ Measure centroids on the last acquired image. """
 
