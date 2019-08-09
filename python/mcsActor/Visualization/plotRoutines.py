@@ -30,7 +30,7 @@ def pairPlot(xs,    ys,    val1,val2,           plotrange,titl,      prefix, suf
        plots to png files, if inter=1 to screen
 
     """
-
+    plotrange = [np.min(val2),np.max(val2)]
 
     #set up plot
     fig,axes=plt.subplots(1,2)
@@ -60,7 +60,7 @@ def pairPlot(xs,    ys,    val1,val2,           plotrange,titl,      prefix, suf
     if(inter == 1):
         plt.show()
     plt.savefig(prefix+suffix+".png")
-
+    plt.close()
  
 def checkCentroids(xc,yc,cutrange,prefix,inter):
 
@@ -89,6 +89,7 @@ def checkCentroids(xc,yc,cutrange,prefix,inter):
     if(inter == 1):
         plt.show()
     plt.savefig(prefix+"_checkpoints.png")
+    plt.close()
 
 def checkMatched(xx,yy,xs,ys,prefix,inter):
 
