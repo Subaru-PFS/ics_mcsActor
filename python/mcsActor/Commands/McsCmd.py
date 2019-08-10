@@ -133,7 +133,7 @@ class McsCmd(object):
             raise RuntimeError(f"could not get db password from {pwpath}")
 
         try:
-            connString = "dbname='fps' user='pfs' host="+self.db+" password="+passstring
+            connString = "dbname='mcs_erun_201908' user='pfs' host="+self.db+" password="+passstring
             self.actor.logger.info(f'connecting to {connString}')
             conn = psycopg2.connect(connString)
             self._conn = conn
@@ -667,33 +667,6 @@ class McsCmd(object):
         if doFinish:
             cmd.finish('parameters=set')
 
-    def createTables(self, cmd):
-        """ Create SQL tables. """
-
-        cmdKeys = cmd.cmd.keywords
-        doDrop = 'drop' in cmdKeys
-        suffix = cmdKeys['suffix'].values[0] if 'suffix' in cmdKeys else ''
-
-        tables = dict()
-        tables['mcs'] = '''id SERIAL PRIMARY KEY,
-                                   datatime timestamp,
-                                   frameId integer,
-                                   moveId smallint,
-                                   fiberId smallint,
-                                   centroidX real, centroidY real,
-                                   fwhmX real, fwhmY real,
-                                   bgValue real, peakValue real'''
-
-        with self.conn as conn:
-            with conn.cursor() as curs:
-                for t in tables:
-                    tableName = f'{t}{suffix}'
-                    if doDrop:
-                        curs.execute(f'drop table if exists {tableName}')
-                    createCmd = f'create table {tableName} ({tables[t]});'
-                curs.execute(createCmd)
-
-        cmd.finish('text="created tables')
 
     def runFibreID(self,cmd, doFinish=True):
         """ Run Fibre Identification on the last acquired centroids """
@@ -892,7 +865,7 @@ class McsCmd(object):
         # Let the database handle the primary key
         with conn:
             with conn.cursor() as curs:
-                curs.execute("select * FROM mcs where false")
+                curs.execute("select * FROM 'mcsData' where false")
                 colnames = [desc[0] for desc in curs.description]
             realcolnames = colnames[1:]
 
@@ -930,7 +903,7 @@ class McsCmd(object):
         else:
             buf = io.StringIO()
 
-            cmd = f"""copy (select * from mcs where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
+            cmd = f"""copy (select * from 'mcsData' where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
             with conn.cursor() as curs:
                 curs.copy_expert(cmd, buf)
             conn.commit()
@@ -941,13 +914,6 @@ class McsCmd(object):
                                 delimiter=',',usecols=range(4,8))
         
         return arr
-
-    def _writeDBtable(self):
-        conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfspass'")
-        cur = conn.cursor()
-        cur.execute("select * from information_schema.tables where table_name=%s", ('test',))
-        print(bool(cur.rowcount))
-        conn.close()
 
     def timeTestFull(self,cmd):
 
