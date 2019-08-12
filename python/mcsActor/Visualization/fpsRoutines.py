@@ -5,8 +5,8 @@ import cv2
 import numpy.ma as ma
 import itertools
 from scipy import optimize
-sys.path.append("/Users/karr/Science/PFS/NewCode/Code/pfs_utils/python/pfs/utils/coordinates/")
-import CoordTransp
+#sys.path.append("/Users/karr/Science/PFS/NewCode/Code/pfs_utils/python/pfs/utils/coordinates/")
+from pfs.utils.coordinates import CoordTransp
 
 
 
