@@ -40,7 +40,7 @@ except:
     pass
 
 try:
-    import mcsActor.mcsRoutines as mcsTools
+    import mcsActor.Visualization.mcsRoutines as mcsTools
 except:
     pass
 
@@ -424,6 +424,8 @@ class McsCmd(object):
         cmdKeys = cmd.cmd.keywords
         doCentroid = 'doCentroid' in cmdKeys
         doFibreID = 'doFibreID' in cmdKeys
+
+        cmd.inform('text="doCentroid = %s." '%{doCentroid})
         expType = cmdKeys[0].name
         if 'visit' in cmdKeys:
             self.actor.exposureID = cmdKeys['visit'].values[0]
@@ -446,10 +448,20 @@ class McsCmd(object):
         #moved dump to DB here, after FibreID
 
         if doCentroid:
+            cmd.inform('text="Setting centroid parameters." ')
+            self.setCentroidParams(cmd, doFinish=True)
+
+            cmd.inform('text="Calculating threshold." ')
+            self.calcThresh(cmd, doFinish=True)
+            
+            cmd.inform('text="Running centroid on current image" ')
             self.runCentroid(cmd, doFinish=False)
 
-            if doFibreID:
-                self.runFibreID(cmd, doFinish=False)
+            cmd.inform('text="Sending centroid data to database" ')
+            self.dumpCentroidtoDB(cmd)
+        
+        if doFibreID:
+            self.runFibreID(cmd, doFinish=False)
             
             self.dumpCentroidtoDB(cmd)
         
@@ -550,51 +562,63 @@ class McsCmd(object):
 
 
         """
+        image = self.actor.image
 
-
-
-        #these variables need to be already set
-
-        try:
-            image = self.actor.image
-
-        except:
-            raise RuntimeError(f"no image taken")
-
-        try:
-            findSigma = self.findSigma
-            centSigma = self.centSigma
-        except:
-            raise RuntimeError(f"must run setCentroidParameters first")
-
-        threshMethod = cmd.cmd.keywords["threshMethod"].values[0]
+        self.findThresh,self.centThresh,xrange,yrange = mcsTools.getThresh(image,
+            'calib',4,2,self.findSigma,self.centSigma)
         
-        try:
-            threshSigma = cmd.cmd.keywords["threshSigma"].values[0]
-        except:
-            threshSigma = 4
-        try:
-            threshFact = cmd.cmd.keywords["threshFact"].values[0]
-        except:
-            threshFact = 2
+        cmd.inform('text="findThresh = %d, centThresh = %d." '%(self.findThresh,self.centThresh))    
+            #self.findThresh = 30
+        
+        #self.centThresh = 10
 
-        if(self.threshMethod == 'fieldID'):
-            try:
-                fibrePos = self.actor.fibrePos
-            except:
-                raise RuntimeError(f"expected fibre positions not set")
+        
+        # #these variables need to be already set
 
-            findThresh,centThresh = mcsTools.getThresh(image,threshMethod,threshSigma,threshFact,findSigma,centSigma,fibrePos=fibrePos)
-        elif(self.threshMethod == 'calib'):
-            self.findThresh,self.centThresh = mcsTools.getThresh(image,threshMethod,threshSigma,threshFact,findSigma,centSigma)
-        elif(self.threshMethod == 'direct'):
-            try:
-                self.findThresh = cmd.cmd.keywords["findThresh"].values[0]
-                self.centThresh = cmd.cmd.keywords["centThresh"].values[0]
-            except:
-                raise RuntimeError(f"No Thresholds Set")
-        else:
-            raise RuntimeError(f"Not a valid threshold method")
+        # try:
+        #     image = self.actor.image
+
+        # except:
+        #     raise RuntimeError(f"no image taken")
+
+        # try:
+        #     findSigma = self.findSigma
+        #     centSigma = self.centSigma
+        # except:
+        #     raise RuntimeError(f"must run setCentroidParameters first")
+        
+        # if method is None:
+        #     #cmd.cmd.keywords["threshMethod"].values[0] = 'calib'
+        #     #threshMethod = cmd.cmd.keywords["threshMethod"].values[0]
+        #     threshMethod = 'calib'
+        #     self.threshMethod = threshMethod
+        
+        # try:
+        #     threshSigma = cmd.cmd.keywords["threshSigma"].values[0]
+        # except:
+        #     threshSigma = 4
+        # try:
+        #     threshFact = cmd.cmd.keywords["threshFact"].values[0]
+        # except:
+        #     threshFact = 2
+
+        # if(self.threshMethod == 'fieldID'):
+        #     try:
+        #         fibrePos = self.actor.fibrePos
+        #     except:
+        #         raise RuntimeError(f"expected fibre positions not set")
+
+        #     findThresh,centThresh = mcsTools.getThresh(image,threshMethod,threshSigma,threshFact,findSigma,centSigma,fibrePos=fibrePos)
+        # elif(self.threshMethod == 'calib'):
+        #     self.findThresh,self.centThresh = mcsTools.getThresh(image,threshMethod,threshSigma,threshFact,findSigma,centSigma)
+        # elif(self.threshMethod == 'direct'):
+        #     try:
+        #         self.findThresh = cmd.cmd.keywords["findThresh"].values[0]
+        #         self.centThresh = cmd.cmd.keywords["centThresh"].values[0]
+        #     except:
+        #         raise RuntimeError(f"No Thresholds Set")
+        # else:
+        #     raise RuntimeError(f"Not a valid threshold method")
 
 
 
@@ -636,7 +660,7 @@ class McsCmd(object):
         try:
             self.findSigma = cmd.cmd.keywords["findSigma"].values[0]
         except:
-            self.findSigma = 60
+            self.findSigma = 35
             
         try:
             self.centSigma = cmd.cmd.keywords["centSigma"].values[0]
@@ -651,7 +675,7 @@ class McsCmd(object):
         try:
             self.nmax = cmd.cmd.keywords["nmax"].values[0]
         except:
-            self.nmax = 10
+            self.nmax = 90
             
         try:
             self.maxIt = cmd.cmd.keywords["maxIt"].values[0]
@@ -694,14 +718,21 @@ class McsCmd(object):
                                    self.fwhmx, self.fwhmy, self.findThresh, self.centThresh, self.boxFind, self.boxCent, 
                                    self.nmin, self.nmax, self.maxIt, 0)
         centroids=np.frombuffer(a,dtype='<f8')
-        npoint=len(centroids)//7
-        ##reshaped centroids
-        tCentroids=np.reshape(centroids,(npoint,7))
+        centroids=np.reshape(centroids,(len(centroids)//7,7))
+    
+        npoint=centroids.shape[0]
+    
+    
+        tCentroids = np.zeros((npoint,8))
+        tCentroids[:,1:]=centroids
+    
+        bg = np.copy(tCentroids[:,6])
+        peak = np.copy(tCentroids[:,5])
 
-        centroids = np.zeros((npoint,7))
-        centroids[:,1:]=centroids[:,0:6]
-
-        self.centroids=centroids
+        tCentroids[:,6] = peak
+        tCentroids[:,5] = bg
+        
+        self.centroids=tCentroids
             
         cmd.inform('text="%d centroids"'% (len(centroids)))
         cmd.inform('state="centroids measured"')
@@ -858,27 +889,33 @@ class McsCmd(object):
             
         # Save measurements to a CSV buffer
         measBuf = io.StringIO()
-        np.savetxt(measBuf, centArr, delimiter=',', fmt='%0.6g')
+        
+        np.savetxt(measBuf, centArr[:,1:7], delimiter=',', fmt='%0.6g')
         measBuf.seek(0,0)
 
         # Let the database handle the primary key
         with conn:
             with conn.cursor() as curs:
-                curs.execute("select * FROM 'mcsData' where false")
+                curs.execute('select * FROM "mcsData" where false')
                 colnames = [desc[0] for desc in curs.description]
             realcolnames = colnames[1:]
-
+        
+        colname = []
+        for i in realcolnames:
+            x='"'+i+'"'
+            colname.append(x)
+        
         buf = io.StringIO()
         for l_i in range(len(centArr)):
             line = '%s,%d,%d,%d,%s' % (now.strftime("%Y-%m-%d %H:%M:%S"), 
-                                       frameId, moveId, l_i, measBuf.readline())
+                                       frameId, moveId, l_i+1, measBuf.readline())
             buf.write(line)
         buf.seek(0,0)
             
         with conn:
             with conn.cursor() as curs:
-                curs.copy_from(buf,'mcs',',',
-                               columns=realcolnames)
+                curs.copy_from(buf,'"mcsData"',',',
+                               columns=colname)
 
         buf.seek(0,0)
         
