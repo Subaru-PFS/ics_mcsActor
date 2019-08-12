@@ -78,7 +78,6 @@ class McsCmd(object):
             ('expose', '@object <expTime> [<visit>] [@doCentroid] [@doFibreID]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             ('runFibreID', '[@newTable]', self.runFibreID),
-            ('createTables', '[@drop]', self.createTables),
             ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
             ('test_centroid', '', self.test_centroid),
             ('reconnect', '', self.reconnect),
