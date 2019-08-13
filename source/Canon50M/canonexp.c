@@ -34,6 +34,28 @@
 #define S_CLOSE  0
 #define S_OPEN   1
 
+/* 
+    This value defines the ratio for detecting the shifted frames.  If we see very high
+	standard deviation in first 100 pixels, that means these pixels are inserted into 
+	the frames.  This cause frame shift in X direction.
+*/ 
+#define BADRATIO 6
+
+float getStddev(float data[])
+{
+    float sum = 0.0, mean, standardDeviation = 0.0;
+    int i;
+    for(i=0; i<10; ++i)
+    {
+        sum += data[i];
+    }
+    mean = sum/10;
+    for(i=0; i<10; ++i)
+        standardDeviation += pow(data[i] - mean, 2);
+    return sqrt(standardDeviation/10);
+}
+
+
 int setShutterStatus(int status)
 {
 	int i, outputData;
@@ -73,7 +95,7 @@ int OpenShutterTime(void* time)
 	return(0);
 }
 
-int WriteFitsImage(char *filename, int height, int width, u_char * image_p)
+int WriteFitsImage(char *filename, int height, int width, u_char * image_p, int exptime)
 {
     fitsfile *fptr;       /* pointer to the FITS file, defined in fitsio.h */
     int status, ii;
@@ -142,7 +164,7 @@ int WriteFitsImage(char *filename, int height, int width, u_char * image_p)
 
     /* write another optional keyword to the header */
     /* Note that the ADDRESS of the value is passed in the routine */
-    exposure = 1500.;
+    exposure = exptime;
     fits_update_key(fptr, TLONG, "EXPOSURE", &exposure,
          "Total Exposure Time", &status);
     if (status != 0) {
@@ -225,6 +247,9 @@ int main(int argc, char *argv[]){
 
 	u_char **bufs;
     u_char *image_p=NULL;
+
+	float  *stddev_img = NULL;
+	float  *stddev_sec = NULL;
 
 	u_char *coaddframe=NULL;
 	float  nloops = 0;
@@ -385,6 +410,11 @@ int main(int argc, char *argv[]){
 	//pdv_start_image(pdv_p);
 	
 	bufs = (u_char **)malloc(loops * sizeof(u_char *));
+
+	// Allocated the array for standard deviation check.
+	stddev_img = (float *)malloc(100 * sizeof(float));
+	stddev_sec = (float *)malloc(100 * sizeof(float));
+
     for (i=0; i<loops; i++){
 		if ((bufs[i] = edt_alloc(imagesize)) == NULL){
 	    	printf("buffer allocation FAILED (probably too many images specified)\n");
@@ -400,6 +430,22 @@ int main(int argc, char *argv[]){
 	pdv_start_images(pdv_p, loops);
     for (i=0; i<loops; i++){
 		image_p = pdv_wait_image(pdv_p);
+		
+		/*   Try to detecting the image shifting by calculating the stand deviation of 
+		 *    the fisrt 100 pixel. 
+		 */
+		for (ii=0; ii<200; ii+=2){
+			stddev_img[ii/2] = image_p[ii] | (image_p[ii+1] << 8);
+			stddev_sec[ii/2] = image_p[200+ii] | (image_p[200+ii+1] << 8);
+		}
+
+		if (getStddev(stddev_img)/getStddev(stddev_sec) > BADRATIO ){
+			fprintf(stderr, "Error: (%s:%s:%d) Image shift detected. "
+				"Re-issue exposure command.\n", __FILE__, __func__, __LINE__);
+			return EXIT_FAILURE;
+		}
+
+
 		memcpy(bufs[i], image_p, imagesize);
     }
 
@@ -439,7 +485,7 @@ int main(int argc, char *argv[]){
 			}
 		}
 
-		WriteFitsImage(string, s_height, s_width, coaddframe);
+		WriteFitsImage(string, s_height, s_width, coaddframe, exptime);
 	} else {
 
 		i=0;
@@ -449,7 +495,7 @@ int main(int argc, char *argv[]){
 			sprintf(string,"%s%04i%s",file,i+1,".fits");
 
 			/*process and/or display image previously acquired here*/
-			WriteFitsImage(string, s_height, s_width,bufs[i]);
+			WriteFitsImage(string, s_height, s_width,bufs[i], 800);
 
 			if (verbose){
 				save_ts=getClockTime();;
@@ -466,6 +512,8 @@ int main(int argc, char *argv[]){
 	/* Free imaeg blocks */
 	free(coaddframe);
 	free(bufs);
+	free(stddev_img);
+	free(stddev_sec);
 	pdv_close(pdv_p);
 
 
