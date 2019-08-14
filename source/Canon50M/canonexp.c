@@ -428,6 +428,7 @@ int main(int argc, char *argv[]){
 
 	(void) edt_dtime();		/* init time for check */
 	pdv_start_images(pdv_p, loops);
+
     for (i=0; i<loops; i++){
 		image_p = pdv_wait_image(pdv_p);
 		
@@ -435,27 +436,28 @@ int main(int argc, char *argv[]){
 		 *    the fisrt 100 pixel. 
 		 */
 		for (ii=0; ii<200; ii+=2){
-			stddev_img[ii/2] = image_p[ii] | (image_p[ii+1] << 8);
-			stddev_sec[ii/2] = image_p[200+ii] | (image_p[200+ii+1] << 8);
+			stddev_sec[ii/2] = image_p[ii] | (image_p[ii+1] << 8);
+			stddev_img[ii/2] = image_p[200+ii] | (image_p[200+ii+1] << 8);
 		}
 
-		if (getStddev(stddev_img)/getStddev(stddev_sec) > BADRATIO ){
-			fprintf(stderr, "Error: (%s:%s:%d) Image shift detected. "
+		if (getStddev(stddev_sec)/getStddev(stddev_img) > BADRATIO ){
+			fprintf(stderr, "Warning: (%s:%s:%d) Image shift detected. "
 				"Re-issue exposure command.\n", __FILE__, __func__, __LINE__);
-			return EXIT_FAILURE;
-		}
-
+			image_p = pdv_wait_image(pdv_p);
+		} 
 
 		memcpy(bufs[i], image_p, imagesize);
     }
 
-    fp = fopen( "/tmp/cameradump.raw" , "w" );
-    if (fp == NULL) {
-      fprintf(stderr, "could not save raw image\n");
-    } else {
-      fwrite(bufs[0] , 1 , sizeof(bufs[0]) , fp );
-      fclose(fp);
-    }
+    // fp = fopen( "/tmp/cameradump.raw" , "w" );
+    // if (fp == NULL) {
+    //   fprintf(stderr, "could not save raw image\n");
+    // } else {
+    //   fwrite(bufs[0] , 1 , sizeof(bufs[0]) , fp );
+    //   fclose(fp);
+    // }
+
+	//pdv_free(image_p);
 
     dtime = edt_dtime();
     printf("Image reading finished with %f frames/sec\n",(double) (loops) / dtime);
@@ -510,12 +512,12 @@ int main(int argc, char *argv[]){
 
 
 	/* Free imaeg blocks */
+	//pdv_free(image_p);
 	free(coaddframe);
 	free(bufs);
 	free(stddev_img);
 	free(stddev_sec);
 	pdv_close(pdv_p);
-
 
 	printf("Exposure sequence is done\n");
 	return EXIT_SUCCESS;

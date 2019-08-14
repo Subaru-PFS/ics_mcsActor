@@ -62,8 +62,11 @@ class McsCmd(object):
         self.exposureID = None
         self._conn = None
 
+        self.findThresh = None
+        self.centThresh =  None
+
         self.db='db-ics'
-        self.setCentroidParams(None, doFinish=False)
+        self.setCentroidParams(None)
         
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -82,6 +85,7 @@ class McsCmd(object):
             ('test_centroid', '', self.test_centroid),
             ('reconnect', '', self.reconnect),
             ('imageStats', '', self.imageStats),
+            ('resetThreshold','',self.resetThreshold),
             # ('quickPlot', '', self.quickPlot),
             ('timeTestFull','',self.timeTestFull),
             ('seeingTest','',self.seeingTest),
@@ -417,7 +421,12 @@ class McsCmd(object):
         cmd.inform('filename="%s"' % (filename))
 
         return filename, image
-           
+    
+    def resetThreshold(self,cmd):
+        self.findThresh = None
+        self.centThresh =  None
+        cmd.finish('Centroid threshold=d=reset')
+       
     def expose(self, cmd):
         """ Take an exposure. Optionally centroids. Optionally FibreID """
 
@@ -449,14 +458,20 @@ class McsCmd(object):
 
         if doCentroid:
             cmd.inform('text="Setting centroid parameters." ')
-            self.setCentroidParams(cmd, doFinish=True)
+            self.setCentroidParams(cmd)
+   
+            #self.calcThresh(cmd)
+            if self.findThresh is None:
+                cmd.inform('text="Calculating threshold." ')
+                self.calcThresh(cmd)
 
-            cmd.inform('text="Calculating threshold." ')
-            self.calcThresh(cmd, doFinish=True)
-            
             cmd.inform('text="Running centroid on current image" ')
-            self.runCentroid(cmd, doFinish=False)
-
+            self.runCentroid(cmd)
+            
+            if (self.nCentroid < 2000):
+                self.calcThresh(cmd)
+                self.runCentroid(cmd)       
+            
             cmd.inform('text="Sending centroid data to database" ')
             self.dumpCentroidtoDB(cmd)
         
@@ -552,7 +567,7 @@ class McsCmd(object):
 
         cmd.inform('state="finished"')
 
-    def calcThresh(self, cmd, doFinish=True):
+    def calcThresh(self, cmd):
 
         """  Calculate thresholds for finding/centroiding from image 
 
@@ -624,7 +639,7 @@ class McsCmd(object):
 
 
         
-    def setCentroidParams(self, cmd, doFinish=True):
+    def setCentroidParams(self, cmd):
 
         """
 
@@ -687,9 +702,6 @@ class McsCmd(object):
         except:
             self.matchRad = 20
 
-        if doFinish:
-            cmd.finish('parameters=set')
-
 
     def runFibreID(self,cmd, doFinish=True):
         """ Run Fibre Identification on the last acquired centroids """
@@ -703,7 +715,7 @@ class McsCmd(object):
         if doFinish:
             cmd.finish('exposureState=done')
 
-    def runCentroid(self, cmd, doFinish=True):
+    def runCentroid(self, cmd):
         """ Measure centroids on the last acquired image. """
 
         cmdKeys = cmd.cmd.keywords
@@ -733,14 +745,10 @@ class McsCmd(object):
         tCentroids[:,5] = bg
         
         self.centroids=tCentroids
-            
+        self.nCentroid = len(centroids)    
         cmd.inform('text="%d centroids"'% (len(centroids)))
         cmd.inform('state="centroids measured"')
                         
-
-        if doFinish:
-            cmd.finish('exposureState=done')
-        
     def test_centroid(self, cmd):
 
         

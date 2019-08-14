@@ -30,117 +30,107 @@ struct thread_data thread_data_array[NTHREAD];
 /* Quick routine to print the results for a particular mpfit - label, number of iterations
    and the final value of the parameters. for debugging only */
 
-void* subimage_Thread(void *arg)
+void* subimage_Thread(void *arg){
 
-{
+	//do the find algorithm on a subimage
 
-  //do the find algorithm on a subimage
+	long i,j,ii,jj;// counters
+	/*set the variables for the routine from the structure (threaded part)*/
 
-  long i,j,ii,jj;// counters
-  /*set the variables for the routine from the structure (threaded part)*/
+	int n_x=((struct thread_data*)arg)->n_x;         //x dimension of image
+	int n_y=((struct thread_data*)arg)->n_y;         //x dimension of image
+	int *image=malloc(n_x*n_y*sizeof(int));          //image
 
-  int n_x=((struct thread_data*)arg)->n_x;         //x dimension of image
-  int n_y=((struct thread_data*)arg)->n_y;         //x dimension of image
-  int *image=malloc(n_x*n_y*sizeof(int));          //image
+	int *imagemask;
 
-  int *imagemask;
+	imagemask = calloc(n_x*n_y,sizeof(int));
+	//printf("a  n_x = %d\n",n_x);
+	//printf("a  n_y = %d\n",n_y);
 
-  imagemask = calloc(n_x*n_y,sizeof(int));
-  //printf("a  n_x = %d\n",n_x);
-  //printf("a  n_y = %d\n",n_y);
+	int npoint=0;  //number of points found (debugging only)
+	int ismax;     //is the point a max?
 
-  int npoint=0;  //number of points found (debugging only)
-  int ismax;     //is the point a max?
- 
-  //list to contain the guesses
+	//list to contain the guesses
 
-//struct cand_point *cand_head = NULL;
-  struct cand_point *cand_curr;
- 
-  image=((struct thread_data*)arg)->image;            
+	//struct cand_point *cand_head = NULL;
+	struct cand_point *cand_curr;
 
-  int fpix0=((struct thread_data*)arg)->fpix0;    //first and last pixels
-  int fpix1=((struct thread_data*)arg)->fpix1;   
+	image=((struct thread_data*)arg)->image;            
 
-  int thresh1=((struct thread_data*)arg)->thresh1;          //data threshold
-  double fwhmx=((struct thread_data*)arg)->fwhmx;          //fwhm
-  int boxFind=((struct thread_data*)arg)->boxFind;      //box size for mpfit
-  int nmin=((struct thread_data*)arg)->nmin;          //data threshold
-  int thresh2=((struct thread_data*)arg)->thresh2;          //data threshold
-  double fwhmy=((struct thread_data*)arg)->fwhmy;          //fwhm
-  int boxCent=((struct thread_data*)arg)->boxCent;      //box size for mpfit
-  int nmax=((struct thread_data*)arg)->nmax;          //data threshold
-  int maxIt=((struct thread_data*)arg)->maxIt;          //data threshold
+	int fpix0=((struct thread_data*)arg)->fpix0;    //first and last pixels
+	int fpix1=((struct thread_data*)arg)->fpix1;   
 
-  struct cand_point *cand_head=((struct thread_data*)arg)->cand_list;  //output list of found points
-  int verbose=((struct thread_data*)arg)->verbose;
+	int thresh1=((struct thread_data*)arg)->thresh1;          //data threshold
+	double fwhmx=((struct thread_data*)arg)->fwhmx;          //fwhm
+	int boxFind=((struct thread_data*)arg)->boxFind;      //box size for mpfit
+	int nmin=((struct thread_data*)arg)->nmin;          //data threshold
+	int thresh2=((struct thread_data*)arg)->thresh2;          //data threshold
+	double fwhmy=((struct thread_data*)arg)->fwhmy;          //fwhm
+	int boxCent=((struct thread_data*)arg)->boxCent;      //box size for mpfit
+	int nmax=((struct thread_data*)arg)->nmax;          //data threshold
+	int maxIt=((struct thread_data*)arg)->maxIt;          //data threshold
 
-  int boxsize;
-  struct cand_point *cand_list;
+	struct cand_point *cand_head=((struct thread_data*)arg)->cand_list;  //output list of found points
+	int verbose=((struct thread_data*)arg)->verbose;
+
+	int boxsize;
+	struct cand_point *cand_list;
   
-  if(verbose == 1)
-    {
-      printf("In Thread\n"); 
-      printf("Starting Processing\n"); 
-    }
-  /*---------------------------------------------------------------*/
-
-  if(verbose == 1)
-  
-    {
-    printf("Finding Points\n"); 
+	if(verbose == 1){
+		printf("In Thread\n"); 
+		printf("Starting Processing\n"); 
+	}
+  	/*---------------------------------------------------------------*/
+	if(verbose == 1){
+    	printf("Finding Points\n"); 
     }
 
   
-  int np;
+  	int np;
   //printf("%d %d %d %d %d %d %d\n",thresh1,thresh2,n_x,n_y,boxFind,nmin,nmax);
 
-  cand_list=getRegions(image,thresh1,thresh2,boxFind,n_x,n_y,nmin,nmax,imagemask,&np,verbose);
+  	cand_list=getRegions(image,thresh1,thresh2,boxFind,n_x,n_y,nmin,nmax,imagemask,&np,verbose);
 
-  /* get the automatic paramters if desired */
-  if((fwhmx==0) || (fwhmy==0))
-    {
+  	/* get the automatic paramters if desired */
+	if((fwhmx==0) || (fwhmy==0)){
       //printf("G %d %d %d %d %d %d %d\n",thresh1,thresh2,n_x,n_y,boxFind,nmin,nmax);
 
-      getParams(cand_list,&fwhmx,&fwhmy);
-    }
+    	getParams(cand_list,&fwhmx,&fwhmy);
+	}
 
   //printf("XX %lf %lf\n",fwhmx,fwhmy);
   
   /*---------------------------------------------------------------*/
   
-  if(verbose == 1)
-    {
-      printf("Found %i points\n",np); 
-      printf("Starting Centroiding \n"); 
-    }
+	if(verbose == 1){
+    	printf("Found %i points\n",np); 
+    	printf("Starting Centroiding \n"); 
+	}
 
-  /*---------------------------------------------------------------*/
+	/*---------------------------------------------------------------*/
 
-  /*Now cycle through the guesses. first do round/sharp checks a la daofind,
-    if the point passes, then do the centroiding and add it to the list*/
+	/*Now cycle through the guesses. first do round/sharp checks a la daofind,
+	if the point passes, then do the centroiding and add it to the list*/
 
-  
 
-  /*cycle through the possible detections. idl/fortran codes in
-  original daofind uses lots of goto replaced with if statements*/
-  
-  cand_curr=cand_list;
-  double *centroidVal;
 
-  int iii=0;
-  while(cand_curr!=NULL)
-  {
-    //get the center points of the possible detection, and its value
-    centroidVal=windowedPos(image,cand_curr->x,cand_curr->y, boxCent,fwhmx,fwhmy,maxIt,n_x,n_y,verbose);
-    cand_curr->x=centroidVal[0];
-    cand_curr->y=centroidVal[1];
-    cand_curr=cand_curr->next;
+	/*cycle through the possible detections. idl/fortran codes in
+	original daofind uses lots of goto replaced with if statements*/
 
-    iii=iii+1;
-   	  //-----------------------------------------------------------//
-	  
-  } 
+	cand_curr=cand_list;
+	double *centroidVal;
+
+	int iii=0;
+	while(cand_curr!=NULL){
+		//get the center points of the possible detection, and its value
+		centroidVal=windowedPos(image,cand_curr->x,cand_curr->y, boxCent,fwhmx,fwhmy,maxIt,n_x,n_y,verbose);
+		cand_curr->x=centroidVal[0];
+		cand_curr->y=centroidVal[1];
+		cand_curr=cand_curr->next;
+
+		iii=iii+1;
+			//-----------------------------------------------------------//	
+	} 
 
   if(verbose == 1)
     {
@@ -153,6 +143,7 @@ void* subimage_Thread(void *arg)
 
   //free memory
   free(image);
+  free(imagemask);
 
   //exit the thread properly
   pthread_exit(0);
@@ -230,81 +221,73 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
   //Cycle through the subimages and set up the threading variables
   int ind, ind1, ind2;
   //Split the image in X and Y directions
-  for (ii=0;ii<XSPLIT;ii++)
-    {
-      for (jj=0;jj<YSPLIT;jj++)
-	{
+	for (ii=0;ii<XSPLIT;ii++){
+		for (jj=0;jj<YSPLIT;jj++){
 
-	  ind=ii+XSPLIT*jj;
-	  
-	  cand_list[ind]=NULL;      //Initialize list of candidate points
+			ind=ii+XSPLIT*jj;
 
-	  /*Calculate boundaries of subimages. Different cases for subrejions on the edge of the image,
-	    or interior, to properly calculate the overlaps. */
+			cand_list[ind]=NULL;      //Initialize list of candidate points
 
-	  //Edge of the whole image at -X side 
-	  if(ii==0)
-	    {
-	      fpix0=1;
-	    }
-	  //Split between interior split on -X side
-	  else
-	    {
-	      fpix0=ii*n_x/XSPLIT+1-boxsize*5;
-	    }
-	  //Edge of the whole image at +X side 
-	  if(ii==XSPLIT-1)
-	    {
-	      lpix0=n_x-1;
-	    }
-	  //Split between interior split on +X side
-	  else
-	    {
-	      lpix0=(ii+1)*n_x/XSPLIT+boxsize*5;
-	    }
-	  //Edge of the whole image at -Y side 
-	  if(jj==0)
-	    {
-	      fpix1=1;
+			/*Calculate boundaries of subimages. Different cases for subrejions on the edge of the image,
+			or interior, to properly calculate the overlaps. */
 
-	    }
-	  //Split between interior split on -Y side
-	  else
-	    {
-	      fpix1=jj*n_y/YSPLIT+1-boxsize*5;
+			//Edge of the whole image at -X side 
+			if(ii==0){
+				fpix0=1;
+			}
+			//Split between interior split on -X side
+			else{
+				fpix0=ii*n_x/XSPLIT+1-boxsize*5;
+			}
+			//Edge of the whole image at +X side 
+			if(ii==XSPLIT-1){
+				lpix0=n_x-1;
+			}
+			//Split between interior split on +X side
+			else{
+				lpix0=(ii+1)*n_x/XSPLIT+boxsize*5;
+			}
+			//Edge of the whole image at -Y side 
+			if(jj==0){
+				fpix1=1;
+			}
+			//Split between interior split on -Y side
+			else
+			{
+				fpix1=jj*n_y/YSPLIT+1-boxsize*5;
 
-	    }
-	  //Edge of the whole image at +Y side 
-	  if(jj==YSPLIT-1)
-	    {
-	      lpix1=n_y-1;
-	    }
-	  //Split between interior split on +Y side
-	  else
-	    {
-	      lpix1=(jj+1)*n_y/YSPLIT+boxsize*5;
-	    }
+			}
+			//Edge of the whole image at +Y side 
+			if(jj==YSPLIT-1)
+			{
+				lpix1=n_y-1;
+			}
+			//Split between interior split on +Y side
+			else
+			{
+				lpix1=(jj+1)*n_y/YSPLIT+boxsize*5;
+			}
 
-	  //Calculate size of subimage 
-	  nx=lpix0-fpix0+1;
-	  ny=lpix1-fpix1+1;
+			//Calculate size of subimage 
+			nx=lpix0-fpix0+1;
+			ny=lpix1-fpix1+1;
 
-	  //Set the dimentions and image size for that thread
-	  thread_data_array[ind].n_x=nx;
-	  thread_data_array[ind].n_y=ny;
-	  thread_data_array[ind].image=malloc(nx*ny*sizeof(int));
-	  
-	  //Assign the image data 
-	  for(i=0;i<ny;i++)
-	    {
-	      for(j=0;j<nx;j++)
+			//Set the dimentions and image size for that thread
+			thread_data_array[ind].n_x=nx;
+			thread_data_array[ind].n_y=ny;
+			thread_data_array[ind].image=malloc(nx*ny*sizeof(int));
+
+		//Assign the image data 
+	for(i=0;i<ny;i++)
 		{
-		  ind1=i*nx+j;
-		  //!! something is going wrong here, in the second index - fixed!
-		  ind2=(i+fpix1-1)*n_x+(j+fpix0-1);
-		  thread_data_array[ind].image[ind1]=image[ind2];
+			for(j=0;j<nx;j++)
+		{
+			ind1=i*nx+j;
+			//!! something is going wrong here, in the second index - fixed!
+			ind2=(i+fpix1-1)*n_x+(j+fpix0-1);
+			thread_data_array[ind].image[ind1]=image[ind2];
 		}
-	    }
+		}
 
 
 	  
@@ -645,6 +628,16 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 
 
   return output;
+
+/* free allocated memory chunk */
+for (ii=0;ii<XSPLIT;ii++){
+	for (jj=0;jj<YSPLIT;jj++){
+
+		ind=ii+XSPLIT*jj;
+		free(thread_data_array[ind].image);
+	}
+}
+
 
 }
 
