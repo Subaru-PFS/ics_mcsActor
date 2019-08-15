@@ -507,7 +507,7 @@ int main(int argc, char *argv[]){
 		edt_free(bufs[i]);
 	}
 
-	pdv_free(image_p);
+	//pdv_free(image_p);
 	free(coaddframe);
 	free(bufs);
 	free(stddev_img);
