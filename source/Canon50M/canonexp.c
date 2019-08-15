@@ -449,15 +449,6 @@ int main(int argc, char *argv[]){
 		memcpy(bufs[i], image_p, imagesize);
     }
 
-    // fp = fopen( "/tmp/cameradump.raw" , "w" );
-    // if (fp == NULL) {
-    //   fprintf(stderr, "could not save raw image\n");
-    // } else {
-    //   fwrite(bufs[0] , 1 , sizeof(bufs[0]) , fp );
-    //   fclose(fp);
-    // }
-
-	//pdv_free(image_p);
 
     dtime = edt_dtime();
     printf("Image reading finished with %f frames/sec\n",(double) (loops) / dtime);
