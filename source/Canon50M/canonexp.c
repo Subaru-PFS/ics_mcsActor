@@ -423,7 +423,7 @@ int main(int argc, char *argv[]){
     }
 	
     if (exptime > 0){
-    		ret=pthread_create(&id,NULL,(void *) OpenShutterTime, (void *)&exptime);
+    	ret=pthread_create(&id,NULL,(void *) OpenShutterTime, (void *)&exptime);
     }
 
 	(void) edt_dtime();		/* init time for check */
@@ -503,7 +503,11 @@ int main(int argc, char *argv[]){
 
 
 	/* Free imaeg blocks */
-	//pdv_free(image_p);
+	for (i=0; i<loops; i++){
+		edt_free(bufs[i]);
+	}
+
+	pdv_free(image_p);
 	free(coaddframe);
 	free(bufs);
 	free(stddev_img);

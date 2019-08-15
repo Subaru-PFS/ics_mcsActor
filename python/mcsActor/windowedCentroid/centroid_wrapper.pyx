@@ -6,6 +6,7 @@ import astropy.io.fits as pyfits
 import numpy as np
 cimport numpy as np
 import ctypes
+from libc.stdlib cimport free
 
 cdef extern from "centroid_types.h" nogil:
         struct centroids:
@@ -61,5 +62,8 @@ def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhmx, double 
     #and into a numpy record array
     
     result=np.frombuffer(cp[:sizeof(centroids) * npoint[0]],dtype=[('x','<f8'),('y','<f8'),('fx','<f8'),('fy','<f8'),('back','<f8'),('peak','<f8'),('qual','<f8')])
+
+    result = np.copy(result)
+    free(vals)
 
     return result
