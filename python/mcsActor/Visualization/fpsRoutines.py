@@ -6,7 +6,7 @@ import numpy.ma as ma
 import itertools
 from scipy import optimize
 #sys.path.append("/Users/karr/Science/PFS/NewCode/Code/pfs_utils/python/pfs/utils/coordinates/")
-import pfs.utils.coordinates.CoordTransp
+from pfs.utils.coordinates import CoordTransp
 
 
 
