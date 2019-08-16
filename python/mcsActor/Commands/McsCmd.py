@@ -233,7 +233,7 @@ class McsCmd(object):
 
             self.actor.exposureID = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
 
-        path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d'))
+        path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d', time.gmtime()))
         path = os.path.expandvars(os.path.expanduser(path))
         if not os.path.isdir(path):
             os.makedirs(path, 0o755)
