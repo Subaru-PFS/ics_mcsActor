@@ -185,6 +185,9 @@ def loadInstParams(config):
     if(config=='oct18'):
         rotCent=[4691.5,3095.7]
         offset=[0,-85]
+    if(config=='aug19'):
+        rotCent=[4470, 2873]
+        offset=[0,-85]
         
     return rotCent,offset
 
