@@ -123,7 +123,7 @@ class mcsCamera(Camera):
             try:	
                 shutil.copy(coaddpath, filename)
             except Exception as e:
-                cmd.warn(f'text="failed to copy coadd {coaddpath} to {filename}: {e}"')
+                cmd.warn('text="failed to copy coadd {coaddpath} to {filename}: {e}"')
                 
         f = pyfits.open(coaddpath)
         

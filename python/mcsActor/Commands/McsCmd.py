@@ -104,6 +104,8 @@ class McsCmd(object):
                                         keys.Key("getArc", types.Int(), help="flag for arc image"),
                                         keys.Key("fwhmx", types.Float(), help="X fwhm for centroid routine"),
                                         keys.Key("fwhmy", types.Float(), help="Y fwhm for centroid routine"),
+                                        keys.Key("findSigma", types.Float(), "RMS of threshold for finding spots"),
+                                        keys.Key("centSigma", types.Float(), help="RMS of threshold for calculating moments"),
                                         keys.Key("boxFind", types.Int(), help="box size for finding spots"),
                                         keys.Key("boxCent", types.Int(), help="box size for centroiding spots"),
                                         keys.Key("nmin", types.Int(), help="minimum number of points for spot"),
@@ -466,7 +468,7 @@ class McsCmd(object):
 
         ##the routine called here needs to be written for DB query
 
-        ###put code in her!!!!!!!
+        ###put code in here!!!!!!!
 
     def getInstParams(self):
 
@@ -597,10 +599,6 @@ class McsCmd(object):
         else:
             raise RuntimeError(f"Not a valid threshold method")
 
-
-
-
-        
     def setCentroidParams(self, cmd, doFinish=True):
 
         """
@@ -637,7 +635,7 @@ class McsCmd(object):
         try:
             self.findSigma = cmd.cmd.keywords["findSigma"].values[0]
         except:
-            self.findSigma = 60
+            self.findSigma = 50
             
         try:
             self.centSigma = cmd.cmd.keywords["centSigma"].values[0]
@@ -1012,26 +1010,3 @@ class McsCmd(object):
 
         cmd.finish('exposureState=done')
 
-    def calcRotationCentre(self,cmd):
-
-        ###RETRIEVE A SET OF CENTROIDS HERE
-
-        xCorner=[]
-        yCorner=[]
-
-        for i in range(nSets):
-            ind=np.where(centroids[:,0]==i)
-            x=centroids[ind,1].ravel()
-            y=centroids[ind,2].ravel()
-
-            x0,x1,y0,y1=mcsTools.getCorners(x,y)
-            xCorner.append(x0)
-            yCorner.append(y0)
-
-        xCorner=np.array(xCorner)
-        yCorner=np.array(yCorner)
-
-        coords=[xCorner,yCorner]
-        xc,yc,r,_=mcsTools.least_squares_circle(xCorner,yCorner)
-
-        return xc,yc
