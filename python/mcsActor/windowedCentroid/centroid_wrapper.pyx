@@ -6,6 +6,7 @@ import astropy.io.fits as pyfits
 import numpy as np
 cimport numpy as np
 import ctypes
+from libc.stdlib cimport free
 
 cdef extern from "centroid_types.h" nogil:
         struct centroids:

@@ -6,16 +6,15 @@
 #include <string.h>
 #include <time.h>
 #include <pthread.h> 
-#include "mpfit.h"
 #include "centroid_types.h"
 #include "fitsio.h"
 #include "centroid.h"
 
 //Definitions for parallizing the code (NTHREAD=# of cores)
 
-#define XSPLIT  1 //# of subregions in X direction
-#define YSPLIT  1 //# of subregions in Y direction
-#define NTHREAD 1  //# of cores
+#define XSPLIT  2//# of subregions in X direction
+#define YSPLIT  2//# of subregions in Y direction
+#define NTHREAD 4 //# of cores
 
 //toggle screen output for debugging/testing 
 
@@ -31,7 +30,6 @@ struct thread_data thread_data_array[NTHREAD];
    and the final value of the parameters. for debugging only */
 
 void* subimage_Thread(void *arg)
-
 {
 
   //do the find algorithm on a subimage
@@ -152,7 +150,8 @@ void* subimage_Thread(void *arg)
   ((struct thread_data*)arg)->cand_list=cand_list;
 
   //free memory
-  free(image);
+  //free(image);
+  free(imagemask);
 
   //exit the thread properly
   pthread_exit(0);
@@ -290,6 +289,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	  ny=lpix1-fpix1+1;
 
 	  //Set the dimentions and image size for that thread
+
 	  thread_data_array[ind].n_x=nx;
 	  thread_data_array[ind].n_y=ny;
 	  thread_data_array[ind].image=malloc(nx*ny*sizeof(int));
@@ -348,18 +348,36 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
     int inloop=0;
     cand_val=NULL;
     iii=0;
-	     
-    
+
     for(ii=0;ii<NTHREAD-1;ii++)
       {
+
+	int skipit=0;
+	if(ii > 0 & inloop ==1)
+	  {
+	    if(thread_data_array[ii].cand_list == NULL)
+	      {
+		skipit=1;
+	      }
+	    else
+	      {
+		//and get the next list
+		cand_val->next=thread_data_array[ii].cand_list;
+		cand_val=cand_val->next;
+	      }
+	  }
+
 
 	if(inloop==0)
 	  {
 	    cand_val=thread_data_array[ii].cand_list;
 	  }
+
+	
 	
 	if(cand_val != NULL)  //check for empty list
 	  {
+
 
 	    //mark the start of the list (incase first part is null)
 	    if (inloop==0)
@@ -369,7 +387,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	      }
 	     
 
-
+	      {
 	    while(cand_val->next != NULL)
 	      {
 
@@ -391,38 +409,49 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	    //And the last point in the list
 	    cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
 	    cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
-
-	    //and get the next list
-	    cand_val->next=thread_data_array[ii+1].cand_list;
-	    cand_val=cand_val->next;
-	  }
+	      }
+	    }
       }
     
     /*and the same for the last segment (or a single segment in the unthreaded case, when
       the above loop is not executed)*/
 
+    
     if(NTHREAD==1)
       {
 	cand_val=thread_data_array[0].cand_list;
 	top_val=cand_val;
       }
-    
+
+
     if(cand_val != NULL)  //Are there items in the list?
       {
-	
-	while(cand_val != NULL)
+
+	//and get the next list
+
+	if(NTHREAD > 1)
 	  {
-	    if(verbose==1)
-	      {
-		//printf("ZZ %lf %lf\n",cand_val->x,cand_val->y);
-	      }
-	    cand_val->x=cand_val->x+thread_data_array[NTHREAD-1].fpix0-1;
-	    cand_val->y=cand_val->y+thread_data_array[NTHREAD-1].fpix1-1;
-	    iii=iii+1;
+	    cand_val->next=thread_data_array[ii].cand_list;
 	    cand_val=cand_val->next;
+
+
+	    while(cand_val->next != NULL)
+	      {
+		if(verbose==1)
+		  {
+		    //printf("ZZ %lf %lf\n",cand_val->x,cand_val->y);
+		  }
+		cand_val->x=cand_val->x+thread_data_array[NTHREAD-1].fpix0-1;
+		cand_val->y=cand_val->y+thread_data_array[NTHREAD-1].fpix1-1;
+		iii=iii+1;
+		cand_val=cand_val->next;
 	    
+	      }
 	  }
+
       }
+    cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
+    cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
 
     //Now filter out points with badly failed fits (fqual > 5)
 
@@ -460,7 +489,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
     
     }
 
-
+	  
     //Now filter out duplicate points
 
     /*Reset to the beginning and set pointers. val and pre point to the same node at this point,
@@ -643,7 +672,16 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 
   np[0]=ii;
 
+  for (ii=0;ii<XSPLIT;ii++)
+    {
+      for (jj=0;jj<YSPLIT;jj++)
+	{
 
+	ind=ii+XSPLIT*jj;
+	free(thread_data_array[ind].image);
+	}
+    }
+      
   return output;
 
 }

@@ -4,7 +4,6 @@
 #include <string.h>
 #include <time.h>
 #include <pthread.h> 
-#include "mpfit.h"
 #include "fitsio.h"
 #include "centroid.h"
 #include "centroid_types.h"

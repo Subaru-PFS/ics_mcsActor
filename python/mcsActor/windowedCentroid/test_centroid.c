@@ -10,7 +10,6 @@
 #include <string.h>
 #include "centroid_types.h"
 #include "centroid.h"
-#include "mpfit.h"
 #include "fitsio.h"
 #include "fitswrappers.h"
 
