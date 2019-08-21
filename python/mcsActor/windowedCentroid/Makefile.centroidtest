@@ -8,7 +8,7 @@ CFLAGS = -Wall -fPIC
 default: $(TARGET)
 all: default
 
-SOURCES = centroid_tidy.c centroid_routines.c mpfit.c test_centroid.c fitswrappers.c
+SOURCES = centroid_win.c newCentroid.c mpfit.c test_centroid.c fitswrappers.c
 OBJECTS = $(SOURCES:.c=.o)
 HEADERS = $(wildcard *.h)
 

@@ -7,7 +7,7 @@ int maxValI(int val1,int val2);
 double maxValD(double val1,double val2);
 
 
-struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int xsize,int ysize,int nmin,int nmax,int *mask,int *npoints,int verbose);
+struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int boxsize1,int xsize,int ysize,int nmin,int nmax,int *mask,int *npoints,int verbose);
 
 int getInd2D(int i,int j,int size);
 

@@ -48,7 +48,7 @@ def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhmx, double 
         
     """ 
 
-    cdef centroids *val
+    cdef centroids *vals
     cdef char *cp
     cdef int npoint[1]
 

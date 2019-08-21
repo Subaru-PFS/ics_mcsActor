@@ -4,7 +4,6 @@
 #include <string.h>
 #include <time.h>
 #include <pthread.h> 
-#include "mpfit.h"
 #include "fitsio.h"
 #include "centroid.h"
 #include "centroid_types.h"
@@ -69,7 +68,7 @@ double maxValD(double val1,double val2)
     }
 }
     
-struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int xsize,int ysize,int nmin,int nmax,int *mask,int *npoints, int verbose)
+struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int boxsize1,int xsize,int ysize,int nmin,int nmax,int *mask,int *npoints, int verbose)
 {
 
   /* when passed an image, finds regions above the threshold. The
@@ -103,7 +102,7 @@ struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int
   long i,j,ii,jj,ip,jp;
   long bx,by,tt,bx2,by2,xb,yb,bxy,peak;
   int pixInd;
-  double npt;
+  double npt,xval,yval;
   struct cand_point *cand_head = NULL;
   struct cand_point *cand_curr;
 
@@ -181,16 +180,18 @@ struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int
 		      
 		    }
 		}
-	     
+
+	      xval=((double)bx/(double)tt)+i;
+	      yval=((double)by/(double)tt)+j;
 	      //now that we have a region, check its size to filter out hot pixels etc.
-	      if((npt >= nmin) && (npt <= nmax))
+	      if((npt >= nmin) && (npt <= nmax) && ((xval-boxsize1) > 0) && ((yval-boxsize1) > 0) && ((xval + boxsize1) < xsize) &&  ((yval + boxsize1) < ysize))
 		{
 
 		  //assign to the structure
 		  cand_curr=(struct cand_point*)malloc(sizeof(struct cand_point));
 
-		  cand_curr->x=((double)bx/(double)tt)+i;
-		  cand_curr->y=((double)by/(double)tt)+j;
+		  cand_curr->x=xval;
+		  cand_curr->y=yval;
 		  cand_curr->x2=((double)bx2/(double)tt-((double)bx/(double)tt)*((double)bx/(double)tt));
 		  cand_curr->y2=((double)by2/(double)tt-((double)by/(double)tt)*((double)by/(double)tt));
 		  cand_curr->xy=(double)bxy/(double)(tt)-((double)bx/(double)tt)*((double)by/(double)tt);
