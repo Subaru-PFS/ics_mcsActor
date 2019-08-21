@@ -7,7 +7,10 @@ import itertools
 from scipy import optimize
 #sys.path.append("/Users/karr/Science/PFS/NewCode/Code/pfs_utils/python/pfs/utils/coordinates/")
 from pfs.utils.coordinates import CoordTransp
-
+#sys.path.append("/Users/karr/Science/PFS/NewCode/Code/pfs_utils/python/pfs/utils/coordinates/")
+#import CoordTransp
+#import DistortionCoefficients
+from astropy.io import fits
 
 
 def getFieldDefinition(fieldID):
@@ -24,7 +27,7 @@ def getFieldDefinition(fieldID):
 
     return fiducials,scienceFibres
 
-def getInstConfig():
+def getInstConfig(fname):
 
     """
 
@@ -33,6 +36,12 @@ def getInstConfig():
     """
 
     ###PUT CODE HERE!!!
+
+
+    hdu=fits.open(fname)
+    hdr = hdu[0].header
+    za=90-hdr['Altitude']
+    inr=hdr['inr-str']
 
     return za,inr
 
