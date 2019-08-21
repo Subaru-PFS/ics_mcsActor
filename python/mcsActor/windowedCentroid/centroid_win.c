@@ -13,8 +13,8 @@
 //Definitions for parallizing the code (NTHREAD=# of cores)
 
 #define XSPLIT  3//# of subregions in X direction
-#define YSPLIT  3//# of subregions in Y direction
-#define NTHREAD 9 //# of cores
+#define YSPLIT  4//# of subregions in Y direction
+#define NTHREAD 12 //# of cores
 
 //toggle screen output for debugging/testing 
 
