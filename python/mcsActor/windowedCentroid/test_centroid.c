@@ -370,7 +370,8 @@ int main(int argc, char **argv)
   fwhm=3.;
   verbose=0;
   boxsize=9;
-  outval=centroid(image,n_x,n_y,threshold,fwhm,boxsize,&np,verbose,fittype);
+  //outval=centroid(image,n_x,n_y,threshold,fwhm,boxsize,&np,verbose,fittype);
+  outval=centroid(image,n_x,n_y,2200,1200,10,6,10,90,20,0);
 
 
   printf("  Testing fittype=0\n");
@@ -402,7 +403,8 @@ int main(int argc, char **argv)
   verbose=0;
   boxsize=9;
   image=read_fits_int(datafile,&n_x,&n_y);
-  outval=centroid(image,n_x,n_y,threshold,fwhm,boxsize,&np,verbose,fittype);
+  //outval=centroid(image,n_x,n_y,threshold,fwhm,boxsize,&np,verbose,fittype);
+  outval=centroid(image,n_x,n_y,2200,1200,10,6,10,90,20,0);
 
 
   printf("  Testing fittype=1\n");
@@ -435,7 +437,8 @@ int main(int argc, char **argv)
   verbose=0;
   boxsize=9;
   image=read_fits_int(datafile,&n_x,&n_y);
-  outval=centroid(image,n_x,n_y,threshold,fwhm,boxsize,&np,verbose,fittype);
+  //outval=centroid(image,n_x,n_y,threshold,fwhm,boxsize,&np,verbose,fittype);
+  outval=centroid(image,n_x,n_y,2200,1200,10,6,10,90,20,0);
 
 
   printf("  Testing fittype=1\n");
