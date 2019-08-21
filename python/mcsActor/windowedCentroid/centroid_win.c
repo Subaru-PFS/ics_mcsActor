@@ -672,7 +672,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
    
 
   output=malloc(sizeof(centroids)*ii);
-  printf("%d\n",sizeof(struct cand_point));
   curr_val=top_val;
   for(i=0; i<ii;i++)
     {

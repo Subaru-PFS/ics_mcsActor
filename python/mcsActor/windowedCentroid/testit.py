@@ -7,8 +7,7 @@ image=getdata('/Users/karr/Science/PFS/Firsts/PFSC00366600.fits')
 
 
 os.system('date')
-for i in range(500):
-    print("n=",i)
+for i in range(50):
     a=centroid_only(np.ascontiguousarray(image.astype('<i4')[2000:6000,2500:7000]),0,0,2200,1200,10,6,10,90,20,0)
     #a=centroid_only(image.astype('<i4'),0,0,2200,1200,10,6,10,90,20,0)
     centroids=np.frombuffer(a,dtype='<f8')
@@ -25,4 +24,4 @@ print(centroids.shape)
 #ax.scatter(centroids[:,0],centroids[:,1])
 #fig.show()
 #plt.savefig("cent.png")
-input()
+
