@@ -14,7 +14,7 @@
 
 #define XSPLIT  3//# of subregions in X direction
 #define YSPLIT  4//# of subregions in Y direction
-#define NTHREAD 12 //# of cores
+#define NTHREAD 12//# of cores
 
 //toggle screen output for debugging/testing 
 
@@ -146,6 +146,7 @@ void* subimage_Thread(void *arg)
   while(cand_curr!=NULL)
   {
     //get the center points of the possible detection, and its value
+  
     centroidVal=windowedPos(image,cand_curr->x,cand_curr->y, boxCent,fwhmx,fwhmy,maxIt,n_x,n_y,verbose);
     cand_curr->x=centroidVal[0];
     cand_curr->y=centroidVal[1];
@@ -360,7 +361,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
       image. */
 
     //First go through the lists and link up each segment. 
-    int iii;
+    int iii,jjj;
     int inloop=0;
     cand_val=NULL;
     iii=0;
@@ -368,6 +369,8 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
     for(ii=0;ii<NTHREAD-1;ii++)
       {
 
+	iii=0;
+	jjj=0;
 	int skipit=0;
 	if(ii > 0 & inloop ==1)
 	  {
@@ -389,11 +392,10 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	    cand_val=thread_data_array[ii].cand_list;
 	  }
 
-	
-	
+	if(skipit==0)
+	  {
 	if(cand_val != NULL)  //check for empty list
 	  {
-
 
 	    //mark the start of the list (incase first part is null)
 	    if (inloop==0)
@@ -402,8 +404,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 		inloop=1;
 	      }
 	     
-
-	      {
+	      
 	    while(cand_val->next != NULL)
 	      {
 
@@ -413,22 +414,50 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 		  }
 
 		//Add the offset for that subimage
-		  {
-		    cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
-		    cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
-		  }       
+
+
+		cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
+		cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
+
 
 		cand_val=cand_val->next;
 		iii=iii+1;
 
 	      }
 	    //And the last point in the list
+	
+	    printf("DD %d %d %lf %lf %d\n",ii,iii,cand_val->x,cand_val->y,thread_data_array[ii].fpix1-1);
+
 	    cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
 	    cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
+		
+	    jjj=1;
+	    if(fabs((cand_val->x-(int)cand_val->x) - 0.642373) < 0.00001)
+	      {
+		printf("LL %d %d %lf %lf %d %d\n",iii,jjj,cand_val->x,cand_val->y,thread_data_array[ii].fpix0-1,thread_data_array[ii].fpix1-1);
+		
 	      }
-	    }
+	    if(fabs((cand_val->x-(int)cand_val->x) - 0.848779) < 0.00001)
+	      {
+		printf("MM %d %d %lf %lf %d %d\n",iii,jjj,cand_val->x,cand_val->y,thread_data_array[ii].fpix0-1,thread_data_array[ii].fpix1-1);
+		
+	      }
+
+	    
+	      if(iii==1)
+	      {
+	      	cand_val->x=cand_val->x-thread_data_array[ii].fpix0-1;
+	      	cand_val->y=cand_val->y-thread_data_array[ii].fpix1-1;
+	      }
+	      
+	if(iii==1)
+	  {
+	    printf("here\n");
+	  }
+	printf("JJ %d\n",iii);
+	  }
+	  }
       }
-    
     /*and the same for the last segment (or a single segment in the unthreaded case, when
       the above loop is not executed)*/
 
@@ -449,8 +478,9 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	  {
 	    cand_val->next=thread_data_array[ii].cand_list;
 	    cand_val=cand_val->next;
-
-
+	    
+	    
+	    
 	    while(cand_val->next != NULL)
 	      {
 		if(verbose==1)
@@ -461,7 +491,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 		cand_val->y=cand_val->y+thread_data_array[NTHREAD-1].fpix1-1;
 		iii=iii+1;
 		cand_val=cand_val->next;
-	    
 	      }
 	  }
 
@@ -476,7 +505,12 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 
     while(curr_val != NULL)
     {
-    
+
+      if((curr_val->y < 1000) | (curr_val->x < 1000))
+      {
+	printf("!!! %lf %lf \n",curr_val->x,curr_val->y);
+      }
+
     	if(curr_val->qual > 5)
     	  {
     
