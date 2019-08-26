@@ -311,6 +311,7 @@ double *windowedPos(int *image,double x, double y,int boxsize,double fwhmx, doub
 
     //finally, assign the results and pass back. 
     double *result=malloc(sizeof(double)*3);
+
     result[0]=xwin1;
     result[1]=ywin1;
     result[2]=nIt;

@@ -6,10 +6,87 @@ import numpy.ma as ma
 import itertools
 from scipy import optimize
 #sys.path.append("/Users/karr/Science/PFS/NewCode/Code/pfs_utils/python/pfs/utils/coordinates/")
-from pfs.utils.coordinates import CoordTransp
+#from pfs.utils.coordinates import CoordTransp
+sys.path.append("/Users/karr/Science/PFS/NewCode/Code/pfs_utils/python/pfs/utils/coordinates/")
+import CoordTransp
+import DistortionCoefficients
+from astropy.io import fits
+
+try:
+    import mcsActor.Visualization.visRoutines as vis
+except:
+    import visRoutines as vis
 
 
+def applyAffineFPS(coord,trans):
+ 
+    xf,yf=vis.transformPointsNew(coord[:,1],coord[:,2],trans['xTrans'],trans['yTrans'],trans['angle'],trans['xScale'],trans['yScale'])
+    
+    return np.array([coord[:,0],xf,yf]).T
 
+def getAffine(x1,x2,y1,y2):
+
+    """
+
+    Calculate and remove an affine transformation between two sets of
+    matched points.
+
+    input:
+
+    x1,y1: coordinates of first set of data (the one that will be transformed)
+    x2,y2: coordinates of second set of data (the reference set)
+
+    returns:
+
+    xf,yf transformed points
+    trans transformation matrix used, stored in a dictionary
+
+    """
+
+    transform,xd,yd,sx,sy,rotation=vis.getTransform(x1,x2,y1,y2,1)
+
+    trans={}
+    trans['xTrans']=xd
+    trans['yTrans']=yd
+    trans['xScale']=sx
+    trans['yScale']=sy
+    trans['angle']=rotation
+    
+    return trans
+    
+
+def removeAffine(x1,y1,x2,y2):
+
+    """
+
+    Calculate and remove an affine transformation between two sets of
+    matched points.
+
+    input:
+
+    x1,y1: coordinates of first set of data (the one that will be transformed)
+    x2,y2: coordinates of second set of data (the reference set)
+
+    returns:
+
+    xf,yf transformed points
+    trans transformation matrix used, stored in a dictionary
+
+    """
+
+    transform,xd,yd,sx,sy,rotation=vis.getTransform(x1,x2,y1,y2,1)
+
+    trans={}
+    trans['xTrans']=xd
+    trans['yTrans']=yd
+    trans['xScale']=sx
+    trans['yScale']=sy
+    trans['angle']=rotation
+    
+    xf,yf=vis.transformPointsNew(x1,y1,xd,yd,rotation,sx,sy)
+
+    return xf,yf,trans
+    
 def getFieldDefinition(fieldID):
 
     """
@@ -24,7 +101,7 @@ def getFieldDefinition(fieldID):
 
     return fiducials,scienceFibres
 
-def getInstConfig():
+def getInstConfig(fname):
 
     """
 
@@ -34,10 +111,54 @@ def getInstConfig():
 
     ###PUT CODE HERE!!!
 
+
+    hdu=fits.open(fname)
+    hdr = hdu[0].header
+    za=90-hdr['Altitude']
+    inr=hdr['inr-str']
+
     return za,inr
 
 
 def getFibrePos(fiducials,scienceFibres,za,inr,rotCent,offset):
+
+    """
+    
+    Convert a set of fiducials and science fibres (in mask coordinates)
+    into expected pixel positons on the image. 
+
+
+    """
+
+    #rotation adjustment
+    inr=inr-180
+    if(inr < 0):
+        inr=inr+360
+        
+    #concatenate - MCS doesn't care which is fiducial and which is science
+
+    xx=np.array([np.concatenate([fiducials[:,1],scienceFibres[:,1]])]).ravel()
+    yy=np.array([np.concatenate([fiducials[:,2],scienceFibres[:,2]])]).ravel()
+
+    #now offset to centre of rotation
+    #xx-=offset[0]
+    #yy-=offset[1]
+
+    #correect input format
+    #xyin=np.array([xx,yy])
+
+    xyinFid=np.array([fiducials[:,1]-offset[0],fiducials[:,2]-offset[1]])
+    xyinSci=np.array([scienceFibres[:,1]-offset[0],scienceFibres[:,2]-offset[1]])
+ 
+    #call the routine
+    xyoutFid=CoordTransp.CoordinateTransform(xyinFid,za,'pfi_mcs_wofe',inr=inr,cent=rotCent)
+    xyoutSci=CoordTransp.CoordinateTransform(xyinSci,za,'pfi_mcs_wofe',inr=inr,cent=rotCent)
+
+    #reassemble into the right format and return
+    
+    return np.array([fiducials[:,0],xyoutFid[0,:],xyoutFid[1,:]]).T,np.array([scienceFibres[:,0],xyoutSci[0,:],xyoutSci[1,:]]).T
+
+def getAllFibrePos(fiducials,scienceFibres,za,inr,rotCent,offset):
 
     """
     
