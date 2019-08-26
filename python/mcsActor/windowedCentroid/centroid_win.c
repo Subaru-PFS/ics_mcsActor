@@ -426,35 +426,20 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	      }
 	    //And the last point in the list
 	
-	    printf("DD %d %d %lf %lf %d\n",ii,iii,cand_val->x,cand_val->y,thread_data_array[ii].fpix1-1);
+	    //printf("DD %d %d %lf %lf %d\n",ii,iii,cand_val->x,cand_val->y,thread_data_array[ii].fpix1-1);
 
 	    cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
 	    cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
 		
 	    jjj=1;
-	    if(fabs((cand_val->x-(int)cand_val->x) - 0.642373) < 0.00001)
-	      {
-		printf("LL %d %d %lf %lf %d %d\n",iii,jjj,cand_val->x,cand_val->y,thread_data_array[ii].fpix0-1,thread_data_array[ii].fpix1-1);
-		
-	      }
-	    if(fabs((cand_val->x-(int)cand_val->x) - 0.848779) < 0.00001)
-	      {
-		printf("MM %d %d %lf %lf %d %d\n",iii,jjj,cand_val->x,cand_val->y,thread_data_array[ii].fpix0-1,thread_data_array[ii].fpix1-1);
-		
-	      }
-
 	    
 	      if(iii==1)
 	      {
 	      	cand_val->x=cand_val->x-thread_data_array[ii].fpix0-1;
 	      	cand_val->y=cand_val->y-thread_data_array[ii].fpix1-1;
 	      }
-	      
-	if(iii==1)
-	  {
-	    printf("here\n");
-	  }
-	printf("JJ %d\n",iii);
+	  
+	//printf("JJ %d\n",iii);
 	  }
 	  }
       }
@@ -468,35 +453,41 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	top_val=cand_val;
       }
 
+    if(thread_data_array[ii].cand_list != NULL)
+    {
+      if(cand_val != NULL)  //Are there items in the list?
+	{
 
-    if(cand_val != NULL)  //Are there items in the list?
-      {
 
-	//and get the next list
+	  if(NTHREAD > 1)
+	    {
 
-	if(NTHREAD > 1)
-	  {
-	    cand_val->next=thread_data_array[ii].cand_list;
-	    cand_val=cand_val->next;
+	      cand_val->next=thread_data_array[ii].cand_list;
+	      cand_val=cand_val->next;
+	     
+	      iii=0;
+
+	      while(cand_val->next != NULL)
+		{
+		  if(verbose==1)
+		    {
+		      //printf("ZZ %lf %lf\n",cand_val->x,cand_val->y);
+		    }
+		  
+		  cand_val->x=cand_val->x+thread_data_array[NTHREAD-1].fpix0-1;
+		  cand_val->y=cand_val->y+thread_data_array[NTHREAD-1].fpix1-1;
+		  iii=iii+1;
+		  cand_val=cand_val->next;
+		}
+	    }
+	}
+    
 	    
-	    
-	    
-	    while(cand_val->next != NULL)
-	      {
-		if(verbose==1)
-		  {
-		    //printf("ZZ %lf %lf\n",cand_val->x,cand_val->y);
-		  }
-		cand_val->x=cand_val->x+thread_data_array[NTHREAD-1].fpix0-1;
-		cand_val->y=cand_val->y+thread_data_array[NTHREAD-1].fpix1-1;
-		iii=iii+1;
-		cand_val=cand_val->next;
-	      }
-	  }
 
-      }
+    
     cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
     cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
+    }
 
     //Now filter out points with badly failed fits (fqual > 5)
 
@@ -506,10 +497,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
     while(curr_val != NULL)
     {
 
-      if((curr_val->y < 1000) | (curr_val->x < 1000))
-      {
-	printf("!!! %lf %lf \n",curr_val->x,curr_val->y);
-      }
 
     	if(curr_val->qual > 5)
     	  {

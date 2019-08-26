@@ -311,11 +311,6 @@ double *windowedPos(int *image,double x, double y,int boxsize,double fwhmx, doub
 
     //finally, assign the results and pass back. 
     double *result=malloc(sizeof(double)*3);
-    if(fabs((xwin1-(int)xwin1) - 0.642373) < 0.00001)
-	{
-	  printf("AA %lf %lf %lf %lf %d %d\n",xwin1,ywin1,x,y,xsize,ysize);
-
-	}
 
     result[0]=xwin1;
     result[1]=ywin1;
