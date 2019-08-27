@@ -477,8 +477,19 @@ class McsCmd(object):
         
         if doFibreID:
             self.runFibreID(cmd, doFinish=False)
-            
             self.dumpCentroidtoDB(cmd)
+
+        # Populating telescope informaiton to databse
+        gen2Model = self.actor.models['gen2'].keyVarDict
+
+        axes = gen2Model['tel_axes'].getValue()
+        az, alt = axes
+        cmd.inform(f'text="az={az} alt={alt}"')
+
+        rot = gen2Model['tel_rot'].getValue()
+        posAngle, instrot = rot
+        cmd.inform(f'text="posAngle={posAngle} instrot={instrot}"')
+
         
         cmd.finish('exposureState=done')
 
@@ -583,58 +594,7 @@ class McsCmd(object):
             'calib',4,2,self.findSigma,self.centSigma)
         
         cmd.inform('text="findThresh = %d, centThresh = %d." '%(self.findThresh,self.centThresh))    
-            #self.findThresh = 30
-        
-        #self.centThresh = 10
-
-        
-        # #these variables need to be already set
-
-        # try:
-        #     image = self.actor.image
-
-        # except:
-        #     raise RuntimeError(f"no image taken")
-
-        # try:
-        #     findSigma = self.findSigma
-        #     centSigma = self.centSigma
-        # except:
-        #     raise RuntimeError(f"must run setCentroidParameters first")
-        
-        # if method is None:
-        #     #cmd.cmd.keywords["threshMethod"].values[0] = 'calib'
-        #     #threshMethod = cmd.cmd.keywords["threshMethod"].values[0]
-        #     threshMethod = 'calib'
-        #     self.threshMethod = threshMethod
-        
-        # try:
-        #     threshSigma = cmd.cmd.keywords["threshSigma"].values[0]
-        # except:
-        #     threshSigma = 4
-        # try:
-        #     threshFact = cmd.cmd.keywords["threshFact"].values[0]
-        # except:
-        #     threshFact = 2
-
-        # if(self.threshMethod == 'fieldID'):
-        #     try:
-        #         fibrePos = self.actor.fibrePos
-        #     except:
-        #         raise RuntimeError(f"expected fibre positions not set")
-
-        #     findThresh,centThresh = mcsTools.getThresh(image,threshMethod,threshSigma,threshFact,findSigma,centSigma,fibrePos=fibrePos)
-        # elif(self.threshMethod == 'calib'):
-        #     self.findThresh,self.centThresh = mcsTools.getThresh(image,threshMethod,threshSigma,threshFact,findSigma,centSigma)
-        # elif(self.threshMethod == 'direct'):
-        #     try:
-        #         self.findThresh = cmd.cmd.keywords["findThresh"].values[0]
-        #         self.centThresh = cmd.cmd.keywords["centThresh"].values[0]
-        #     except:
-        #         raise RuntimeError(f"No Thresholds Set")
-        # else:
-        #     raise RuntimeError(f"Not a valid threshold method")
-
+ 
 
 
 
