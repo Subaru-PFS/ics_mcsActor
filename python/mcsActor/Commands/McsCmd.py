@@ -59,7 +59,6 @@ class McsCmd(object):
         self.expTime = 1000
         self.newTable = None
         self.simulationPath = None
-        self.exposureID = None
         self._conn = None
 
         self.findThresh = None
@@ -76,9 +75,9 @@ class McsCmd(object):
         self.vocab = [
             ('ping', '', self.ping),
             ('status', '', self.status),
-            ('expose', '@(bias|test) [<visit>]', self.expose),
-            ('expose', '@(dark|flat) <expTime> [<visit>]', self.expose),
-            ('expose', '@object <expTime> [<visit>] [@doCentroid] [@doFibreID]', self.expose),
+            ('expose', '@(bias|test) [<frameId>]', self.expose),
+            ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
+            ('expose', '@object <expTime> [<frameId>] [@doCentroid] [@doFibreID]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             ('runFibreID', '[@newTable]', self.runFibreID),
             ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
@@ -102,7 +101,7 @@ class McsCmd(object):
         self.keys = keys.KeysDictionary("mcs_mcs", (1, 1),
                                         keys.Key("expTime", types.Float(), help="The exposure time, seconds"),
                                         keys.Key("expType", types.String(), help="The exposure type"),
-                                        keys.Key("visit", types.Int(), help="exposure visit"),
+                                        keys.Key("frameId", types.Int(), help="exposure frameID"),
                                         keys.Key("path", types.String(), help="Simulated image directory"),
                                         keys.Key("getArc", types.Int(), help="flag for arc image"),
                                         keys.Key("fwhmx", types.Float(), help="X fwhm for centroid routine"),
@@ -203,13 +202,13 @@ class McsCmd(object):
         cmd.debug('text="returning simulation file %s"' % (imagePath))
         return image
 
-    def requestNextFilename(self, cmd):
+    def requestNextFilename(self, cmd, frameId):
         """ Return a queue which will eventually contain a filename. """
 
         q = queue.Queue()
 
         def worker(q=q, cmd=cmd):
-            filename = self.getNextFilename(cmd)
+            filename = self.getNextFilename(cmd, frameId)
             q.put(filename)
             q.task_done()
 
@@ -219,29 +218,30 @@ class McsCmd(object):
 
         return q
 
-    def getNextFilename(self, cmd):
+    def getNextFilename(self, cmd, frameId):
         """ Fetch next image filename. 
 
         In real life, we will instantiate a Subaru-compliant image pathname generating object.  
 
         """
 
-        if self.exposureID is None:
+        if frameId is None:
             ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit', timeLim=10.0)
             if ret.didFail:
                 raise RuntimeError("getNextFilename failed getting a visit number in 10s!")
 
-            self.actor.exposureID = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
+            visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
+            frameId = visit * 100
 
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d', time.gmtime()))
         path = os.path.expandvars(os.path.expanduser(path))
         if not os.path.isdir(path):
             os.makedirs(path, 0o755)
-            
-        newpath = os.path.join(path, 'PFSC%06d00.fits' % (self.actor.exposureID))
+
+        newpath = os.path.join(path, 'PFSC%08d.fits' % (frameId))
 
         return newpath
-    
+
     def _getInstHeader(self, cmd):
         """ Gather FITS cards from all actors we are interested in. """
 
@@ -371,7 +371,7 @@ class McsCmd(object):
 
         return hdr
 
-    def _doExpose(self, cmd, expTime, expType):
+    def _doExpose(self, cmd, expTime, expType, frameId):
         """ Take an exposure and save it to disk. """
 
         nameQ = self.requestNextFilename(cmd)
@@ -436,10 +436,10 @@ class McsCmd(object):
 
         cmd.inform('text="doCentroid = %s." '%{doCentroid})
         expType = cmdKeys[0].name
-        if 'visit' in cmdKeys:
-            self.actor.exposureID = cmdKeys['visit'].values[0]
+        if 'frameId' in cmdKeys:
+            frameId = cmdKeys['frameId'].values[0]
         else:
-            self.actor.exposureID = None
+            frameId = None
 
         if expType in ('bias', 'test'):
             expTime = self.expTime
@@ -451,7 +451,7 @@ class McsCmd(object):
  
         cmd.diag('text="Exposure time now is %d ms." '% (expTime))    
  
-        filename, image = self._doExpose(cmd, expTime, expType)
+        filename, image = self._doExpose(cmd, expTime, expType, frameId)
         self.actor.image = image
 
         #moved dump to DB here, after FibreID
