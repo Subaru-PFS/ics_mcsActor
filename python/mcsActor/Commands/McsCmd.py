@@ -443,6 +443,7 @@ class McsCmd(object):
  
         filename, image = self._doExpose(cmd, expTime, expType, frameId)
         if frameId is None:
+            filename = pathlib.Path(filename)
             frameId = int(filename.stem[4:], base=10)
         self.actor.image = image
 
