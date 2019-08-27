@@ -322,7 +322,7 @@ class McsCmd(object):
 
         return hdr
 
-    def dumpCentroidtoDB(self, cmd):
+    def dumpCentroidtoDB(self, cmd, frameId):
         """Connect to database and return json string to an attribute."""
         
         conn = self.conn
@@ -336,10 +336,9 @@ class McsCmd(object):
             #self._makeTables(conn, doDrop=False)
             cmd.inform('text="Attaching centroid to exsiting table. "')
         
-        frameID=self.actor.exposureID
-        buf = self._writeCentroids(self.centroids,1,frameID,1,conn)
+        buf = self._writeCentroids(self.centroids,1,frameId,1,conn)
 
-        cmd.inform('text="Centroids of exposure ID %06d00 dummped. "'%(frameID))
+        cmd.inform('text="Centroids of exposure ID %08d dumped."' % (frameId))
 
     def _makeImageHeader(self, cmd):
         """ Create a complete WCS header.
@@ -374,7 +373,7 @@ class McsCmd(object):
     def _doExpose(self, cmd, expTime, expType, frameId):
         """ Take an exposure and save it to disk. """
 
-        nameQ = self.requestNextFilename(cmd)
+        nameQ = self.requestNextFilename(cmd, frameId)
         cmd.diag(f'text="new exposure"')
         if self.simulationPath is None:
             filename = 'scratchFile'
@@ -452,6 +451,8 @@ class McsCmd(object):
         cmd.diag('text="Exposure time now is %d ms." '% (expTime))    
  
         filename, image = self._doExpose(cmd, expTime, expType, frameId)
+        if frameId is None:
+            frameId = int(filename.stem[4:], base=10)
         self.actor.image = image
 
         #moved dump to DB here, after FibreID
@@ -473,11 +474,11 @@ class McsCmd(object):
                 self.runCentroid(cmd)       
             
             cmd.inform('text="Sending centroid data to database" ')
-            self.dumpCentroidtoDB(cmd)
+            self.dumpCentroidtoDB(cmd, frameId)
         
         if doFibreID:
             self.runFibreID(cmd, doFinish=False)
-            self.dumpCentroidtoDB(cmd)
+            self.dumpCentroidtoDB(cmd, frameId)
 
         # Populating telescope informaiton to databse
         gen2Model = self.actor.models['gen2'].keyVarDict
@@ -494,9 +495,9 @@ class McsCmd(object):
         now.strftime("%Y-%m-%d %H:%M:%S")
 
         # Packing information into data structure
-        telescopeInfo = {'frameid': self.actor.exposureID, 
-                         'starttime' : now.strftime("%Y-%m-%d %H:%M:%S"),
-                         'exptime':  expTime,
+        telescopeInfo = {'frameid': frameId,
+                         'starttime': now.strftime("%Y-%m-%d %H:%M:%S"),
+                         'exptime': expTime,
                          'altitude': alt,
                          'azimuth': az,
                          'instrot': instrot}
@@ -878,9 +879,10 @@ class McsCmd(object):
         buf = io.StringIO()
 
         
-        line = '%d,%s,%d,%d,%s,%d' % (telescopeInfo['frameid']*100,telescopeInfo['starttime'],
-                                telescopeInfo['exptime']/1000.0,telescopeInfo['altitude'],telescopeInfo['azimuth'],
-                                telescopeInfo['instrot'])
+        line = '%d,%s,%d,%d,%s,%d' % (telescopeInfo['frameid'],telescopeInfo['starttime'],
+                                      telescopeInfo['exptime']/1000.0,
+                                      telescopeInfo['altitude'],telescopeInfo['azimuth'],
+                                      telescopeInfo['instrot'])
         
         buf.write(line)
         buf.seek(0,0)
@@ -892,7 +894,7 @@ class McsCmd(object):
 
         buf.seek(0,0)
         
-        cmd.inform('text="Telescope information populated."')
+        cmd.inform('text="Telescope information for frame %s populated."' % (telescopeInfo['frameid']))
 
         return buf
 
