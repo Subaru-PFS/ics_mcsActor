@@ -1,17 +1,9 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
-from builtins import zip
-
-from builtins import range
-from builtins import object
-import ast
-
-import matplotlib
-import matplotlib.pyplot as plt
 import time
 import datetime
 import io
+import pathlib
 import queue
 import threading
 
@@ -46,7 +38,6 @@ except:
 
 
 import numpy as np
-import pylab as py
 
 # matplotlib.use('Agg')
 Bool=bool
