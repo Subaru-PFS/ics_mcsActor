@@ -490,7 +490,19 @@ class McsCmd(object):
         posAngle, instrot = rot
         cmd.inform(f'text="posAngle={posAngle} instrot={instrot}"')
 
+        now = datetime.datetime.now()
+        now.strftime("%Y-%m-%d %H:%M:%S")
+
+        # Packing information into data structure
+        telescopeInfo = {'frameid': self.actor.exposureID, 
+                         'starttime' : now.strftime("%Y-%m-%d %H:%M:%S"),
+                         'exptime':  expTime,
+                         'altitude': alt,
+                         'azimuth': az,
+                         'instrot': instrot}
         
+        self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
+
         cmd.finish('exposureState=done')
 
     def getExpectedFibrePos(self,cmd,fieldID):
@@ -848,7 +860,43 @@ class McsCmd(object):
                 curs.execute(cmd)
   
         conn.commit()
+
+    def _writeTelescopeInfo(self, cmd, telescopeInfo, conn = None):
+
+        # Let the database handle the primary key
+        with conn:
+            with conn.cursor() as curs:
+                curs.execute('select * FROM "mcsexposure" where false')
+                colnames = [desc[0] for desc in curs.description]
+            realcolnames = colnames[1:]
         
+        colname = []
+        for i in realcolnames:
+            x='"'+i+'"'
+            colname.append(x)
+        
+        buf = io.StringIO()
+
+        
+        line = '%d,%s,%d,%d,%s,%d' % (telescopeInfo['frameid']*100,telescopeInfo['starttime'],
+                                telescopeInfo['exptime']/1000.0,telescopeInfo['altitude'],telescopeInfo['azimuth'],
+                                telescopeInfo['instrot'])
+        
+        buf.write(line)
+        buf.seek(0,0)
+            
+        with conn:
+            with conn.cursor() as curs:
+                curs.copy_from(buf,'"mcsexposure"',',',
+                               columns=colname)
+
+        buf.seek(0,0)
+        
+        cmd.inform('text="Telescope information populated."')
+
+        return buf
+
+
     def _writeCentroids(self, centArr, nextRowId, frameId, moveId, conn=None):
         """ Write all measurements for a given (frameId, moveId) """
 
