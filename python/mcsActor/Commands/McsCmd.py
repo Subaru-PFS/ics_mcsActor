@@ -59,7 +59,6 @@ class McsCmd(object):
         self.expTime = 1000
         self.newTable = None
         self.simulationPath = None
-        self.exposureID = None
         self._conn = None
 
         self.findThresh = None
@@ -76,9 +75,9 @@ class McsCmd(object):
         self.vocab = [
             ('ping', '', self.ping),
             ('status', '', self.status),
-            ('expose', '@(bias|test) [<visit>]', self.expose),
-            ('expose', '@(dark|flat) <expTime> [<visit>]', self.expose),
-            ('expose', '@object <expTime> [<visit>] [@doCentroid] [@doFibreID]', self.expose),
+            ('expose', '@(bias|test) [<frameId>]', self.expose),
+            ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
+            ('expose', '@object <expTime> [<frameId>] [@doCentroid] [@doFibreID]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             ('runFibreID', '[@newTable]', self.runFibreID),
             ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
@@ -102,7 +101,7 @@ class McsCmd(object):
         self.keys = keys.KeysDictionary("mcs_mcs", (1, 1),
                                         keys.Key("expTime", types.Float(), help="The exposure time, seconds"),
                                         keys.Key("expType", types.String(), help="The exposure type"),
-                                        keys.Key("visit", types.Int(), help="exposure visit"),
+                                        keys.Key("frameId", types.Int(), help="exposure frameID"),
                                         keys.Key("path", types.String(), help="Simulated image directory"),
                                         keys.Key("getArc", types.Int(), help="flag for arc image"),
                                         keys.Key("fwhmx", types.Float(), help="X fwhm for centroid routine"),
@@ -203,13 +202,13 @@ class McsCmd(object):
         cmd.debug('text="returning simulation file %s"' % (imagePath))
         return image
 
-    def requestNextFilename(self, cmd):
+    def requestNextFilename(self, cmd, frameId):
         """ Return a queue which will eventually contain a filename. """
 
         q = queue.Queue()
 
         def worker(q=q, cmd=cmd):
-            filename = self.getNextFilename(cmd)
+            filename = self.getNextFilename(cmd, frameId)
             q.put(filename)
             q.task_done()
 
@@ -219,29 +218,30 @@ class McsCmd(object):
 
         return q
 
-    def getNextFilename(self, cmd):
+    def getNextFilename(self, cmd, frameId):
         """ Fetch next image filename. 
 
         In real life, we will instantiate a Subaru-compliant image pathname generating object.  
 
         """
 
-        if self.exposureID is None:
+        if frameId is None:
             ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit', timeLim=10.0)
             if ret.didFail:
                 raise RuntimeError("getNextFilename failed getting a visit number in 10s!")
 
-            self.actor.exposureID = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
+            visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
+            frameId = visit * 100
 
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d', time.gmtime()))
         path = os.path.expandvars(os.path.expanduser(path))
         if not os.path.isdir(path):
             os.makedirs(path, 0o755)
-            
-        newpath = os.path.join(path, 'PFSC%06d00.fits' % (self.actor.exposureID))
+
+        newpath = os.path.join(path, 'PFSC%08d.fits' % (frameId))
 
         return newpath
-    
+
     def _getInstHeader(self, cmd):
         """ Gather FITS cards from all actors we are interested in. """
 
@@ -322,7 +322,7 @@ class McsCmd(object):
 
         return hdr
 
-    def dumpCentroidtoDB(self, cmd):
+    def dumpCentroidtoDB(self, cmd, frameId):
         """Connect to database and return json string to an attribute."""
         
         conn = self.conn
@@ -336,10 +336,9 @@ class McsCmd(object):
             #self._makeTables(conn, doDrop=False)
             cmd.inform('text="Attaching centroid to exsiting table. "')
         
-        frameID=self.actor.exposureID
-        buf = self._writeCentroids(self.centroids,1,frameID,1,conn)
+        buf = self._writeCentroids(self.centroids,1,frameId,1,conn)
 
-        cmd.inform('text="Centroids of exposure ID %06d00 dummped. "'%(frameID))
+        cmd.inform('text="Centroids of exposure ID %08d dumped."' % (frameId))
 
     def _makeImageHeader(self, cmd):
         """ Create a complete WCS header.
@@ -371,10 +370,10 @@ class McsCmd(object):
 
         return hdr
 
-    def _doExpose(self, cmd, expTime, expType):
+    def _doExpose(self, cmd, expTime, expType, frameId):
         """ Take an exposure and save it to disk. """
 
-        nameQ = self.requestNextFilename(cmd)
+        nameQ = self.requestNextFilename(cmd, frameId)
         cmd.diag(f'text="new exposure"')
         if self.simulationPath is None:
             filename = 'scratchFile'
@@ -436,10 +435,10 @@ class McsCmd(object):
 
         cmd.inform('text="doCentroid = %s." '%{doCentroid})
         expType = cmdKeys[0].name
-        if 'visit' in cmdKeys:
-            self.actor.exposureID = cmdKeys['visit'].values[0]
+        if 'frameId' in cmdKeys:
+            frameId = cmdKeys['frameId'].values[0]
         else:
-            self.actor.exposureID = None
+            frameId = None
 
         if expType in ('bias', 'test'):
             expTime = self.expTime
@@ -451,7 +450,9 @@ class McsCmd(object):
  
         cmd.diag('text="Exposure time now is %d ms." '% (expTime))    
  
-        filename, image = self._doExpose(cmd, expTime, expType)
+        filename, image = self._doExpose(cmd, expTime, expType, frameId)
+        if frameId is None:
+            frameId = int(filename.stem[4:], base=10)
         self.actor.image = image
 
         #moved dump to DB here, after FibreID
@@ -473,11 +474,11 @@ class McsCmd(object):
                 self.runCentroid(cmd)       
             
             cmd.inform('text="Sending centroid data to database" ')
-            self.dumpCentroidtoDB(cmd)
+            self.dumpCentroidtoDB(cmd, frameId)
         
         if doFibreID:
             self.runFibreID(cmd, doFinish=False)
-            self.dumpCentroidtoDB(cmd)
+            self.dumpCentroidtoDB(cmd, frameId)
 
         # Populating telescope informaiton to databse
         gen2Model = self.actor.models['gen2'].keyVarDict
@@ -494,9 +495,9 @@ class McsCmd(object):
         now.strftime("%Y-%m-%d %H:%M:%S")
 
         # Packing information into data structure
-        telescopeInfo = {'frameid': self.actor.exposureID, 
-                         'starttime' : now.strftime("%Y-%m-%d %H:%M:%S"),
-                         'exptime':  expTime,
+        telescopeInfo = {'frameid': frameId,
+                         'starttime': now.strftime("%Y-%m-%d %H:%M:%S"),
+                         'exptime': expTime,
                          'altitude': alt,
                          'azimuth': az,
                          'instrot': instrot}
@@ -878,9 +879,10 @@ class McsCmd(object):
         buf = io.StringIO()
 
         
-        line = '%d,%s,%d,%d,%s,%d' % (telescopeInfo['frameid']*100,telescopeInfo['starttime'],
-                                telescopeInfo['exptime']/1000.0,telescopeInfo['altitude'],telescopeInfo['azimuth'],
-                                telescopeInfo['instrot'])
+        line = '%d,%s,%d,%d,%s,%d' % (telescopeInfo['frameid'],telescopeInfo['starttime'],
+                                      telescopeInfo['exptime']/1000.0,
+                                      telescopeInfo['altitude'],telescopeInfo['azimuth'],
+                                      telescopeInfo['instrot'])
         
         buf.write(line)
         buf.seek(0,0)
@@ -892,7 +894,7 @@ class McsCmd(object):
 
         buf.seek(0,0)
         
-        cmd.inform('text="Telescope information populated."')
+        cmd.inform('text="Telescope information for frame %s populated."' % (telescopeInfo['frameid']))
 
         return buf
 
