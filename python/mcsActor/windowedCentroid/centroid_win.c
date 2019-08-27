@@ -372,7 +372,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	iii=0;
 	jjj=0;
 	int skipit=0;
-	if(ii > 0 & inloop ==1)
+	if(ii > 0 && inloop ==1)
 	  {
 	    if(thread_data_array[ii].cand_list == NULL)
 	      {
