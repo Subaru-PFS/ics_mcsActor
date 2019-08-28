@@ -447,8 +447,6 @@ class McsCmd(object):
             frameId = int(filename.stem[4:], base=10)
         self.actor.image = image
 
-        #moved dump to DB here, after FibreID
-
         if doCentroid:
             cmd.inform('text="Setting centroid parameters." ')
             self.setCentroidParams(cmd)
@@ -472,20 +470,36 @@ class McsCmd(object):
             self.runFibreID(cmd, doFinish=False)
             self.dumpCentroidtoDB(cmd, frameId)
 
-        # Populating telescope informaiton to databse
-        gen2Model = self.actor.models['gen2'].keyVarDict
+        self.handleTelescopeGeometry(cmd, filename, frameId, expTime)
 
-        axes = gen2Model['tel_axes'].getValue()
-        az, alt = axes
-        cmd.inform(f'text="az={az} alt={alt}"')
+        cmd.finish('exposureState=done')
 
-        rot = gen2Model['tel_rot'].getValue()
-        posAngle, instrot = rot
-        cmd.inform(f'text="posAngle={posAngle} instrot={instrot}"')
+    def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
+
+        if self.simulationPath is None:
+            # We are live: use Gen2 telescope info.
+            gen2Model = self.actor.models['gen2'].keyVarDict
+
+            axes = gen2Model['tel_axes'].getValue()
+            az, alt = axes
+
+            rot = gen2Model['tel_rot'].getValue()
+            posAngle, instrot = rot
+            now = datetime.datetime.now()
+        else:
+            # We are reading images from disk: get the geometry from the headers.
+            hdr = fitsio.read_header(str(filename), 0)
+            simPath = hdr['W_MCSMNM']
+            simHdr = fitsio.read_header(str(simPath), 0)
+            cmd.inform('text="loaded telescope info from %s"'% (simPath))
+            az = simHdr['AZIMUTH']
+            alt = simHdr['ALTITUDE']
+            expTime = simHdr['EXPTIME']
+            instrot = simHdr['INR-STR']
 
         now = datetime.datetime.now()
-        now.strftime("%Y-%m-%d %H:%M:%S")
 
+        cmd.inform(f'text="az={az} alt={alt} instrot={instrot}"')
         # Packing information into data structure
         telescopeInfo = {'frameid': frameId,
                          'starttime': now.strftime("%Y-%m-%d %H:%M:%S"),
@@ -493,10 +507,8 @@ class McsCmd(object):
                          'altitude': alt,
                          'azimuth': az,
                          'instrot': instrot}
-        
-        self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
 
-        cmd.finish('exposureState=done')
+        self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
 
     def getExpectedFibrePos(self,cmd,fieldID):
 
