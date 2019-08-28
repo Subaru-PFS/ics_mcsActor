@@ -8,3 +8,4 @@ build/
 /.pydevproject
 /.project
 
+centroid_wrapper.c
