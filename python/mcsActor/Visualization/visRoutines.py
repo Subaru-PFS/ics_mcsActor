@@ -5,10 +5,8 @@ from scipy.stats import sigmaclip
 from astropy.io.fits import getdata
 import cv2
 
-try:
-    import mcsActor.windowedCentroid.centroid as centroid
-except:
-    import centroid as centroid
+import mcsActor.windowedCentroid.centroid as centroid
+
 
 
 def getCentroids(image,thresh1,thresh2,fwhmx,fwhmy,boxFind,boxCent,nmin,nmax,maxIt):

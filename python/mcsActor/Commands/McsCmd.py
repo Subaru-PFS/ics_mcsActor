@@ -26,15 +26,9 @@ import psycopg2
 import psycopg2.extras
 from xml.etree.ElementTree import dump
 
-try:
-    import mcsActor.windowedCentroid.centroid as centroid
-except:
-    pass
+import mcsActor.windowedCentroid.centroid as centroid
+import mcsActor.Visualization.mcsRoutines as mcsTools
 
-try:
-    import mcsActor.Visualization.mcsRoutines as mcsTools
-except:
-    pass
 
 
 import numpy as np
@@ -71,19 +65,11 @@ class McsCmd(object):
             ('expose', '@object <expTime> [<frameId>] [@doCentroid] [@doFibreID]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             ('runFibreID', '[@newTable]', self.runFibreID),
-            ('fakeCentroidOnly', '<expTime>', self.fakeCentroidOnly),
-            ('test_centroid', '', self.test_centroid),
             ('reconnect', '', self.reconnect),
-            ('imageStats', '', self.imageStats),
             ('resetThreshold','',self.resetThreshold),
-            # ('quickPlot', '', self.quickPlot),
-            ('timeTestFull','',self.timeTestFull),
-            ('seeingTest','',self.seeingTest),
             ('setCentroidParams','[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<nmax>] [<maxIt>]',
              self.setCentroidParams),
             ('calcThresh','[<threshMethod>] [<threshSigma>] [<threshFact>]', self.calcThresh),
-            ('getExpectedFibrePos','[<fieldID>]',self.getExpectedFibrePos),
-            ('getInstParams','[<fieldID>]',self.getInstParams),
             ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
         ]
@@ -510,90 +496,7 @@ class McsCmd(object):
 
         self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
 
-    def getExpectedFibrePos(self,cmd,fieldID):
-
-        """  Retrieve expected fibre positions from the database """
-
-        pass
-
-        #I'm assuming the result is two Nx3 arrays (id #, xpos, ypos)???shape
-
-        ##the routine called here needs to be written for DB query
-
-        ###put code in her!!!!!!!
-
-    def getInstParams(self):
-
-        """
-
-        retrieve instrument parameters. rotCent is a 2 element array with the rotation centre in pixels
-        offset is a 2 element array with the offet between the mask centre and rotation centre
-
-        """
-
-        #put code in here!!!!!
-
-        self.rotCent = rotCent
-        self.offset = offset
-
-        
-        
-    def doCentroidCoarse(self, cmd):
-        
-
-        pass
-        
-    def _doCentroid(self,cmd,image,fittype):
-
-        pass
-
-         
-    def _encodeArray(self, array):
-        """ Temporarily wrap a binary array transfer encoding. """
-
-        # Actually, we want dtype,naxis,axNlen,base64(array)
-        return base64.b64encode(array.tostring())
-
-    def imageStats(self, cmd):
-        
-        doFinish = True
-        cmd.inform('text="image median = %d." '% (np.median(self.actor.image))) 
-        cmd.inform('text="image mean = %d." '% (self.actor.image.mean())) 
-        cmd.inform('text="image min = %d." '% (self.actor.image.min())) 
-        cmd.inform('text="image max = %d." '% (self.actor.image.max()))
-        cmd.inform('text="image std = %d." '% (self.actor.image.std()))
-
-        if doFinish:
-            cmd.finish('Statistics Calculated')
-
-    def fakeCentroidOnly(self,cmd):
-
-        cmd.inform('state="measuring"')
-
-        npos=2350
-        centroids=np.zeros((2350,7))
-
-        #fake positions
-        pos=np.meshgrid(np.arange(50),np.arange(47))
-        centroids[:,0]=pos[0]*150
-        centroids[:,1]=pos[1]*100
-
-        #fake FWHM
-        centroids[:,2]=np.normal(3.,0.4,npos)
-        centroids[:,3]=np.normal(3.,0.4,npos)
-
-        #fake peaks
-        centroids[:,4]=np.normal(5000,100,npos)
-
-        #fake backgrounds
-        centroids[:,5]=np.normal(800,30,npos)
-
-        #fake qualities
-        centroids[:,6]=np.ones(npos)
-
-        self.actor.centroids=centroids
-
-        cmd.inform('state="finished"')
+ 
 
     def calcThresh(self, cmd):
 
@@ -679,19 +582,6 @@ class McsCmd(object):
         except:
             self.matchRad = 20
 
-
-    def runFibreID(self,cmd, doFinish=True):
-        """ Run Fibre Identification on the last acquired centroids """
-
-        centroids = self.centroids
-        fibrePos = self.getExpectedFibrePositions(fieldID)
-        idCentroids = mcsTools.findHomes(centroids,fibrePos,matchRad)
-
-        self.centroids = idCentroids
-
-        if doFinish:
-            cmd.finish('exposureState=done')
-
     def runCentroid(self, cmd):
         """ Measure centroids on the last acquired image. """
 
@@ -726,146 +616,8 @@ class McsCmd(object):
         cmd.inform('text="%d centroids"'% (len(centroids)))
         cmd.inform('state="centroids measured"')
                         
-    def test_centroid(self, cmd):
-
-        
-        """ 
-        Demo Command to run a centroid sequence. 
-        This needs to be split into a series of commands, with input from FPS,
-        and appropriate handling of intput/output/configuration by either keywords
-        or database, as decided. 
-        """
-
-        #Read in Simulated Data
-
-        #First step: get the centroids in the home position, from a
-        #long exposure. This does not do fibre identification
-
-        #Fake camera image
-        #image=pyfits.getdata('TestData/home.fits').astype('<i4')
-
-        #get an image from a file, no arc image, long exposure time. 
-        expTime=1
-        expType='object'
-        
-        image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/TestData/home",0)
-
-        print("Read Image\n");
-
-        #centroid call
-        
-        a = centroid.get_homes_call(image)
-
-        #convert cython output into numpy array
-        
-        homes=np.frombuffer(a,dtype='<f8')
-
-        print(homes)
-
-        #second step: short exposure with arc image
-        #image=pyfits.getdata('/Users/karr/GoogleDrive/first_move.fits').astype('<i4')
-        #arc_image=pyfits.getdata('/Users/karr/GoogleDrive/first_move_arc.fits').astype('<i4')
-
-        expTime=0.5
-        image, arc_image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/first_move",1)
-        
-        #Call the centroiding/finding
-        
-        b = centroid.centroid_coarse_call(image,arc_image,homes)
-
-        #convert from cython output to numpy typed array
-        
-        homepos=np.frombuffer(b,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
-
-        #second move, same as the first
-
-        #image=pyfits.getdata('./second_move.fits').astype('<i4')
-        #arc_image=pyfits.getdata('./second_move.fits').astype('<i4')
-
-        expTime=0.5
-        image, arc_image=self._doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/second_move",1)
-
-        b = centroid.centroid_coarse_call(image,arc_image,homes)
-
-        homepos=np.frombuffer(b,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
-
-
-        #now for a fine move: long exposure, not arc image
-
-        image=pyfits.getdata('./third_move.fits').astype('<i4')
-
-        expTime=1.0
-        image = _doFakeExpose(cmd, expTime, expType, "/Users/karr/GoogleDrive/third_move",0)
-
-        #we need to pass it the list of previous positions as well
-        
-        npos=homepos.shape[0]
-
-        xp=np.zeros((npos))
-        yp=np.zeros((npos))
-
-        for i in range(npos):
-            xp[i]=homepos[i][6]
-            yp[i]=homepos[i][7]
-
-        #and the call
-        c = centroid.centroid_fine_call(image,homes,xp,yp)
-
-        #cython to numpy
-        
-        homepos=np.frombuffer(c,dtype=[('xp','<f8'),('yp','<f8'),('xt','<f8'),('yt','<f8'),('xc','<f8'),('yc','<f8'),('x','<f8'),('y','<f8'),('peak','<f8'),('back','<f8'),('fx','<f8'),('fy','<f8'),('qual','<f4'),('idnum','<f4')])
-
-    def _makeTables(self, conn, doDrop=False):
-        """ Create MCS tables. Someone said 20 measured things. """
-        
-        if self.simulationPath is None:
-       
-            cmd = '''create table mcsPerFiber (
-            id SERIAL PRIMARY KEY,
-            frameId integer,
-            moveId smallint,
-            fiberId smallint,
-            
-            centroidX real, centroidY real,
-            f1x real, f1y real,
-            f2x real, f2y real,
-            f3x real, f3y real,
-            f4x real, f4y real,
-            f5x real, f5y real,
-            f6x real, f6y real,
-            f7x real, f7y real,
-            f8x real, f8y real,
-            f9x real, f9y real
-            );'''
-        
-            
-            with conn.cursor() as curs:
-                if doDrop:
-                    curs.execute('drop table if exists mcsPerFiber')
-                    pass
-                curs.execute(cmd)
-        else:
-            
-            cmd = '''create table mcs (
-                id SERIAL PRIMARY KEY,
-                datatime timestamp,
-                frameId integer,
-                moveId smallint,
-                fiberId smallint,
-                
-                centroidX real, centroidY real,
-                fwhmX real, fwhmY real,
-                bgValue real, peakValue real
-                );'''
-                
-                    
-            with conn.cursor() as curs:
-                if doDrop:
-                    curs.execute('drop table if exists mcs')
-                curs.execute(cmd)
-  
-        conn.commit()
-
+    
+    
     def _writeTelescopeInfo(self, cmd, telescopeInfo, conn = None):
 
         # Let the database handle the primary key
@@ -973,89 +725,4 @@ class McsCmd(object):
         
         return arr
 
-    def timeTestFull(self,cmd):
-
-        fwhm=3.
-        hmin=2500
-        boxsize=9
-        expTime=1000.
-        expType="object"
-
-        #prelude stuff
-        #fake table
-        arr = np.random.uniform(0,1, (2394, 20)).astype('f4')
-
-        #connect to database
-        t1=time.time()
-        for i in range(5):
-            filename, image = self._doExpose(cmd, expTime, expType)
-            self.actor.image = image.astype('<i4')
-
-            a=centroid_only(self.actor.image,fwhm,hmin,boxsize)
-            
-            centroids=np.frombuffer(a,dtype='<f8')
-            numpoints=len(centroids)//7
-            cmd.inform('text="np = %d." '% (numpoints))
-            
-            self.actor.centroids=np.reshape(centroids,(numpoints,7))
-            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfspass'")
-            self._makeTables(conn,doDrop=True)
-            
-            #db insertion
-            buf = self._writeCentroids(arr,1,100,1,conn)
-            cmd.inform('text="size = %d." '% (numpoints))
-        t2=time.time()
-        cmd.inform('text="time = %f." '% ((t2-t1)/1.))
-
-        hduList.writeto(filename, checksum=False, overwrite=True)
-
-        cmd.inform('filename="%s"' % (filename))
-
-        return filename, image
-
-
-    def seeingTest(self,cmd):
-
-        fwhm=3.
-        hmin=3000
-        boxsize=9
-        expType="object"
-
-
-        exptimes=np.array([500,1000.,2000.,3000.,4000.,5000,10000.])
-        for expTime in exptimes:
-
-            
-            for i in range(30):
-            
-                filename, image = self._doExpose(cmd, expTime, expType)
-                if(i==0):
-                    cmd.inform('="expTime = %f. first= %s" '% (expTime,filename))
-                    #self.actor.image = image.astype('<i4')
-            cmd.inform('="expTime = %f. last= %s" '% (expTime,filename))
-
-        cmd.finish('exposureState=done')
-
-    def calcRotationCentre(self,cmd):
-
-        ###RETRIEVE A SET OF CENTROIDS HERE
-
-        xCorner=[]
-        yCorner=[]
-
-        for i in range(nSets):
-            ind=np.where(centroids[:,0]==i)
-            x=centroids[ind,1].ravel()
-            y=centroids[ind,2].ravel()
-
-            x0,x1,y0,y1=mcsTools.getCorners(x,y)
-            xCorner.append(x0)
-            yCorner.append(y0)
-
-        xCorner=np.array(xCorner)
-        yCorner=np.array(yCorner)
-
-        coords=[xCorner,yCorner]
-        xc,yc,r,_=mcsTools.least_squares_circle(xCorner,yCorner)
-
-        return xc,yc
+   

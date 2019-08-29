@@ -9,10 +9,8 @@ from pfs.utils.coordinates import CoordTransp
 from pfs.utils.coordinates import DistortionCoefficients
 from astropy.io import fits
 
-try:
-    import mcsActor.Visualization.visRoutines as vis
-except:
-    import visRoutines as vis
+import mcsActor.Visualization.visRoutines as vis
+
 
 
 def applyAffineFPS(coord,trans):
