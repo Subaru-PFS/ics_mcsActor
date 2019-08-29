@@ -62,7 +62,7 @@ class McsCmd(object):
             ('status', '', self.status),
             ('expose', '@(bias|test) [<frameId>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
-            ('expose', '@object <expTime> [<frameId>] [@doCentroid] [@doFibreID]', self.expose),
+            ('expose', '@object <expTime> [<frameId>] [@noCentroids] [@doCentroid] [@doFibreID]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             ('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
@@ -407,7 +407,13 @@ class McsCmd(object):
         """ Take an exposure. Optionally centroids. Optionally FibreID """
 
         cmdKeys = cmd.cmd.keywords
-        doCentroid = 'doCentroid' in cmdKeys
+
+        # Switch from default no centroids to default do centroids
+        noCentroidArg = 'noCentroids' in cmdKeys
+        if noCentroidArg:
+            doCentroid = False
+        else:
+            doCentroid = True
         doFibreID = 'doFibreID' in cmdKeys
 
         cmd.inform('text="doCentroid = %s." '%{doCentroid})
