@@ -235,7 +235,7 @@ double *windowedPos(int *image,double x, double y,int boxsize,double fwhmx, doub
 
      */
     //required precision
-    double precision=1e-4;
+    double precision=1e-6;
     
     //parameter for windowing
     double swinx=fwhmx/sqrt(8*log(2));
