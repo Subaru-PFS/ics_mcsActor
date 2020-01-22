@@ -27,7 +27,6 @@ class Mcs(actorcore.ICC.ICC):
         reload(rmodCamera)
         reload(mcsCamera)
         
-        
         try:
             if camera is 'rmod':
                 self.camera = mcsCamera.mcsCamera()
