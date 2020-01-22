@@ -163,8 +163,10 @@ int main(int argc, char *argv[]){
 	int    imagesize;
 	int    verbose=0,loops=1;
 	int    i,ii;
-    int    timeouts = 0;
-
+	int    numbufs = 4;
+	int    started;
+	int    timeouts =0 , last_timeouts = 0;
+	int    recovering_timeout = FALSE;
 
 	EdtDev *pdv_p = NULL;
 
@@ -227,37 +229,30 @@ int main(int argc, char *argv[]){
 		if (verbose) printf("take %i exposures.\n",loops);
 	}
 
-
 	/* Start to establish EDT connection */
 	unit = edt_parse_unit_channel(unitstr, edt_devname, "pdv", &channel);
-	
-	/*
-	 *   Waiting for shutter
- 	 */
-	shutter_ts = getClockTime();
-	//sleep(1);
 
 	/*
-     * pdv_open_channel is just pdv_open with an extra argument, the channel,
-     * which is normally 0 unless you're running multiple cameras (2nd base
-     * mode on a PCI DV C-Link or dasy-chained RCI boxes off a single PCI
-     * FOI)
-     */
+	* pdv_open_channel is just pdv_open with an extra argument, the channel,
+	* which is normally 0 unless you're running multiple cameras (2nd base
+	* mode on a PCI DV C-Link or dasy-chained RCI boxes off a single PCI
+	* FOI)
+	*/
 
 	if ((pdv_p = pdv_open_channel(edt_devname, unit, channel)) == NULL){
-    	fprintf(stderr, "Error:pdv_open(%s%d_%d)", edt_devname, unit, channel);
-        pdv_perror(errstr);
-        return EXIT_FAILURE;
+		fprintf(stderr, "Error:pdv_open(%s%d_%d)", edt_devname, unit, channel);
+		pdv_perror(errstr);
+		return EXIT_FAILURE;
 	}
 
-    pdv_flush_fifo(pdv_p);
+	pdv_flush_fifo(pdv_p);
 
 	s_height=pdv_get_height(pdv_p);
 	s_width=pdv_get_width(pdv_p);
-    s_depth = pdv_get_depth(pdv_p);
-    imagesize = pdv_get_imagesize(pdv_p);
+	s_depth = pdv_get_depth(pdv_p);
+	imagesize = pdv_get_imagesize(pdv_p);
 	
-	image_p=pdv_alloc(pdv_image_size(pdv_p));
+	//image_p=pdv_alloc(pdv_image_size(pdv_p));
 
 	if (verbose) printf("Image size --> Height = %i Width= %i\n", s_height, s_width);
 
@@ -268,40 +263,44 @@ int main(int argc, char *argv[]){
 
 	}
 
-	/* The number of buffers is limited only by the amount of host memory available,
-	 * up to approximately 3.5GBytes (or less, depending on other OS use of the low
-	 * 3.5 GB of memory). Each buffer has a certain amount of overhead, so setting
-	 * a large number, even if the images are small, is not recommended. Four is
-	 * the recommended number: at any time, one buffer is being read in, one buffer
-	 * is being read out, one is being set up for DMA, and one is in reserve in case
-	 * of overlap. Additional buffers may be necessary with very fast cameras;
-	 * 32 will almost always smooth out any problems with really fast cameras, and
-	 * if the system can't keep up with 64 buffers allocated, there may be other problems.
-	 *
-	 */
-	pdv_multibuf(pdv_p, 4);
-	if (pdv_p->dd_p->force_single){
-         pdv_start_image(pdv_p);
-         started = 1;
-    }else{
-         pdv_start_images(pdv_p, numbufs);
-         started = numbufs;
-    }
+		/* The number of buffers is limited only by the amount of host memory available,
+		* up to approximately 3.5GBytes (or less, depending on other OS use of the low
+		* 3.5 GB of memory). Each buffer has a certain amount of overhead, so setting
+		* a large number, even if the images are small, is not recommended. Four is
+		* the recommended number: at any time, one buffer is being read in, one buffer
+		* is being read out, one is being set up for DMA, and one is in reserve in case
+		* of overlap. Additional buffers may be necessary with very fast cameras;
+		* 32 will almost always smooth out any problems with really fast cameras, and
+		* if the system can't keep up with 64 buffers allocated, there may be other problems.
+		*
+		*/
+	for (i=0; i<loops; i++){
+		pdv_flush_fifo(pdv_p);
+
+		pdv_multibuf(pdv_p, 4);
+		if (pdv_p->dd_p->force_single){
+			pdv_start_image(pdv_p);
+			started = 1;
+		}else{
+			pdv_start_images(pdv_p, numbufs);
+			started = numbufs;
+		}
 
 
-    if (verbose) fprintf(stdout,"Setting time-out limit %i\n", 100000);
-    pdv_set_timeout(pdv_p, 100000);
+		if (verbose) fprintf(stdout,"Setting time-out limit %i\n", 100000);
+		pdv_set_timeout(pdv_p, 100000);
 
-	(void) edt_dtime();		/* init time for check */
-    for (i=0; i<loops; i++){
+		(void) edt_dtime();		/* init time for check */
+	
 		printf("getting image %d\r", i + 1);
         fflush(stdout);
-
+		image_p=pdv_alloc(pdv_image_size(pdv_p));
+		
 		image_p = pdv_wait_image(pdv_p);
 		if (i < loops - started){
              pdv_start_image(pdv_p);
         }
-
+		dtime = edt_dtime();
 
         timeouts = pdv_timeouts(pdv_p);
 
@@ -334,16 +333,16 @@ int main(int argc, char *argv[]){
 		}
         WriteFitsImage(string, s_height, s_width,image_p);
 		if (verbose) fprintf(stdout,"filename saved as %s\n", string);
+		
+		//pdv_free(image_p);
+		if (verbose) printf("%f frames/sec\n", dtime);
 
 
 	}
-    dtime = edt_dtime();
-
-    if (verbose) printf("%f frames/sec\n", (double) (loops) / dtime);
-
-	//pdv_free(image_p);
+    
 	pdv_close(pdv_p);
 
+    
 	printf("done\n");
 
 	return EXIT_SUCCESS;
