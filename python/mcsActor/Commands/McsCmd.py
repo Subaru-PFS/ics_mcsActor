@@ -64,7 +64,7 @@ class McsCmd(object):
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose', '@object <expTime> [<frameId>] [@noCentroids] [@doCentroid] [@doFibreID]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
-            ('runFibreID', '[@newTable]', self.runFibreID),
+            #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
             ('resetThreshold','',self.resetThreshold),
             ('setCentroidParams','[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<nmax>] [<maxIt>]',
@@ -129,7 +129,7 @@ class McsCmd(object):
         cmd.finish("text='Present and (probably) well'")
 
     def reconnect(self, cmd):
-        self.actor.connectCamera(cmd)
+        self.actor.connectCamera(cmd, camera='rmod')
         self.actor.camera.setExposureTime(cmd,self.expTime)
 
         cmd.finish('text="Camera connected!"')
@@ -195,6 +195,15 @@ class McsCmd(object):
 
         return q
 
+
+    def _insertPFSVisitID(self, visitid):
+        with self.conn:
+            with self.conn.cursor() as curs:
+                postgres_insert_query = """ INSERT INTO pfs_visit (pfs_visit_id, pfs_visit_description) VALUES (%s,%s)"""
+                record_to_insert = (visitid, "MCS exposure")
+                curs.execute(postgres_insert_query, record_to_insert)
+
+
     def getNextFilename(self, cmd, frameId):
         """ Fetch next image filename. 
 
@@ -209,6 +218,7 @@ class McsCmd(object):
 
             visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
             frameId = visit * 100
+            self._insertPFSVisitID(visit)
 
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d', time.gmtime()))
         path = os.path.expandvars(os.path.expanduser(path))
@@ -494,6 +504,7 @@ class McsCmd(object):
         cmd.inform(f'text="az={az} alt={alt} instrot={instrot}"')
         # Packing information into data structure
         telescopeInfo = {'frameid': frameId,
+                         'visitid': self.actor.models['gen2'].keyVarDict['visit'].valueList[0],
                          'starttime': now.strftime("%Y-%m-%d %H:%M:%S"),
                          'exptime': expTime,
                          'altitude': alt,
@@ -629,9 +640,9 @@ class McsCmd(object):
         # Let the database handle the primary key
         with conn:
             with conn.cursor() as curs:
-                curs.execute('select * FROM "mcsexposure" where false')
+                curs.execute('select * FROM "mcs_exposure" where false')
                 colnames = [desc[0] for desc in curs.description]
-            realcolnames = colnames[1:]
+            realcolnames = colnames[0:]
         
         colname = []
         for i in realcolnames:
@@ -640,18 +651,32 @@ class McsCmd(object):
         
         buf = io.StringIO()
 
-        
-        line = '%d,%s,%d,%d,%s,%d' % (telescopeInfo['frameid'],telescopeInfo['starttime'],
-                                      telescopeInfo['exptime']/1000.0,
-                                      telescopeInfo['altitude'],telescopeInfo['azimuth'],
-                                      telescopeInfo['instrot'])
-        
+        """
+          TODO: Those are the fake values for making PFI to work now, adding actual code later
+        """
+        adc_pa = 0
+        dome_temperature = 5
+        dome_pressure = 101
+        dome_humidity = 0.3
+        outside_temperature = 5
+        outside_pressure = 101
+        outside_humidity = 0.3        
+        mcs_cover_temperature = 5
+        mcs_m1_temperature =6
+        taken_at = telescopeInfo['starttime']
+        taken_in_hst_at = telescopeInfo['starttime']
+        line = '%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s' % (telescopeInfo['frameid'], 
+            telescopeInfo['visitid'], telescopeInfo['exptime']/1000.0,
+            telescopeInfo['altitude'],telescopeInfo['azimuth'],telescopeInfo['instrot'],
+            adc_pa,dome_temperature,dome_pressure,dome_humidity,outside_temperature,outside_pressure,
+            outside_humidity,mcs_cover_temperature,mcs_m1_temperature,taken_at,taken_in_hst_at)
+
         buf.write(line)
         buf.seek(0,0)
             
         with conn:
             with conn.cursor() as curs:
-                curs.copy_from(buf,'"mcsexposure"',',',
+                curs.copy_from(buf,'"mcs_exposure"',',',
                                columns=colname)
 
         buf.seek(0,0)
@@ -676,7 +701,7 @@ class McsCmd(object):
         # Let the database handle the primary key
         with conn:
             with conn.cursor() as curs:
-                curs.execute('select * FROM "mcsData" where false')
+                curs.execute('select * FROM "mcs_data" where false')
                 colnames = [desc[0] for desc in curs.description]
             realcolnames = colnames[1:]
         
@@ -694,7 +719,7 @@ class McsCmd(object):
             
         with conn:
             with conn.cursor() as curs:
-                curs.copy_from(buf,'"mcsData"',',',
+                curs.copy_from(buf,'"mcs_data"',',',
                                columns=colname)
 
         buf.seek(0,0)

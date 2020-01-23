@@ -29,7 +29,7 @@ class Mcs(actorcore.ICC.ICC):
         
         try:
             if camera is 'rmod':
-                self.camera = mcsCamera.mcsCamera()
+                self.camera = rmodCamera.rmodCamera()
                 self.camera.initialCamera(cmd)
                 cmd.inform('text="loaded RMOD-71M camera"')
             if camera is 'mcs':

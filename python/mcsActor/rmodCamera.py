@@ -46,7 +46,7 @@ class rmodCamera(Camera):
         self.expTime = expTime
         cmd.inform('expTime=%f ms' % (expTime))
         
-    def expose(self, cmd, expTime, expType, filename):
+    def expose(self, cmd, expTime, expType, filename, doCopy=True):
         """ Generate an 'exposure' image. We don't have an actual camera, so generate some 
         plausible image. 
 

@@ -334,7 +334,6 @@ int main(int argc, char *argv[]){
         WriteFitsImage(string, s_height, s_width,image_p);
 		if (verbose) fprintf(stdout,"filename saved as %s\n", string);
 		
-		//pdv_free(image_p);
 		if (verbose) printf("%f frames/sec\n", dtime);
 
 
