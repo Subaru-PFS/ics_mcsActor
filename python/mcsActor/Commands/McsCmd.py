@@ -449,6 +449,8 @@ class McsCmd(object):
             frameId = int(filename.stem[4:], base=10)
         self.actor.image = image
 
+        self.handleTelescopeGeometry(cmd, filename, frameId, expTime)
+
         if doCentroid:
             cmd.inform('text="Setting centroid parameters." ')
             self.setCentroidParams(cmd)
@@ -472,7 +474,6 @@ class McsCmd(object):
             self.runFibreID(cmd, doFinish=False)
             self.dumpCentroidtoDB(cmd, frameId)
 
-        self.handleTelescopeGeometry(cmd, filename, frameId, expTime)
 
         cmd.finish('exposureState=done')
 
@@ -510,7 +511,7 @@ class McsCmd(object):
                          'altitude': alt,
                          'azimuth': az,
                          'instrot': instrot}
-
+        print("telescopeInfo")
         self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
 
  
@@ -695,7 +696,10 @@ class McsCmd(object):
         # Save measurements to a CSV buffer
         measBuf = io.StringIO()
         
-        np.savetxt(measBuf, centArr[:,1:7], delimiter=',', fmt='%0.6g')
+
+        data = np.insert(centArr, 5, 0, axis=1)
+       
+        np.savetxt(measBuf, data[:,1:8], delimiter=',', fmt='%0.6g')
         measBuf.seek(0,0)
 
         # Let the database handle the primary key
@@ -703,17 +707,17 @@ class McsCmd(object):
             with conn.cursor() as curs:
                 curs.execute('select * FROM "mcs_data" where false')
                 colnames = [desc[0] for desc in curs.description]
-            realcolnames = colnames[1:]
+            realcolnames = colnames[:]
         
         colname = []
         for i in realcolnames:
             x='"'+i+'"'
             colname.append(x)
-        
         buf = io.StringIO()
         for l_i in range(len(centArr)):
-            line = '%s,%d,%d,%d,%s' % (now.strftime("%Y-%m-%d %H:%M:%S"), 
-                                       frameId, moveId, l_i+1, measBuf.readline())
+            #line = '%s,%d,%d,%d,%s' % (now.strftime("%Y-%m-%d %H:%M:%S"), 
+            #                           frameId, moveId, l_i+1, measBuf.readline())
+            line = '%d,%d,%s' % (frameId, l_i+1, measBuf.readline())
             buf.write(line)
         buf.seek(0,0)
             
