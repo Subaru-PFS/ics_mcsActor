@@ -12,9 +12,9 @@
 
 //Definitions for parallizing the code (NTHREAD=# of cores)
 
-#define XSPLIT  3//# of subregions in X direction
-#define YSPLIT  4//# of subregions in Y direction
-#define NTHREAD 12//# of cores
+#define XSPLIT  1//# of subregions in X direction
+#define YSPLIT  1//# of subregions in Y direction
+#define NTHREAD 1//# of cores
 
 //toggle screen output for debugging/testing 
 
@@ -31,7 +31,7 @@ void freeAll(struct cand_point **head)
   /*routine to free the list of structures*/
 
   struct cand_point* current = *head;
-  struct cand_point* next;
+  struct cand_point* next=NULL;
   while (current != NULL)
     {
       next = current->next;
@@ -57,9 +57,7 @@ void* subimage_Thread(void *arg)
   int n_y=((struct thread_data*)arg)->n_y;         //x dimension of image
   int *image=malloc(n_x*n_y*sizeof(int));          //image
 
-  int *imagemask;
-
-  imagemask = calloc(n_x*n_y,sizeof(int));
+  int *imagemask = calloc(n_x*n_y,sizeof(int));
   //printf("a  n_x = %d\n",n_x);
   //printf("a  n_y = %d\n",n_y);
 
@@ -69,7 +67,7 @@ void* subimage_Thread(void *arg)
   //list to contain the guesses
 
 //struct cand_point *cand_head = NULL;
-  struct cand_point *cand_curr;
+  struct cand_point *cand_curr=NULL;
  
   image=((struct thread_data*)arg)->image;            
 
@@ -117,6 +115,7 @@ void* subimage_Thread(void *arg)
       //printf("G %d %d %d %d %d %d %d\n",thresh1,thresh2,n_x,n_y,boxFind,nmin,nmax);
 
       getParams(cand_list,&fwhmx,&fwhmy);
+      //printf("KK %lf %lf\n",fwhmx,fwhmy);
     }
 
   //printf("XX %lf %lf\n",fwhmx,fwhmy);
@@ -140,14 +139,15 @@ void* subimage_Thread(void *arg)
   original daofind uses lots of goto replaced with if statements*/
   
   cand_curr=cand_list;
-  double *centroidVal;
+  double *centroidVal=NULL;
 
   int iii=0;
   while(cand_curr!=NULL)
   {
     //get the center points of the possible detection, and its value
   
-    centroidVal=windowedPos(image,cand_curr->x,cand_curr->y, boxCent,fwhmx,fwhmy,maxIt,n_x,n_y,verbose);
+    //centroidVal=windowedPos(image,cand_curr->x,cand_curr->y, boxCent,fwhmx,fwhmy,maxIt,n_x,n_y,verbose);
+    centroidVal=windowedPos(image,cand_curr->x,cand_curr->y, boxCent,cand_curr->x2,cand_curr->y2,maxIt,n_x,n_y,verbose);
     cand_curr->x=centroidVal[0];
     cand_curr->y=centroidVal[1];
     cand_curr=cand_curr->next;
@@ -167,7 +167,7 @@ void* subimage_Thread(void *arg)
   ((struct thread_data*)arg)->cand_list=cand_list;
 
   //free memory
-  //free(image);
+  free(image);
   free(imagemask);
 
   //exit the thread properly
@@ -184,7 +184,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
   /*main routine. parses input values, calls setup routine, divides up the threads, 
     runs the threads, combines and filters the outputs */
 
-  struct centroids *output; 
+  struct centroids *output=NULL; 
 
   int ii,jj,i,j;          //counter variabls
   //int fname_check=0,hmin_check=0,fwhm_check=0;  //flags to check input
@@ -226,8 +226,8 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
   struct cand_point *check_pre=NULL;   //pointer previous to check_val
   struct cand_point *top_val=NULL;     //top of list
 
-  struct cand_point *cand_val;  //List f points
-  struct cand_point *real_top;  //List f points
+  struct cand_point *cand_val=NULL;  //List f points
+  struct cand_point *real_top=NULL;  //List f points
 
   double x1,y1;  //positions of first value
   double x2,y2;  //positions of first value
@@ -498,31 +498,31 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
     {
 
 
-    	if(curr_val->qual > 5)
-    	  {
-    
-    	    //Delete First Node
-    	    if(curr_val==top_val)
-    	      {
-    		top_val=top_val->next;
-    		
-    		curr_val=curr_val->next;
-    		curr_pre=curr_pre->next;
-    	      }
-    	    //delete non first node
-    	    else
-    	      
-    	      {
-    		curr_pre->next=curr_val->next;
-    		curr_val=curr_val->next;
-    	      }
-    
-    	  }
-    	else
-    	  {
+    	//if(curr_val->qual > 5)
+    	//  {
+    	//
+    	//    //Delete First Node
+    	//    if(curr_val==top_val)
+    	//      {
+    	//	top_val=top_val->next;
+    	//	
+    	//	curr_val=curr_val->next;
+    	//	curr_pre=curr_pre->next;
+    	//      }
+    	//    //delete non first node
+    	//    else
+    	//      
+    	//      {
+    	//	curr_pre->next=curr_val->next;
+    	//	curr_val=curr_val->next;
+    	//      }
+    	//
+    	//  }
+    	//else
+    	//  {
     	    curr_pre=curr_pre->next;
     	    curr_val=curr_val->next;
-    	  }
+	    // }
     
     }
 
@@ -702,7 +702,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
       output[i].y2=curr_val->y2;
       output[i].peak=curr_val->peak;
       output[i].xy=curr_val->xy;
-      output[i].qual=curr_val->qual;
+      output[i].back=curr_val->back;
       curr_val=curr_val->next;
     }
 
@@ -712,15 +712,15 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
   
   np[0]=ii;
 
-  for (ii=0;ii<XSPLIT;ii++)
-    {
-      for (jj=0;jj<YSPLIT;jj++)
-	{
-
-	ind=ii+XSPLIT*jj;
-	free(thread_data_array[ind].image);
-	}
-    }
+  //for (ii=0;ii<XSPLIT;ii++)
+  //  {
+  //    for (jj=0;jj<YSPLIT;jj++)
+  //	{
+  //
+  //	ind=ii+XSPLIT*jj;
+  //	free(thread_data_array[ind].image);
+  //	}
+  //  }
       
   return output;
 
