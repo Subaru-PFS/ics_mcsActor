@@ -177,7 +177,7 @@ class McsCmd(object):
         image = pyfits.getdata(imagePath, 0)
         self.simulationPath = (path, idx+1, imagePath)
         cmd.debug('text="returning simulation file %s"' % (imagePath))
-        return image
+        return image, imagePath
 
     def requestNextFilename(self, cmd, frameId):
         """ Return a queue which will eventually contain a filename. """
@@ -350,13 +350,14 @@ class McsCmd(object):
     def _doExpose(self, cmd, expTime, expType, frameId):
         """ Take an exposure and save it to disk. """
 
+        if self.simulationPath is not None:
+            return self.getNextSimulationImage(cmd)
+
         nameQ = self.requestNextFilename(cmd, frameId)
         cmd.diag(f'text="new exposure"')
-        if self.simulationPath is None:
-            filename = 'scratchFile'
-            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
-        else:
-            image = self.getNextSimulationImage(cmd)
+
+        filename = 'scratchFile'
+        image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
         cmd.diag(f'text="done: {image.shape}"')
 
         cmd.diag('text="reading filename"')
@@ -500,9 +501,9 @@ class McsCmd(object):
                          'azimuth': az,
                          'instrot': instrot}
 
-        self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
-
- 
+        # We do *not* want to update existing rows for simulated images.
+        if self.simulationPath is None:
+            self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
 
     def calcThresh(self, cmd):
 
@@ -622,8 +623,6 @@ class McsCmd(object):
         cmd.inform('text="%d centroids"'% (len(centroids)))
         cmd.inform('state="centroids measured"')
                         
-    
-    
     def _writeTelescopeInfo(self, cmd, telescopeInfo, conn = None):
 
         # Let the database handle the primary key
@@ -640,7 +639,6 @@ class McsCmd(object):
         
         buf = io.StringIO()
 
-        
         line = '%d,%s,%d,%d,%s,%d' % (telescopeInfo['frameid'],telescopeInfo['starttime'],
                                       telescopeInfo['exptime']/1000.0,
                                       telescopeInfo['altitude'],telescopeInfo['azimuth'],
