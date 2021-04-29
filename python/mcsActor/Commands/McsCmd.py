@@ -212,7 +212,7 @@ class McsCmd(object):
 
         self.simulationPath = (path, idx+1, imagePath)
         cmd.debug('text="returning simulation file %s"' % (imagePath))
-        return imagePath,image
+        return image, imagePath
 
     def requestNextFilename(self, cmd, frameId):
         """ Return a queue which will eventually contain a filename. """
@@ -379,24 +379,15 @@ class McsCmd(object):
         if self.simulationPath is not None:
             return self.getNextSimulationImage(cmd)
 
-        cmd.diag(f'text="sim={self.simulationPath}"')
-
         nameQ = self.requestNextFilename(cmd, frameId)
 
-        
         cmd.diag(f'text="new exposure"')
-        if self.simulationPath is None:
-            filename = 'scratchFile'
-            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
-        else:
-            image,hdr = self.getNextSimulationImage(cmd)
-            self.visitId=frameId // 100
-        
+        filename = 'scratchFile'
+        image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
         cmd.diag(f'text="done: {image.shape}"')
 
         cmd.diag('text="reading filename"')
 
-        
         try:
             filename = nameQ.get(timeout=5.0)
         except queue.Empty:
@@ -795,10 +786,10 @@ class McsCmd(object):
                          'altitude': alt,
                          'azimuth': az,
                          'instrot': instrot}
-        print("telescopeInfo")
-        self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
 
- 
+        # We do *not* want to update existing rows for simulated images.
+        if self.simulationPath is None:
+            self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
 
     def calcThresh(self, cmd, frameId, zenithAngle, insRot):
 
@@ -964,7 +955,7 @@ class McsCmd(object):
         self.nCentroid = len(points)    
         cmd.inform('text="%d centroids"'% (len(centroids)))
         cmd.inform('state="centroids measured"')
-    
+
     def _writeTelescopeInfo(self, cmd, telescopeInfo, conn = None):
 
         # Let the database handle the primary key
