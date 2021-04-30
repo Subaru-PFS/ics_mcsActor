@@ -569,7 +569,7 @@ class McsCmd(object):
         cmd.inform('text="filename=%s"'%(filename))
         
         if doFibreID:
-            self.runFibreID(cmd, doFinish=False)
+            #self.runFibreID(cmd, doFinish=False)
             self.dumpCentroidtoDB(cmd, frameId)
 
 
