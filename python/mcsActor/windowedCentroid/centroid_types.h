@@ -50,6 +50,7 @@ typedef struct cand_point
   double peak;  //PEAK VALUE
   double xy; //ANGLE OF FWHM
   double qual; //quality flag
+  double back; //number of points in region
   double npt; //number of points in region
   struct cand_point *next;
 } cand_point;
@@ -64,7 +65,7 @@ typedef struct centroids
   double y2;
   double peak;
   double xy;
-  double qual;
+  double back;
 
 } centroids;
 

@@ -460,7 +460,7 @@ class McsCmd(object):
             self.dumpCentroidtoDB(cmd, frameId)
         
         if doFibreID:
-            self.runFibreID(cmd, doFinish=False)
+            #self.runFibreID(cmd, doFinish=False)
             self.dumpCentroidtoDB(cmd, frameId)
 
         self.handleTelescopeGeometry(cmd, filename, frameId, expTime)
