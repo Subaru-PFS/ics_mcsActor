@@ -6,6 +6,7 @@ import io
 import pathlib
 import queue
 import threading
+import sep
 
 import os
 import base64
@@ -29,7 +30,7 @@ from xml.etree.ElementTree import dump
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.Visualization.mcsRoutines as mcsTools
 
-
+import pandas as pd
 
 import numpy as np
 
@@ -62,7 +63,7 @@ class McsCmd(object):
             ('status', '', self.status),
             ('expose', '@(bias|test) [<frameId>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
-            ('expose', '@object <expTime> [<frameId>] [@noCentroids] [@doCentroid] [@doFibreID]', self.expose),
+            ('expose', '@object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
@@ -357,7 +358,7 @@ class McsCmd(object):
 
         return hdr
 
-    def _doExpose(self, cmd, expTime, expType, frameId):
+    def _doExpose(self, cmd, expTime, expType, frameId, mask=None):
         """ Take an exposure and save it to disk. """
 
         nameQ = self.requestNextFilename(cmd, frameId)
@@ -376,7 +377,12 @@ class McsCmd(object):
             cmd.warn('text="failed to get a new filename in time"')
             raise
         cmd.diag(f'text="read filename: {filename}"')
-
+        
+        if mask is not None:
+            cmd.inform(f'text="mask image shape: {mask.shape} type:{mask.dtype}"')
+            cmd.inform(f'text="image shape: {image.shape} type:{image.dtype}"')
+            image = image*mask.astype('uint16')
+            
         hdr = self._constructHeader(cmd, filename, expType, expTime)
         cmd.diag(f'text="hdr done: {len(hdr)}"')
         phdu = pyfits.PrimaryHDU(header=hdr)
@@ -419,12 +425,22 @@ class McsCmd(object):
         cmdKeys = cmd.cmd.keywords
 
         # Switch from default no centroids to default do centroids
-        noCentroidArg = 'noCentroids' in cmdKeys
+        noCentroidArg = 'noCentroid' in cmdKeys
         if noCentroidArg:
             doCentroid = False
         else:
             doCentroid = True
+        
         doFibreID = 'doFibreID' in cmdKeys
+
+        simDotArg = 'simDot' in cmdKeys
+        if simDotArg:
+            simDot = True
+            dotmask = self._makeDotMask(cmd)
+        else:
+            simDot = False
+
+
 
         cmd.inform('text="doCentroid = %s." '%{doCentroid})
         expType = cmdKeys[0].name
@@ -440,10 +456,13 @@ class McsCmd(object):
 
         if (expTime != self.expTime):
             self.actor.camera.setExposureTime(cmd,expTime)
- 
-        cmd.diag('text="Exposure time now is %d ms." '% (expTime))    
- 
-        filename, image = self._doExpose(cmd, expTime, expType, frameId)
+        
+        cmd.inform('text="Exposure time now is %d ms." '% (expTime))    
+        if simDot is True:
+            filename, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
+        else:
+            filename, image = self._doExpose(cmd, expTime, expType, frameId)
+
         if frameId is None:
             filename = pathlib.Path(filename)
             frameId = int(filename.stem[4:], base=10)
@@ -461,11 +480,11 @@ class McsCmd(object):
                 self.calcThresh(cmd)
 
             cmd.inform('text="Running centroid on current image" ')
-            self.runCentroid(cmd)
+            self.runCentroidSEP(cmd)
             
-            if (self.nCentroid < 2000):
-                self.calcThresh(cmd)
-                self.runCentroid(cmd)       
+            #if (self.nCentroid < 2000):
+            #    self.calcThresh(cmd)
+            #    self.runCentroid(cmd)       
             
             cmd.inform('text="Sending centroid data to database" ')
             self.dumpCentroidtoDB(cmd, frameId)
@@ -599,6 +618,33 @@ class McsCmd(object):
             self.matchRad = cmd.cmd.keywords["matchRad"].values[0]
         except:
             self.matchRad = 20
+
+    def runCentroidSEP(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+        self.newTable = "newTable" in cmdKeys
+            
+        cmd.debug('text="newTable value = %s"' % (self.newTable))
+
+        image = self.actor.image
+        
+        cmd.inform(f'state="measuring cached image: {image.shape}"')
+        centroids = sep.extract(image.astype(float), 300)
+        npoint=centroids.shape[0]
+        tCentroids = np.zeros((npoint,8))
+
+        tCentroids[:,0]=np.arange(npoint)+1
+        tCentroids[:,1]=centroids['x']
+        tCentroids[:,2]=centroids['y']
+        tCentroids[:,3]=centroids['x2']
+        tCentroids[:,4]=centroids['y2']
+        tCentroids[:,5]=centroids['xy']
+        tCentroids[:,6]=centroids['thresh']
+        tCentroids[:,7]=centroids['peak']
+
+        self.centroids=tCentroids
+        self.nCentroid = len(centroids)    
+        cmd.inform('text="%d centroids"'% (len(centroids)))
+        cmd.inform('state="centroids measured"')
 
     def runCentroid(self, cmd):
         """ Measure centroids on the last acquired image. """
@@ -761,3 +807,45 @@ class McsCmd(object):
         return arr
 
    
+    def _makeDotMask(self,cmd):
+        """ Make dot mask for simulation or proessing purpose)"""
+
+        # read dot location
+        dotfile = '/home/pfs/mhs/devel/pfs_instdata/data/pfi/dot/dot_measurements_20210428_el90_rot+00_ave.csv'    
+        dotpos = pd.read_csv(dotfile)
+        
+
+        unit_height = 30
+        unit_weight = 30
+        #r_mean=10
+        cmd.inform('text="Making dot image"')
+
+        mask = self._create_circular_mask(unit_height, unit_weight, radius=10)
+
+        masked_img = np.zeros([unit_height,unit_weight])+1
+
+        masked_img[mask] = 0
+        # To-do: change here for the image size
+        dotmask = np.zeros([7096,10000])+1
+
+        for i in range(len(dotpos)):
+            xstart=np.around(dotpos['x_tran'].values[i]-(unit_weight/2)).astype('int')
+
+            ystart=np.around(dotpos['y_tran'].values[i]-(unit_height/2)).astype('int') 
+
+            dotmask[ystart:ystart+unit_height,xstart:xstart+unit_weight] = masked_img
+
+        return dotmask
+    
+    def _create_circular_mask(self, h, w, center=None, radius=None):
+
+        if center is None: # use the middle of the image
+            center = (int(w/2), int(h/2))
+        if radius is None: # use the smallest distance between the center and image walls
+            radius = min(center[0], center[1], w-center[0], h-center[1])
+
+        Y, X = np.ogrid[:h, :w]
+        dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+        mask = dist_from_center <= radius
+        return mask        

@@ -1,5 +1,5 @@
 from builtins import object
-import numpy
+import numpy as np
 import time
 import subprocess as sub
 import astropy.io.fits as pyfits
@@ -44,6 +44,9 @@ class rmodCamera(Camera):
     def setExposureTime(self, cmd, expTime):
         """ Initial the MCS camera. """
         self.expTime = expTime
+        p = sub.Popen(['rmodcontrol', '-e', f'{expTime}'],stdout=sub.PIPE, stderr=sub.PIPE)
+        output, errors = p.communicate()
+        
         cmd.inform('expTime=%f ms' % (expTime))
         
     def expose(self, cmd, expTime, expType, filename, doCopy=True):
