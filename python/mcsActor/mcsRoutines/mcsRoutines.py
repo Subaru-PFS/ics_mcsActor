@@ -15,6 +15,9 @@ from scipy.stats import sigmaclip
 import centroid as centroid
 #sys.path.insert(1, "/Users/karr/Science/PFS/pfsPackages/ics_cobraCharmer/python/ics/cobraCharmer/")
 #sys.path.insert(1, "/Users/karr/software/mhs/products/DarwinX86/spt_operational_database/0.0.6/python/opdb-0.1-py3.7.egg/")
+rootPath=os.path.join(os.environ['ICS_MHS_ROOT'])
+dbPath=os.path.join(rootPath,"products/Linux64//spt_operational_database/0.0.6/python/opdb-0.1-py3.8.egg/")
+sys.path.insert(1, dbPaths)
 from opdb import models,utils,opdb
 import pfi as pfi 
 from scipy.spatial import cKDTree
