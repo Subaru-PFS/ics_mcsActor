@@ -35,7 +35,7 @@ reload(mcsToolsNew)
 
 rootPath=os.path.join(os.environ['ICS_MHS_ROOT'])
 dbPath=os.path.join(rootPath,"products/Linux64//spt_operational_database/0.0.6/python/opdb-0.1-py3.8.egg/")
-sys.path.insert(1, dbPaths)
+sys.path.insert(1, dbPath)
 
 from pfs.utils import coordinates
 from pfs.utils.coordinates import CoordTransp
