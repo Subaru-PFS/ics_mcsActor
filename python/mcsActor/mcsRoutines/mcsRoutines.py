@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,20 +7,21 @@ from importlib import reload
 import sys
 from pfs.utils import coordinates
 import pickle
-
+#import pfi as pfi
 from pfs.utils import coordinates
 from pfs.utils.coordinates import CoordTransp
 
 import pandas as pd
 from scipy.stats import sigmaclip
 import centroid as centroid
-#sys.path.insert(1, "/Users/karr/Science/PFS/pfsPackages/ics_cobraCharmer/python/ics/cobraCharmer/")
-#sys.path.insert(1, "/Users/karr/software/mhs/products/DarwinX86/spt_operational_database/0.0.6/python/opdb-0.1-py3.7.egg/")
+
 rootPath=os.path.join(os.environ['ICS_MHS_ROOT'])
 dbPath=os.path.join(rootPath,"products/Linux64//spt_operational_database/0.0.6/python/opdb-0.1-py3.8.egg/")
 sys.path.insert(1, dbPath)
 from opdb import models,utils,opdb
-import pfi as pfi 
+
+#from cobraCharmer import pfi
+
 from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist
 import cv2
@@ -32,7 +34,7 @@ def readCobraGeometryFake():
     the arm length is set to 4mm, the dot positions are offset and arbitrary. All "cobras" are good.
     """
 
-    centrePos=np.loadtxt("/Users/karr/ics_mcsActor/python/mcsActor/Visualization/scienceFibres.dat",delimiter=",")
+    centrePos=np.loadtxt("/home/pfs/karr/Set3/scienceFibres.dat",delimiter=",")
     centrePos[:,0]+=1
     armLength=np.repeat(3,centrePos.shape[0])
     nCobras=len(armLength)

@@ -28,8 +28,8 @@ import psycopg2.extras
 from xml.etree.ElementTree import dump
 #
 import mcsActor.windowedCentroid.centroid as centroid
-import mcsActor.Routines.mcsRoutines as mcsToolsNew
-import mcsActor.Routines.dbRoutinesMCS as dbTools
+import mcsActor.mcsRoutines.mcsRoutines as mcsToolsNew
+import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
 from importlib import reload
 reload(mcsToolsNew)
 
@@ -89,6 +89,7 @@ class McsCmd(object):
             ('simulate', 'off', self.simulateOff),
             ('switchFibreMode', '<fibreMode>', self.switchFibreMode),
             ('resetGeometry', '', self.resetGeometry),
+            ('resetGeometryFile','<geomFile>',self.resetGeometryFile)
         ]
 
         # Define typed command arguments for the above commands.
@@ -112,21 +113,21 @@ class McsCmd(object):
                                         keys.Key("matchRad", types.Int(), help="radius in pixels for matching positions"),
                                         keys.Key("threshMethod", types.String(), help="method for thresholding"),
                                         keys.Key("threshMode", types.Float(), help="mode for threshold"),
+                                        keys.Key("geomFile", types.String(), help="file for geometry"),
+                                        keys.Key("dotFile", types.String(), help="file for dot information"),
                                         keys.Key("fieldID", types.String(), help="fieldID for getting instrument parameters"),
                                         keys.Key("fibreMode", types.String(), help="flag for testing different inputs")
                                         )
 
-    @property
 
-    def connectToDB(self,cmd):
-
+    def connectToDB(self, cmd):
 
         """connect to the database if not already connected"""
         if self._db is not None:
             return self._db
 
         try:
-            db=dbTools.connectToDB(hostname='',port=5432,dbname='opdb',username='karr',passwd=None)
+            db=dbTools.connectToDB(hostname='117.56.225.230',port='5432',dbname='opdb',username='pfs',passwd=None)
             
         except:
             raise RuntimeError("unable to connect to the database")
@@ -334,7 +335,7 @@ class McsCmd(object):
         db = self.connectToDB(cmd)
         cmd.inform(f'text="writing centroids to database for exposure ID {frameId}"')
 
-        dbTools.writeCentroidsToDB(db,self.centroids,frameId)
+        dbTools.writeCentroidsToDB(db,self.centroids,int(frameId))
         cmd.inform(f'text="centroids written"')
 
     def _makeImageHeader(self, cmd):
@@ -461,7 +462,7 @@ class McsCmd(object):
             doCentroid = True
         doFibreID = 'doFibreID' in cmdKeys
         cmd.inform('text="doCentroid = %s." '%{doCentroid})
-        cmd.inform(f'text="doCentroid= {doCentroid:s} doFibreId = {doFibreId:s}')
+        cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID}')
 
         #get frame ID if explicitly set, otherise reset
         expType = cmdKeys[0].name
@@ -501,15 +502,15 @@ class McsCmd(object):
 
             #load telescope values from the DB
             cmd.inform('text="loading telescope parameters"')
-            zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,frameId)
+            zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
             
             cmd.inform('text="zenith angle=%s"'%(zenithAngle))
             cmd.inform('text="instrument rotation=%s"'%(insRot))
-
+            
             #get the geometry if it hasn't been loaded yet
             cmd.inform('text="loading geometry"')
             self.getGeometry(cmd)
-
+            
             
             cmd.inform('text="Setting centroid parameters." ')
             self.setCentroidParams(cmd)
@@ -561,7 +562,7 @@ class McsCmd(object):
         cmd.inform(f'text="fibreMode = {self.fibreMode}"')
         cmd.finish('switchFibreMode=done')
 
-    def resetGeometry:
+    def resetGeometry():
 
         """
         reset the geometry flag. Next call of getGeometry will reload parameters.
@@ -578,7 +579,7 @@ class McsCmd(object):
         ##three modes here - asrd is in pixels, full is in mm, and comm is in mm with fake cobra geometry becuase
         ##there are no cobras
 
-        if(self.geometrySet==False):
+        if(self.geometrySet==True):
             cmd.inform('text="geometry is already set"')
             return
 
@@ -593,7 +594,7 @@ class McsCmd(object):
             cmd.inform(f'text="offset={self.offset[0]},{self.offset[1]}"')
 
             #boresight centre in pixels
-            self.rotCent=dbTools.loadBoresightFromDB(db,self.visitId)
+            self.rotCent=dbTools.loadBoresightFromDB(db,int(self.visitId))
             cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
 
             #read xmlFile
@@ -620,7 +621,7 @@ class McsCmd(object):
             cmd.inform(f'text="offset={self.offset[0]},{self.offset[1]}"')
 
             #boresight centre in pixels
-            self.rotCent=dbTools.loadBoresightFromDB(db,self.visitId)
+            self.rotCent=dbTools.loadBoresightFromDB(db,int(self.visitId))
             cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
 
             #read xmlFile
@@ -644,7 +645,7 @@ class McsCmd(object):
             cmd.inform(f'text="offset={self.offset[0]},{self.offset[1]}"')
 
             #boresight centre, in pixels
-            self.rotCent=dbTools.loadBoresightFromDB(db,self.visitId)
+            self.rotCent=dbTools.loadBoresightFromDB(db,int(self.visitId))
 
             cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
 
@@ -694,7 +695,7 @@ class McsCmd(object):
             cmd.inform(f'text="fiducial fibres matched"')
         
             afCoeff,xd,yd,sx,sy,rotation=mcsToolsNew.calcAffineTransform(matchPoint,self.fidPos)
-            dbTools.writeAffineToDB(db,afCoeff,frameId)
+            dbTools.writeAffineToDB(db,afCoeff,int(frameId))
             
             cmd.inform(f'text="transform calculated {xd} {yd} {sx} {sy} {rotation}"')
 
@@ -713,11 +714,11 @@ class McsCmd(object):
             
         db = self.connectToDB(cmd)
 
-        tarPos=dbTools.loadTargetsFromDB(db,frameId)
+        tarPos=dbTools.loadTargetsFromDB(db,int(frameId))
         cmd.inform(f'text="loaded target postitions from DB"')
         cobraMatch=mcsToolsNew.fibreID(self.centroidsMMTrans,tarPos,self.centrePos,self.armLength,self.dotPos,self.adjacentCobras,self.goodIdx)
         cmd.inform(f'text="identified fibres"')
-        dbTools.writeMatchesToDB(db,cobraMatch,frameId)
+        dbTools.writeMatchesToDB(db,cobraMatch,int(frameId))
 
         cmd.inform(f'text="wrote matched cobras to database"')
 
@@ -777,7 +778,7 @@ class McsCmd(object):
         
         cmd.inform('text="loading telescope parameters"')
 
-        zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,frameId)
+        zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
 
         #different transforms for different setups: with and w/o field elements
         if(self.fibreMode == 'full'):
