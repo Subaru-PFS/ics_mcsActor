@@ -605,11 +605,11 @@ class McsCmd(object):
             if(self.geomFile == None):
                 self.geomFile = os.path.join(instPath,"data/pfi/modules/ALL/ALL_final.xml")
             if(self.dotFile == None):
-                self.dotFile = os.path.join(instPath,"data/pfi/dot_measurements_20210428_el30_rot+00_ave.csv")
+                self.dotFile = os.path.join(instPath,"data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
                 
             #xmlFile="/Users/karr/Science/PFS/cobraData/Full2D/20210219_002/output/ALL_new.xml"
             #dotFile="/Users/karr/software/mhs/products/DarwinX86/pfs_instdata/1.0.1/data/pfi/dot_measurements_20210428_el90_rot+00_ave.csv"
-            cmd.inform(f'text="reading geometry from {xmlFile}"')
+            cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
 
             self.centrePos,self.armLength,self.dotPos,self.goodIdx=mcsToolsNew.readCobraGeometry(xmlFile,dotFile)
             cmd.inform('text="cobra geometry read"')
@@ -628,8 +628,10 @@ class McsCmd(object):
             instPath=os.path.join(os.environ['PFS_INSTDATA_DIR'])
             if(self.geomFile == None):
                 self.geomFile = os.path.join(instPath,"data/pfi/modules/ALL/ALL_final.xml")
+            if(self.dotFile == None):
+                self.dotFile = os.path.join(instPath,"data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
 
-            cmd.inform(f'text="reading geometry from {self.geomFile}"')
+            cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
             self.centrePos,self.armLength,self.dotPos,self.goodIdx=mcsToolsNew.readCobraGeometry(self.geomFile,self.dotFile)
             cmd.inform('text="cobra geometry read"')
 

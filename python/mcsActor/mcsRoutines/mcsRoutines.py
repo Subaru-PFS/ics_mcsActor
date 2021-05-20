@@ -18,9 +18,12 @@ import centroid as centroid
 rootPath=os.path.join(os.environ['ICS_MHS_ROOT'])
 dbPath=os.path.join(rootPath,"products/Linux64//spt_operational_database/0.0.6/python/opdb-0.1-py3.8.egg/")
 sys.path.insert(1, dbPath)
+
+cobraPath=os.path.join(rootPath,"devel/ics_cobraCharmer/python/")
+sys.path.insert(1,cobraPath)
 from opdb import models,utils,opdb
 
-#from cobraCharmer import pfi
+from cobraCharmer import pfi
 
 from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist
