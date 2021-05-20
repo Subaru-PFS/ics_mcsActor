@@ -817,7 +817,7 @@ class McsCmd(object):
 
         unit_height = 30
         unit_weight = 30
-        #r_mean=10
+        r_mean=np.around(np.mean(dotpos['r_tran'].values)).astype('int')
         cmd.inform('text="Making dot image"')
 
         mask = self._create_circular_mask(unit_height, unit_weight, radius=10)
