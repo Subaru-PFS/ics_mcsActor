@@ -22,7 +22,6 @@ from opscore.utility.qstr import qstr
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
 from scipy.spatial import cKDTree
 
-# import pfs.utils.config as pfsConfig
 
 import psycopg2
 import psycopg2.extras
@@ -33,7 +32,10 @@ import mcsActor.Routines.mcsRoutines as mcsToolsNew
 import mcsActor.Routines.dbRoutinesMCS as dbTools
 from importlib import reload
 reload(mcsToolsNew)
-sys.path.insert(1, "/Users/karr/software/mhs/products/DarwinX86/spt_operational_database/0.0.6/python/opdb-0.1-py3.7.egg/")
+
+rootPath=os.path.join(os.environ['ICS_MHS_ROOT'])
+dbPath=os.path.join(rootPath,"products/Linux64//spt_operational_database/0.0.6/python/opdb-0.1-py3.8.egg/")
+sys.path.insert(1, dbPaths)
 
 from pfs.utils import coordinates
 from pfs.utils.coordinates import CoordTransp
@@ -60,9 +62,11 @@ class McsCmd(object):
         self.findThresh = None
         self.centThresh =  None
 
-        #self.db='db-ics'
         self.setCentroidParams(None)
         self.adjacentCobras = None
+        self.geometrySet = False
+        self.geomFile = None
+        self.dotFile = None
         
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -84,6 +88,7 @@ class McsCmd(object):
             ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
             ('switchFibreMode', '<fibreMode>', self.switchFibreMode),
+            ('resetGeometry', '', self.resetGeometry),
         ]
 
         # Define typed command arguments for the above commands.
@@ -112,30 +117,11 @@ class McsCmd(object):
                                         )
 
     @property
-    def conn(self):
-        if self._conn is not None:
-            return self._conn
 
-        pwpath=os.path.join(os.environ['ICS_MCSACTOR_DIR'],
-                            "etc", "dbpasswd.cfg")
-
-        try:
-            file = open(pwpath, "r")
-            passstring = file.read()
-        except:
-            raise RuntimeError(f"could not get db password from {pwpath}")
-
-        try:
-            connString = "dbname='opdb' user='pfs' host="+self.db+" password="+passstring
-            self.actor.logger.info(f'connecting to {connString}')
-            conn = psycopg2.connect(connString)
-            self._conn = conn
-        except Exception as e:
-            raise RuntimeError("unable to connect to the database {connString}: {e}")
-
-        return self._conn
-    
     def connectToDB(self,cmd):
+
+
+        """connect to the database if not already connected"""
         if self._db is not None:
             return self._db
 
@@ -173,18 +159,18 @@ class McsCmd(object):
 
         cmd.inform('text="MCS camera present!"')
         cmd.finish()
-
-    def inputVersion(self, cmd):
-        
-        cmdKeys = cmd.cmd.keywords
-        self.inputV = cmdKeys[0].name
-        cmd.finish()
         
     def simulateOff(self, cmd):
+
+        """turn off simulation mode"""
+        
         self.simulationPath = None
         cmd.finish('text="set simulation path to %s"' % str(self.simulationPath))
 
     def simulateOn(self, cmd):
+
+        """set path for simulated images"""
+        
         cmdKeys = cmd.cmd.keywords
 
         path = cmdKeys['path'].values[0]
@@ -342,34 +328,14 @@ class McsCmd(object):
         return hdr
 
     def writeCentroidsToDB(self, cmd, frameId):
-        """Connect to database and return json string to an attribute."""
+        """write centroids to database"""
 
 
         db = self.connectToDB(cmd)
-        cmd.diag(f'text="writing centroids to db {db}"')
-        #cmd.inform(f'text="writing centroids to frameID "' % (str(frameId)))
-        cmd.inform('text="frameIds = %s." '%{frameId})
+        cmd.inform(f'text="writing centroids to database for exposure ID {frameId}"')
 
         dbTools.writeCentroidsToDB(db,self.centroids,frameId)
-        cmd.inform(f'text="written to db"')
-
-    def dumpCentroidtoDB(self, cmd, frameId):
-        """Connect to database and return json string to an attribute."""
-        
-        conn = self.conn
-        cmd.diag(f'text="dumping centroids to db {conn}"')
-        
-        # The section should be removed, replaced by the createTables command.
-        if self.newTable:
-            self._makeTables(conn, doDrop=True)
-            cmd.inform('text="Centroid table created. "')
-        else:
-            #self._makeTables(conn, doDrop=False)
-            cmd.inform('text="Attaching centroid to exsiting table. "')
-        
-        buf = self._writeCentroids(self.centroids,1,frameId,1,conn)
-
-        cmd.inform('text="Centroids of exposure ID %08d dumped."' % (frameId))
+        cmd.inform(f'text="centroids written"')
 
     def _makeImageHeader(self, cmd):
         """ Create a complete WCS header.
@@ -467,13 +433,22 @@ class McsCmd(object):
 
     
     def resetThreshold(self,cmd):
+
+        """reset the thresholds"""
+        
         self.findThresh = None
         self.centThresh =  None
         cmd.finish('Centroid threshold=d=reset')
         
             
     def expose(self, cmd):
-        """ Take an exposure. Optionally centroids. Optionally FibreID """
+        
+        """
+        call the sequence of steps for an exposure 
+         - take image (or read from disk)
+         - if noCentroids not set, do cetnroiding, write to database
+         - if doFibreID set, do transformations, fibre identification, write to DB
+        """
 
         
         cmdKeys = cmd.cmd.keywords
@@ -485,14 +460,18 @@ class McsCmd(object):
         else:
             doCentroid = True
         doFibreID = 'doFibreID' in cmdKeys
-
         cmd.inform('text="doCentroid = %s." '%{doCentroid})
+        cmd.inform(f'text="doCentroid= {doCentroid:s} doFibreId = {doFibreId:s}')
+
+        #get frame ID if explicitly set, otherise reset
         expType = cmdKeys[0].name
         if 'frameId' in cmdKeys:
             frameId = cmdKeys['frameId'].values[0]
         else:
             frameId = None
 
+            
+        #set exposure time 
         if expType in ('bias', 'test'):
             expTime = self.expTime
         else:
@@ -502,29 +481,36 @@ class McsCmd(object):
             self.actor.camera.setExposureTime(cmd,expTime)
 
         cmd.diag('text="Exposure time now is %d ms." '% (expTime))    
- 
+
+        # do the expoure and and associated saving/header stuff
         filename, image = self._doExpose(cmd, expTime, expType, frameId)
         if frameId is None:
             filename = pathlib.Path(filename)
             frameId = int(filename.stem[4:], base=10)
+
+        #set visitID
         self.visitId = frameId // 100
         self.actor.image = image
-        cmd.inform(f'text="image stats {image.mean()}"')
-
-        #get telescope information from database
+        #cmd.inform(f'text="image stats {image.mean()}"')
         
-        #do the centroids
+        #if the centroid flag is set
         if doCentroid:
-            cmd.inform('text="loading telescope parameters"')
 
+            #connect to DB
             db = self.connectToDB(cmd)
 
+            #load telescope values from the DB
+            cmd.inform('text="loading telescope parameters"')
             zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,frameId)
             
             cmd.inform('text="zenith angle=%s"'%(zenithAngle))
             cmd.inform('text="instrument rotation=%s"'%(insRot))
 
+            #get the geometry if it hasn't been loaded yet
+            cmd.inform('text="loading geometry"')
             self.getGeometry(cmd)
+
+            
             cmd.inform('text="Setting centroid parameters." ')
             self.setCentroidParams(cmd)
    
@@ -549,7 +535,6 @@ class McsCmd(object):
 
                 #read FF from the database, get list of adjacent fibres if they haven't been calculated yet.
                 if(self.adjacentCobras == None):
-                    db = self.connectToDB(cmd)
                     adjacentCobras=mcsToolsNew.makeAdjacentList(self.centrePos[:,1:3],self.armLength)
                     cmd.inform(f'text="made adjacent lists"')
                     self.fidPos=dbTools.loadFiducialsFromDB(db)
@@ -576,6 +561,14 @@ class McsCmd(object):
         cmd.inform(f'text="fibreMode = {self.fibreMode}"')
         cmd.finish('switchFibreMode=done')
 
+    def resetGeometry:
+
+        """
+        reset the geometry flag. Next call of getGeometry will reload parameters.
+        """
+        
+        self.geometrySet=False
+        
     def getGeometry(self,cmd):
 
 
@@ -584,6 +577,10 @@ class McsCmd(object):
 
         ##three modes here - asrd is in pixels, full is in mm, and comm is in mm with fake cobra geometry becuase
         ##there are no cobras
+
+        if(self.geometrySet==False):
+            cmd.inform('text="geometry is already set"')
+            return
 
         if(self.fibreMode=="asrd"):
 
@@ -600,14 +597,24 @@ class McsCmd(object):
             cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
 
             #read xmlFile
-            xmlFile="/Users/karr/Science/PFS/cobraData/Full2D/20210219_002/output/ALL_new.xml"
-            dotFile="/Users/karr/software/mhs/products/DarwinX86/pfs_instdata/1.0.1/data/pfi/dot_measurements_20210428_el90_rot+00_ave.csv"
+            #where is inst_data
+            
+            
+            instPath=os.path.join(os.environ['PFS_INSTDATA_DIR'])
+            if(self.geomFile == None):
+                self.geomFile = os.path.join(instPath,"data/pfi/modules/ALL/ALL_final.xml")
+            if(self.dotFile == None):
+                self.dotFile = os.path.join(instPath,"data/pfi/dot_measurements_20210428_el30_rot+00_ave.csv")
+                
+            #xmlFile="/Users/karr/Science/PFS/cobraData/Full2D/20210219_002/output/ALL_new.xml"
+            #dotFile="/Users/karr/software/mhs/products/DarwinX86/pfs_instdata/1.0.1/data/pfi/dot_measurements_20210428_el90_rot+00_ave.csv"
             cmd.inform(f'text="reading geometry from {xmlFile}"')
 
             self.centrePos,self.armLength,self.dotPos,self.goodIdx=mcsToolsNew.readCobraGeometry(xmlFile,dotFile)
             cmd.inform('text="cobra geometry read"')
 
         elif(self.fibreMode=="full"):
+
             #check this value
             self.offset=[0,0]
             cmd.inform(f'text="offset={self.offset[0]},{self.offset[1]}"')
@@ -617,10 +624,12 @@ class McsCmd(object):
             cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
 
             #read xmlFile
-            xmlFile="/Users/karr/Science/PFS/cobraData/Full2D/20210219_002/output/ALL_new.xml"
-            cmd.inform(f'text="reading geometry from {xmlFile}"')
+            instPath=os.path.join(os.environ['PFS_INSTDATA_DIR'])
+            if(self.geomFile == None):
+                self.geomFile = os.path.join(instPath,"data/pfi/modules/ALL/ALL_final.xml")
 
-            self.centrePos,self.armLength,self.dotPos,self.goodIdx=mcsToolsNew.readCobraGeometry(xmlFile)
+            cmd.inform(f'text="reading geometry from {self.geomFile}"')
+            self.centrePos,self.armLength,self.dotPos,self.goodIdx=mcsToolsNew.readCobraGeometry(self.geomFile,self.dotFile)
             cmd.inform('text="cobra geometry read"')
 
         elif(self.fibreMode=="comm"):
@@ -646,8 +655,22 @@ class McsCmd(object):
 
         cmd.inform('text="fiducial fibres read"')
 
+    def setDotFile(self,cmd):
         
+        self.geomFile=cmd.cmd.keywords["dotFile"].values[0]
+        cmd.inform(f'text="geometry file set to {self.dotFile}"')
 
+    def resetGeometryFile(self,cmd):
+
+        self.geomFile = None
+        cmd.inform(f'text="geometry file set to {self.geomFile}"')
+    
+    def setGeometryFile(self,cmd):
+
+        self.geomFile=cmd.cmd.keywords["geomFile"].values[0]
+        cmd.inform(f'text="geometry file set to {self.geomFile}"')
+
+        
     def transformations(self,cmd,frameId,zenithAngle,insRot):
 
         #two caes here, the full mm version, and the asrd pixel version, with no ff
@@ -700,10 +723,6 @@ class McsCmd(object):
 
         #save the values to the previous position
         self.prevPos=cobraMatch[:,[0,2,3]]
-        
-    def writeMatchesToDB(self,cmd):
-        pass
-          
         
     def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
 
@@ -851,10 +870,11 @@ class McsCmd(object):
         except:
             self.threshMode = 'full'
 
- 
         
 
     def runCentroid(self, cmd):
+
+        
         """ Measure centroids on the last acquired image. """
 
         cmdKeys = cmd.cmd.keywords
