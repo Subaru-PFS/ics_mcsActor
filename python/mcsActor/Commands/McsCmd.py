@@ -604,6 +604,7 @@ class McsCmd(object):
             instPath=os.path.join(os.environ['PFS_INSTDATA_DIR'])
             if(self.geomFile == None):
                 self.geomFile = os.path.join(instPath,"data/pfi/modules/ALL/ALL_final.xml")
+                #self.geomFile = "/home/pfs/karr/Set1/ALL_new.xml"
             if(self.dotFile == None):
                 self.dotFile = os.path.join(instPath,"data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
                 
@@ -611,7 +612,7 @@ class McsCmd(object):
             #dotFile="/Users/karr/software/mhs/products/DarwinX86/pfs_instdata/1.0.1/data/pfi/dot_measurements_20210428_el90_rot+00_ave.csv"
             cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
 
-            self.centrePos,self.armLength,self.dotPos,self.goodIdx=mcsToolsNew.readCobraGeometry(xmlFile,dotFile)
+            self.centrePos,self.armLength,self.dotPos,self.goodIdx=mcsToolsNew.readCobraGeometry(self.geomFile,self.dotFile)
             cmd.inform('text="cobra geometry read"')
 
         elif(self.fibreMode=="full"):
