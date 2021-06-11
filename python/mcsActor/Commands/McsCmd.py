@@ -143,6 +143,12 @@ class McsCmd(object):
         self.actor.connectCamera(cmd)
         self.actor.camera.setExposureTime(cmd,self.expTime)
 
+        gen2Keys = self.actor.models['gen2'].keyVarDict
+        
+        print(f'{gen2Keys}')
+
+        #cmd.inform(f'text={gen2Keys['INST-PA']}')
+
         cmd.inform('text="MCS camera present!"')
         cmd.finish()
 
@@ -235,7 +241,7 @@ class McsCmd(object):
 
         # For now, do _not_ add gen2 cards, since we still have the gen2Actor generate them.
         modelNames = set(self.actor.models.keys())
-        modelNames.discard("gen2")
+        #modelNames.discard("gen2")
         
         cmd.debug('text="fetching MHS cards for %s..."' % (modelNames))
         cards = fitsUtils.gatherHeaderCards(cmd, self.actor,
@@ -267,21 +273,8 @@ class McsCmd(object):
             expType = 'acquisition'
 
         frameId = os.path.splitext(os.path.basename(filename))[0]
-        ret = self.actor.cmdr.call(actor='gen2',
-                                   cmdStr=f'getFitsCards \
-                                            frameid={frameId} \
-                                            expType={expType} expTime={expTime/1000.0}',
-                                   timeLim=3.0)
-        if ret.didFail:
-            raise RuntimeError("getFitsCards failed!")
-
-        hdrString = self.actor.models['gen2'].keyVarDict['header'].valueList[0]
-        hdrString = base64.b64decode(hdrString).decode('latin-1')
-        try:
-            hdr = pyfits.Header.fromstring(hdrString)
-        except Exception as e:
-            cmd.warn('text="FAILED to fetch gen2 cards: %s"' % (e))
-            hdr = pyfits.Header()
+        
+        hdr = pyfits.Header()
 
         try:
             detectorTemp = self.actor.models['meb'].keyVarDict['temps'].valueList[1]
@@ -344,7 +337,7 @@ class McsCmd(object):
         """
 
         gen2Keys = self.actor.models['gen2'].keyVarDict
-
+        print(gen2Keys['AZIMUTH'])
         imageCenter = (8960//2, 5778//2)
         rot = gen2Keys['tel_rot'][1]
         alt = gen2Keys['tel_axes'][1]
@@ -497,7 +490,11 @@ class McsCmd(object):
         cmd.finish('exposureState=done')
 
     def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
+        gen2Model = self.actor.models['gen2'].keyVarDict
+        az, alt = gen2Model['tel_axes'].getValue()
+        rot = gen2Model['tel_rot'].getValue()
 
+        cmd.inform(f'text="Telescope informatio az={az} alt={alt} rot={rot}"')
         if self.simulationPath is None:
             # We are live: use Gen2 telescope info.
             gen2Model = self.actor.models['gen2'].keyVarDict
