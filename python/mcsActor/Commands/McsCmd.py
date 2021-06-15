@@ -221,6 +221,9 @@ class McsCmd(object):
         cmd.inform('text="imageSize = %s." '%{image.shape[1]})
 
         self.simulationPath = (path, idx+1, imagePath)
+        frameId = int(imagePath.stem[4:], base=10)
+        self.visitId = frameId // 100
+
         cmd.debug('text="returning simulation file %s"' % (imagePath))
         return imagePath, image
 
