@@ -523,7 +523,7 @@ class McsCmd(object):
             db = self.connectToDB(cmd)
 
             #load telescope values from the DB
-            cmd.inform('text="loading telescope parameters"')
+            cmd.inform(f'text="loading telescope parameters for frame={frameId}"')
             zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
             
             cmd.inform('text="zenith angle=%s"'%(zenithAngle))
@@ -532,7 +532,6 @@ class McsCmd(object):
             #get the geometry if it hasn't been loaded yet
             cmd.inform('text="loading geometry"')
             self.getGeometry(cmd)
-            
             
             cmd.inform('text="Setting centroid parameters." ')
             self.setCentroidParams(cmd)
@@ -814,6 +813,7 @@ class McsCmd(object):
         cmd.inform('text="loading telescope parameters"')
 
         zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
+        cmd.diag(f'text="zenithAngle={zenithAngle}, insRot={insRot}"')
 
         #different transforms for different setups: with and w/o field elements
         if(self.fibreMode == 'full'):
