@@ -210,7 +210,10 @@ class McsCmd(object):
             raise RuntimeError(f"no .fits files in {path}")
 
         if  idx+1 > len(files):
-            idx = 0
+            # I don't think this is what we want: when the data set
+            # has been read we should *stop*, not loop back.
+            # idx = 0
+            raise RuntimeError(f"no more .fits files in {path}")
 
         imagePath = files[idx]
         cmd.inform('text="frameIds2 = %s." '%{imagePath})
