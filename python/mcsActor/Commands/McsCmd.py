@@ -221,6 +221,7 @@ class McsCmd(object):
         cmd.inform('text="imageSize = %s." '%{image.shape[1]})
 
         self.simulationPath = (path, idx+1, imagePath)
+        imagePath = pathlib.Path(imagePath)
         frameId = int(imagePath.stem[4:], base=10)
         self.visitId = frameId // 100
 
@@ -267,6 +268,8 @@ class McsCmd(object):
 
             visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
             frameId = visit * 100
+
+            ## DANGER!!! This **CANNOT** be run at Subaru:
             self._insertPFSVisitID(visit)
 
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d', time.gmtime()))
@@ -968,19 +971,11 @@ class McsCmd(object):
     def _writeTelescopeInfo(self, cmd, telescopeInfo, conn = None):
 
         # Let the database handle the primary key
-        with conn:
-            with conn.cursor() as curs:
-                curs.execute('select * FROM "mcs_exposure" where false')
-                colnames = [desc[0] for desc in curs.description]
-            realcolnames = colnames[0:]
+        db = self.connectToDB(cmd)
+        res = db.session.execute('select * FROM "mcs_exposure" where false')
+        colnames = res.keys()
+        realcolnames = colnames[0:]
         
-        colname = []
-        for i in realcolnames:
-            x='"'+i+'"'
-            colname.append(x)
-        
-        buf = io.StringIO()
-
         """
           TODO: Those are the fake values for making PFI to work now, adding actual code later
         """
@@ -1001,14 +996,11 @@ class McsCmd(object):
             adc_pa,dome_temperature,dome_pressure,dome_humidity,outside_temperature,outside_pressure,
             outside_humidity,mcs_cover_temperature,mcs_m1_temperature,taken_at,taken_in_hst_at)
 
+        buf = io.StringIO()
         buf.write(line)
         buf.seek(0,0)
-            
-        with conn:
-            with conn.cursor() as curs:
-                curs.copy_from(buf,'"mcs_exposure"',',',
-                               columns=colname)
 
+        self._writeData('mcs_exposure', realcolnames, buf)
         buf.seek(0,0)
         
         cmd.inform('text="Telescope information for frame %s populated."' % (telescopeInfo['frameid']))
@@ -1045,7 +1037,6 @@ class McsCmd(object):
             
         # Save measurements to a CSV buffer
         measBuf = io.StringIO()
-        
 
         data = np.insert(centArr, 5, 0, axis=1)
        
@@ -1053,11 +1044,9 @@ class McsCmd(object):
         measBuf.seek(0,0)
 
         # Let the database handle the primary key
-        with conn:
-            with conn.cursor() as curs:
-                curs.execute('select * FROM "mcs_data" where false')
-                colnames = [desc[0] for desc in curs.description]
-            realcolnames = colnames[:]
+        db = self.connectToDB(None)
+        colnames = db.session.execute('select * FROM "mcs_data" where false')
+        realcolnames = colnames[:]
         
         colname = []
         for i in realcolnames:
@@ -1071,38 +1060,26 @@ class McsCmd(object):
             buf.write(line)
         buf.seek(0,0)
             
-        with conn:
-            with conn.cursor() as curs:
-                curs.copy_from(buf,'"mcs_data"',',',
-                               columns=colname)
-
+        self._writeData('mcs_data', realcolnames, buf)
         buf.seek(0,0)
-        
         return buf
 
     def _readCentroids(self, conn, frameId, moveId):
         """ Read all measurements for a given (frameId, moveId)"""
-        
+
+        if conn is None:
+            conn = self.connectToDB()
+
         if self.simulationPath is None:
-            buf = io.StringIO()
-        
             cmd = """copy (select * from mcsPerFiber where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
-            with conn.cursor() as curs:
-                curs.copy_expert(cmd, buf)
-            conn.commit()
-            buf.seek(0,0)
-        
+            buf = self._readData(cmd)
+
             # Skip the frameId, etc. columns.
             arr = np.genfromtxt(buf, dtype='f4',
                                 delimiter=',',usecols=range(4,24))
         else:
-            buf = io.StringIO()
-
             cmd = f"""copy (select * from 'mcsData' where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
-            with conn.cursor() as curs:
-                curs.copy_expert(cmd, buf)
-            conn.commit()
-            buf.seek(0,0)
+            buf = self._readData(cmd)
 
             # Skip the frameId, etc. columns.
             arr = np.genfromtxt(buf, dtype='f4',
