@@ -140,7 +140,8 @@ class McsCmd(object):
         except:
             raise RuntimeError("unable to connect to the database")
 
-        cmd.inform('text="Connected to Database"')
+        if cmd is not None:
+            cmd.inform('text="Connected to Database"')
 
         self._db=db
         return self._db
