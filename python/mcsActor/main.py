@@ -5,6 +5,7 @@ import actorcore.ICC
 import aitCamera
 import mcsCamera
 import fakeCamera
+import rmodCamera
 from past.builtins import reload
 
 class Mcs(actorcore.ICC.ICC):
@@ -20,14 +21,21 @@ class Mcs(actorcore.ICC.ICC):
         self.exposureID = 0
         
         self.connectCamera(self.bcast)
-        
-    def connectCamera(self, cmd, doFinish=True):
-
+    
+ 
+    def connectCamera(self, cmd, camera='rmod', doFinish=True):
+        reload(rmodCamera)
         reload(mcsCamera)
+        
         try:
-            self.camera = mcsCamera.mcsCamera()
-            self.camera.initialCamera(cmd)
-            cmd.inform('text="loaded real MCS camera"')
+            if camera is 'rmod':
+                self.camera = rmodCamera.rmodCamera()
+                self.camera.initialCamera(cmd)
+                cmd.inform('text="loaded RMOD-71M camera"')
+            if camera is 'mcs':
+                self.camera = mcsCamera.mcsCamera()
+                self.camera.initialCamera(cmd)
+                cmd.inform('text="loaded real MCS camera"')
         except Exception as e:
             cmd.warn('text="failed to load MCS camera, loading fakeCamera: %s"' % (e))
             self.camera = fakeCamera.FakeCamera()
