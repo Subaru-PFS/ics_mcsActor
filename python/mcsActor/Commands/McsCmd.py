@@ -123,7 +123,20 @@ class McsCmd(object):
             return self._db
 
         try:
-            db=dbTools.connectToDB(hostname='117.56.225.230',port='5432',dbname='opdb',username='pfs',passwd=None)
+            config = self.actor.config
+            hostname = config.get('db', 'hostname')
+            dbname = config.get('db', 'dbname', fallback='opdb')
+            port = config.get('db', 'port', fallback=5432)
+            username = config.get('db', 'username', fallback='pfs')
+        except Exception as e:
+            raise RuntimeError(f'failed to load opdb configuration: {e}')
+
+        try:
+            db=dbTools.connectToDB(hostname=hostname,
+                                   port=port,
+                                   dbname=dbname,
+                                   username=username,
+                                   passwd=None)
             
         except:
             raise RuntimeError("unable to connect to the database")
