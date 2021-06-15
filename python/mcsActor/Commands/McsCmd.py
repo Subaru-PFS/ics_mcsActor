@@ -578,7 +578,7 @@ class McsCmd(object):
         cmd.inform('text="filename=%s"'%(filename))
         
         if doFibreID:
-            self.runFibreID(cmd, doFinish=False)
+            #self.runFibreID(cmd, doFinish=False)
             self.dumpCentroidtoDB(cmd, frameId)
 
 
@@ -795,10 +795,10 @@ class McsCmd(object):
                          'altitude': alt,
                          'azimuth': az,
                          'instrot': instrot}
-        print("telescopeInfo")
-        self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
 
- 
+        # We do *not* want to update existing rows for simulated images.
+        if self.simulationPath is None:
+            self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
 
     def calcThresh(self, cmd, frameId, zenithAngle, insRot):
 
@@ -964,6 +964,7 @@ class McsCmd(object):
         self.nCentroid = len(points)    
         cmd.inform('text="%d centroids"'% (len(centroids)))
         cmd.inform('state="centroids measured"')
+                        
     
     def _writeTelescopeInfo(self, cmd, telescopeInfo, conn = None):
 
