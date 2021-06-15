@@ -756,11 +756,13 @@ class McsCmd(object):
         self.prevPos=cobraMatch[:,[0,2,3]]
         
     def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
-        gen2Model = self.actor.models['gen2'].keyVarDict
-        az, alt = gen2Model['tel_axes'].getValue()
-        rot = gen2Model['tel_rot'].getValue()
+        # For now, assume that the opdb is already current. We
+        # actually need to allow both modes: updating the opdb or not
+        # updating it. Need to add arg to "simulate" command.
+        #
+        if self.simulationPath is not None:
+            return
 
-        cmd.inform(f'text="Telescope informatio az={az} alt={alt} rot={rot}"')
         if self.simulationPath is None:
             # We are live: use Gen2 telescope info.
             gen2Model = self.actor.models['gen2'].keyVarDict
@@ -773,6 +775,7 @@ class McsCmd(object):
             now = datetime.datetime.now()
         else:
             # We are reading images from disk: get the geometry from the headers.
+            # TODO: parse exposure start time.
             hdr = fitsio.read_header(str(filename), 0)
             simPath = hdr['W_MCSMNM']
             simHdr = fitsio.read_header(str(simPath), 0)
@@ -781,8 +784,7 @@ class McsCmd(object):
             alt = simHdr['ALTITUDE']
             expTime = simHdr['EXPTIME']
             instrot = simHdr['INR-STR']
-
-        now = datetime.datetime.now()
+            now = datetime.datetime.now()
 
         cmd.inform(f'text="az={az} alt={alt} instrot={instrot}"')
         # Packing information into data structure
@@ -794,9 +796,7 @@ class McsCmd(object):
                          'azimuth': az,
                          'instrot': instrot}
 
-        # We do *not* want to update existing rows for simulated images.
-        if self.simulationPath is None:
-            self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
+        self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
 
     def calcThresh(self, cmd, frameId, zenithAngle, insRot):
 
