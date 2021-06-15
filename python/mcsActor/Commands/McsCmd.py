@@ -786,17 +786,18 @@ class McsCmd(object):
                 startTime = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(ctime))
                 cmd.warn(f'text="no start card in {simPath}, using file date: {startTime}"')
 
-        cmd.inform(f'text="az={az} alt={alt} instrot={instrot}"')
+        visitId = frameId // 100
+        cmd.inform(f'text="frame={frameId} visit={visitId} az={az} alt={alt} instrot={instrot}"')
         # Packing information into data structure
         telescopeInfo = {'frameid': frameId,
-                         'visitid': self.actor.models['gen2'].keyVarDict['visit'].valueList[0],
+                         'visitid': visitId,
                          'starttime': startTime,
                          'exptime': expTime,
                          'altitude': alt,
                          'azimuth': az,
                          'instrot': instrot}
 
-        self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
+        self._writeTelescopeInfo(cmd, telescopeInfo)
 
     def calcThresh(self, cmd, frameId, zenithAngle, insRot):
 
