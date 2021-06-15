@@ -1013,6 +1013,27 @@ class McsCmd(object):
 
         return buf
 
+    def _writeData(self, tableName, columnNames, dataBuf):
+        """Wrap a direct COPY_FROM via sqlalchemy. """
+
+        columns = ','.join('"{}"'.format(k) for k in columnNames)
+        sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(
+            tableName, columns)
+        db = self.connectToDB(None)
+        session = db.session
+        with session.connection().connection.cursor() as cursor:
+            cursor.copy_expert(sql, dataBuf)
+
+    def _readData(self, sql):
+        """Wrap a direct COPY_TO via sqlalchemy. """
+
+        dataBuf =  io.StringIO()
+        db = self.connectToDB(None)
+        session = db.session
+        with session.connection().connection.cursor() as cursor:
+            cursor.copy_expert(sql, dataBuf)
+        dataBuf.seek(0,0)
+        return dataBuf
 
     def _writeCentroids(self, centArr, nextRowId, frameId, moveId, conn=None):
         """ Write all measurements for a given (frameId, moveId) """
