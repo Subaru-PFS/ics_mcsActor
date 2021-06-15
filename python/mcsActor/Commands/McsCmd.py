@@ -219,7 +219,7 @@ class McsCmd(object):
 
         self.simulationPath = (path, idx+1, imagePath)
         cmd.debug('text="returning simulation file %s"' % (imagePath))
-        return image, imagePath
+        return imagePath, image
 
     def requestNextFilename(self, cmd, frameId):
         """ Return a queue which will eventually contain a filename. """
