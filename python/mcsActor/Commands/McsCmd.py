@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-#import time
+import time
 import datetime
 import io
 import pathlib
@@ -9,7 +9,6 @@ import threading
 import sep
 
 import os
-import base64
 import astropy.io.fits as pyfits
 import fitsio
 import sys
@@ -761,13 +760,6 @@ class McsCmd(object):
         self.prevPos=cobraMatch[:,[0,2,3]]
         
     def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
-        # For now, assume that the opdb is already current. We
-        # actually need to allow both modes: updating the opdb or not
-        # updating it. Need to add arg to "simulate" command.
-        #
-        if self.simulationPath is not None:
-            return
-
         if self.simulationPath is None:
             # We are live: use Gen2 telescope info.
             gen2Model = self.actor.models['gen2'].keyVarDict
@@ -777,25 +769,27 @@ class McsCmd(object):
 
             rot = gen2Model['tel_rot'].getValue()
             posAngle, instrot = rot
-            now = datetime.datetime.now()
+            startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
             # We are reading images from disk: get the geometry from the headers.
-            # TODO: parse exposure start time.
-            hdr = fitsio.read_header(str(filename), 0)
-            simPath = hdr['W_MCSMNM']
+            simPath = str(filename)
             simHdr = fitsio.read_header(str(simPath), 0)
             cmd.inform('text="loaded telescope info from %s"'% (simPath))
-            az = simHdr['AZIMUTH']
-            alt = simHdr['ALTITUDE']
-            expTime = simHdr['EXPTIME']
-            instrot = simHdr['INR-STR']
-            now = datetime.datetime.now()
+            az = simHdr.get('AZIMUTH', -9998.0)
+            alt = simHdr.get('ALTITUDE', -9998.0)
+            expTime = simHdr.get('EXPTIME', -9998.0)
+            instrot = simHdr.get('INR-STR', -9998.0)
+            startTime = simHdr.get('UTC-STR', None)
+            if startTime is None:
+                ctime = os.stat(filename).st_ctime
+                startTime = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(ctime))
+                cmd.warn(f'text="no start card in {simPath}, using file date: {startTime}"')
 
         cmd.inform(f'text="az={az} alt={alt} instrot={instrot}"')
         # Packing information into data structure
         telescopeInfo = {'frameid': frameId,
                          'visitid': self.actor.models['gen2'].keyVarDict['visit'].valueList[0],
-                         'starttime': now.strftime("%Y-%m-%d %H:%M:%S"),
+                         'starttime': startTime,
                          'exptime': expTime,
                          'altitude': alt,
                          'azimuth': az,
