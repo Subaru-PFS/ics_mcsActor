@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-#import time
+import time
 import datetime
 import io
 import pathlib
@@ -9,7 +9,6 @@ import threading
 import sep
 
 import os
-import base64
 import astropy.io.fits as pyfits
 import fitsio
 import sys
@@ -34,16 +33,10 @@ import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
 from importlib import reload
 reload(mcsToolsNew)
 
-rootPath=os.path.join(os.environ['ICS_MHS_ROOT'])
-dbPath=os.path.join(rootPath,"products/Linux64//spt_operational_database/0.0.6/python/opdb-0.1-py3.8.egg/")
-sys.path.insert(1, dbPath)
-
 import pandas as pd
 from pfs.utils import coordinates
 from pfs.utils.coordinates import CoordTransp
 reload(CoordTransp)
-from opdb import models,utils,opdb
-
 
 import numpy as np
 
@@ -129,12 +122,26 @@ class McsCmd(object):
             return self._db
 
         try:
-            db=dbTools.connectToDB(hostname='117.56.225.230',port='5432',dbname='opdb',username='pfs',passwd=None)
+            config = self.actor.config
+            hostname = config.get('db', 'hostname')
+            dbname = config.get('db', 'dbname', fallback='opdb')
+            port = config.get('db', 'port', fallback=5432)
+            username = config.get('db', 'username', fallback='pfs')
+        except Exception as e:
+            raise RuntimeError(f'failed to load opdb configuration: {e}')
+
+        try:
+            db=dbTools.connectToDB(hostname=hostname,
+                                   port=port,
+                                   dbname=dbname,
+                                   username=username,
+                                   passwd=None)
             
         except:
             raise RuntimeError("unable to connect to the database")
 
-        cmd.inform('text="Connected to Database"')
+        if cmd is not None:
+            cmd.inform('text="Connected to Database"')
 
         self._db=db
         return self._db
@@ -203,7 +210,10 @@ class McsCmd(object):
             raise RuntimeError(f"no .fits files in {path}")
 
         if  idx+1 > len(files):
-            idx = 0
+            # I don't think this is what we want: when the data set
+            # has been read we should *stop*, not loop back.
+            # idx = 0
+            raise RuntimeError(f"no more .fits files in {path}")
 
         imagePath = files[idx]
         cmd.inform('text="frameIds2 = %s." '%{imagePath})
@@ -211,8 +221,12 @@ class McsCmd(object):
         cmd.inform('text="imageSize = %s." '%{image.shape[1]})
 
         self.simulationPath = (path, idx+1, imagePath)
+        imagePath = pathlib.Path(imagePath)
+        frameId = int(imagePath.stem[4:], base=10)
+        self.visitId = frameId // 100
+
         cmd.debug('text="returning simulation file %s"' % (imagePath))
-        return imagePath,image
+        return imagePath, image
 
     def requestNextFilename(self, cmd, frameId):
         """ Return a queue which will eventually contain a filename. """
@@ -254,6 +268,8 @@ class McsCmd(object):
 
             visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
             frameId = visit * 100
+
+            ## DANGER!!! This **CANNOT** be run at Subaru:
             self._insertPFSVisitID(visit)
 
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d', time.gmtime()))
@@ -379,24 +395,15 @@ class McsCmd(object):
         if self.simulationPath is not None:
             return self.getNextSimulationImage(cmd)
 
-        cmd.diag(f'text="sim={self.simulationPath}"')
-
         nameQ = self.requestNextFilename(cmd, frameId)
 
-        
         cmd.diag(f'text="new exposure"')
-        if self.simulationPath is None:
-            filename = 'scratchFile'
-            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
-        else:
-            image,hdr = self.getNextSimulationImage(cmd)
-            self.visitId=frameId // 100
-        
+        filename = 'scratchFile'
+        image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
         cmd.diag(f'text="done: {image.shape}"')
 
         cmd.diag('text="reading filename"')
 
-        
         try:
             filename = nameQ.get(timeout=5.0)
         except queue.Empty:
@@ -525,7 +532,7 @@ class McsCmd(object):
             db = self.connectToDB(cmd)
 
             #load telescope values from the DB
-            cmd.inform('text="loading telescope parameters"')
+            cmd.inform(f'text="loading telescope parameters for frame={frameId}"')
             zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
             
             cmd.inform('text="zenith angle=%s"'%(zenithAngle))
@@ -534,7 +541,6 @@ class McsCmd(object):
             #get the geometry if it hasn't been loaded yet
             cmd.inform('text="loading geometry"')
             self.getGeometry(cmd)
-            
             
             cmd.inform('text="Setting centroid parameters." ')
             self.setCentroidParams(cmd)
@@ -758,11 +764,6 @@ class McsCmd(object):
         self.prevPos=cobraMatch[:,[0,2,3]]
         
     def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
-        gen2Model = self.actor.models['gen2'].keyVarDict
-        az, alt = gen2Model['tel_axes'].getValue()
-        rot = gen2Model['tel_rot'].getValue()
-
-        cmd.inform(f'text="Telescope informatio az={az} alt={alt} rot={rot}"')
         if self.simulationPath is None:
             # We are live: use Gen2 telescope info.
             gen2Model = self.actor.models['gen2'].keyVarDict
@@ -772,33 +773,34 @@ class McsCmd(object):
 
             rot = gen2Model['tel_rot'].getValue()
             posAngle, instrot = rot
-            now = datetime.datetime.now()
+            startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
             # We are reading images from disk: get the geometry from the headers.
-            hdr = fitsio.read_header(str(filename), 0)
-            simPath = hdr['W_MCSMNM']
+            simPath = str(filename)
             simHdr = fitsio.read_header(str(simPath), 0)
             cmd.inform('text="loaded telescope info from %s"'% (simPath))
-            az = simHdr['AZIMUTH']
-            alt = simHdr['ALTITUDE']
-            expTime = simHdr['EXPTIME']
-            instrot = simHdr['INR-STR']
+            az = simHdr.get('AZIMUTH', -9998.0)
+            alt = simHdr.get('ALTITUDE', -9998.0)
+            expTime = simHdr.get('EXPTIME', -9998.0)
+            instrot = simHdr.get('INR-STR', -9998.0)
+            startTime = simHdr.get('UTC-STR', None)
+            if startTime is None:
+                ctime = os.stat(filename).st_ctime
+                startTime = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(ctime))
+                cmd.warn(f'text="no start card in {simPath}, using file date: {startTime}"')
 
-        now = datetime.datetime.now()
-
-        cmd.inform(f'text="az={az} alt={alt} instrot={instrot}"')
+        visitId = frameId // 100
+        cmd.inform(f'text="frame={frameId} visit={visitId} az={az} alt={alt} instrot={instrot}"')
         # Packing information into data structure
         telescopeInfo = {'frameid': frameId,
-                         'visitid': self.actor.models['gen2'].keyVarDict['visit'].valueList[0],
-                         'starttime': now.strftime("%Y-%m-%d %H:%M:%S"),
+                         'visitid': visitId,
+                         'starttime': startTime,
                          'exptime': expTime,
                          'altitude': alt,
                          'azimuth': az,
                          'instrot': instrot}
 
-        # We do *not* want to update existing rows for simulated images.
-        if self.simulationPath is None:
-            self._writeTelescopeInfo(cmd,telescopeInfo, self.conn)
+        self._writeTelescopeInfo(cmd, telescopeInfo)
 
     def calcThresh(self, cmd, frameId, zenithAngle, insRot):
 
@@ -816,6 +818,7 @@ class McsCmd(object):
         cmd.inform('text="loading telescope parameters"')
 
         zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
+        cmd.diag(f'text="zenithAngle={zenithAngle}, insRot={insRot}"')
 
         #different transforms for different setups: with and w/o field elements
         if(self.fibreMode == 'full'):
@@ -964,24 +967,15 @@ class McsCmd(object):
         self.nCentroid = len(points)    
         cmd.inform('text="%d centroids"'% (len(centroids)))
         cmd.inform('state="centroids measured"')
-                        
-    
+
     def _writeTelescopeInfo(self, cmd, telescopeInfo, conn = None):
 
         # Let the database handle the primary key
-        with conn:
-            with conn.cursor() as curs:
-                curs.execute('select * FROM "mcs_exposure" where false')
-                colnames = [desc[0] for desc in curs.description]
-            realcolnames = colnames[0:]
+        db = self.connectToDB(cmd)
+        res = db.session.execute('select * FROM "mcs_exposure" where false')
+        colnames = res.keys()
+        realcolnames = colnames[0:]
         
-        colname = []
-        for i in realcolnames:
-            x='"'+i+'"'
-            colname.append(x)
-        
-        buf = io.StringIO()
-
         """
           TODO: Those are the fake values for making PFI to work now, adding actual code later
         """
@@ -1002,20 +996,38 @@ class McsCmd(object):
             adc_pa,dome_temperature,dome_pressure,dome_humidity,outside_temperature,outside_pressure,
             outside_humidity,mcs_cover_temperature,mcs_m1_temperature,taken_at,taken_in_hst_at)
 
+        buf = io.StringIO()
         buf.write(line)
         buf.seek(0,0)
-            
-        with conn:
-            with conn.cursor() as curs:
-                curs.copy_from(buf,'"mcs_exposure"',',',
-                               columns=colname)
 
+        self._writeData('mcs_exposure', realcolnames, buf)
         buf.seek(0,0)
         
         cmd.inform('text="Telescope information for frame %s populated."' % (telescopeInfo['frameid']))
 
         return buf
 
+    def _writeData(self, tableName, columnNames, dataBuf):
+        """Wrap a direct COPY_FROM via sqlalchemy. """
+
+        columns = ','.join('"{}"'.format(k) for k in columnNames)
+        sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(
+            tableName, columns)
+        db = self.connectToDB(None)
+        session = db.session
+        with session.connection().connection.cursor() as cursor:
+            cursor.copy_expert(sql, dataBuf)
+
+    def _readData(self, sql):
+        """Wrap a direct COPY_TO via sqlalchemy. """
+
+        dataBuf =  io.StringIO()
+        db = self.connectToDB(None)
+        session = db.session
+        with session.connection().connection.cursor() as cursor:
+            cursor.copy_expert(sql, dataBuf)
+        dataBuf.seek(0,0)
+        return dataBuf
 
     def _writeCentroids(self, centArr, nextRowId, frameId, moveId, conn=None):
         """ Write all measurements for a given (frameId, moveId) """
@@ -1025,7 +1037,6 @@ class McsCmd(object):
             
         # Save measurements to a CSV buffer
         measBuf = io.StringIO()
-        
 
         data = np.insert(centArr, 5, 0, axis=1)
        
@@ -1033,11 +1044,9 @@ class McsCmd(object):
         measBuf.seek(0,0)
 
         # Let the database handle the primary key
-        with conn:
-            with conn.cursor() as curs:
-                curs.execute('select * FROM "mcs_data" where false')
-                colnames = [desc[0] for desc in curs.description]
-            realcolnames = colnames[:]
+        db = self.connectToDB(None)
+        colnames = db.session.execute('select * FROM "mcs_data" where false')
+        realcolnames = colnames[:]
         
         colname = []
         for i in realcolnames:
@@ -1051,38 +1060,26 @@ class McsCmd(object):
             buf.write(line)
         buf.seek(0,0)
             
-        with conn:
-            with conn.cursor() as curs:
-                curs.copy_from(buf,'"mcs_data"',',',
-                               columns=colname)
-
+        self._writeData('mcs_data', realcolnames, buf)
         buf.seek(0,0)
-        
         return buf
 
     def _readCentroids(self, conn, frameId, moveId):
         """ Read all measurements for a given (frameId, moveId)"""
-        
+
+        if conn is None:
+            conn = self.connectToDB()
+
         if self.simulationPath is None:
-            buf = io.StringIO()
-        
             cmd = """copy (select * from mcsPerFiber where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
-            with conn.cursor() as curs:
-                curs.copy_expert(cmd, buf)
-            conn.commit()
-            buf.seek(0,0)
-        
+            buf = self._readData(cmd)
+
             # Skip the frameId, etc. columns.
             arr = np.genfromtxt(buf, dtype='f4',
                                 delimiter=',',usecols=range(4,24))
         else:
-            buf = io.StringIO()
-
             cmd = f"""copy (select * from 'mcsData' where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
-            with conn.cursor() as curs:
-                curs.copy_expert(cmd, buf)
-            conn.commit()
-            buf.seek(0,0)
+            buf = self._readData(cmd)
 
             # Skip the frameId, etc. columns.
             arr = np.genfromtxt(buf, dtype='f4',
