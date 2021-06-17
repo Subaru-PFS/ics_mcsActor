@@ -564,7 +564,7 @@ class McsCmd(object):
             #get the geometry if it hasn't been loaded yet
             #cmd.inform('text="loading geometry"')
             #self.getGeometry(cmd)
-            
+
             #read FF from the database, get list of adjacent fibres if they haven't been calculated yet.
             if(self.adjacentCobras == None):
                 adjacentCobras=mcsToolsNew.makeAdjacentList(self.centrePos[:,1:3],self.armLength)
@@ -833,8 +833,7 @@ class McsCmd(object):
                          'azimuth': az,
                          'instrot': instrot}
 
-        #self._writeTelescopeInfo(cmd, telescopeInfo)
-        self._writeTelescopeInfowithInsert(cmd, telescopeInfo)
+        self._writeTelescopeInfo(cmd, telescopeInfo)
 
 
     def calcThresh(self, cmd, frameId, zenithAngle, insRot):
@@ -1003,46 +1002,7 @@ class McsCmd(object):
         cmd.inform('text="%d centroids"'% (len(centroids)))
         cmd.inform('state="centroids measured"')
 
-    def _writeTelescopeInfowithInsert(self, cmd, telescopeInfo):
-        db = self.connectToDB(cmd)
-        res = db.session.execute('select * FROM "mcs_exposure" where false')
-        colnames = res.keys()
-        realcolnames = colnames[0:]
-
-        adc_pa = 0
-        dome_temperature = 5
-        dome_pressure = 101
-        dome_humidity = 0.3
-        outside_temperature = 5
-        outside_pressure = 101
-        outside_humidity = 0.3        
-        mcs_cover_temperature = 5
-        mcs_m1_temperature =6
-        taken_at = telescopeInfo['starttime']
-        taken_in_hst_at = telescopeInfo['starttime']
-
-        dataInfo= {realcolnames[0]:telescopeInfo['frameid'],
-                realcolnames[1]:telescopeInfo['visitid'],
-                realcolnames[2]:telescopeInfo['exptime']/1000.0,
-                realcolnames[3]: telescopeInfo['altitude'],
-                realcolnames[4]:telescopeInfo['azimuth'],
-                realcolnames[5]:telescopeInfo['instrot'],
-                realcolnames[6]:adc_pa,
-                realcolnames[7]:dome_temperature,
-                realcolnames[8]:dome_pressure,
-                realcolnames[9]:dome_humidity,
-                realcolnames[10]:outside_temperature,
-                realcolnames[11]:outside_pressure,
-                realcolnames[12]:outside_humidity,
-                realcolnames[13]:mcs_cover_temperature,
-                realcolnames[14]:mcs_m1_temperature,
-                realcolnames[15]:telescopeInfo['starttime'],
-                realcolnames[16]:telescopeInfo['starttime'],    
-                }
-
-        db.insert('mcs_exposure',pd.DataFrame(data=dataInfo,index=[0]))
-        cmd.inform('text="Telescope information for frame %s populated with INSERT."' % (telescopeInfo['frameid']))
-
+ 
 
     def _writeTelescopeInfo(self, cmd, telescopeInfo, conn = None):
 
@@ -1066,11 +1026,13 @@ class McsCmd(object):
         mcs_m1_temperature =6
         taken_at = telescopeInfo['starttime']
         taken_in_hst_at = telescopeInfo['starttime']
-        line = '%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%s,%s' % (telescopeInfo['frameid'], 
+        line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%s,%s' % (telescopeInfo['frameid'], 
             telescopeInfo['visitid'], telescopeInfo['exptime']/1000.0,
             telescopeInfo['altitude'],telescopeInfo['azimuth'],telescopeInfo['instrot'],
             adc_pa,dome_temperature,dome_pressure,dome_humidity,outside_temperature,outside_pressure,
             outside_humidity,mcs_cover_temperature,mcs_m1_temperature,taken_at,taken_in_hst_at)
+
+        cmd.inform(f'text="{line}"')
 
         buf = io.StringIO()
         buf.write(line)
@@ -1093,6 +1055,7 @@ class McsCmd(object):
         session = db.session
         with session.connection().connection.cursor() as cursor:
             cursor.copy_expert(sql, dataBuf)
+        cursor.close()
 
     def _readData(self, sql):
         """Wrap a direct COPY_TO via sqlalchemy. """
