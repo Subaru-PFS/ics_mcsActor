@@ -353,15 +353,12 @@ class McsCmd(object):
 
         return hdr
 
-    def writeCentroidsToDB(self, cmd, frameId):
+    def _writeCentroidsToDB(self, cmd, frameId):
         """write centroids to database"""
 
-
         db = self.connectToDB(cmd)
-        cmd.inform(f'text="writing centroids to database for exposure ID {frameId}"')
-
         dbTools.writeCentroidsToDB(db,self.centroids,int(frameId))
-        cmd.inform(f'text="centroids written"')
+        cmd.inform(f'text="Centroids of exposure ID {frameId} populated"')
 
     def _makeImageHeader(self, cmd):
         """ Create a complete WCS header.
@@ -379,7 +376,7 @@ class McsCmd(object):
         """
 
         gen2Keys = self.actor.models['gen2'].keyVarDict
-        print(gen2Keys['AZIMUTH'])
+
         imageCenter = (8960//2, 5778//2)
         rot = gen2Keys['tel_rot'][1]
         alt = gen2Keys['tel_axes'][1]
@@ -562,7 +559,7 @@ class McsCmd(object):
                 self.runCentroid(cmd)       
             
             cmd.inform('text="Sending centroid data to database" ')
-            self.writeCentroidsToDB(cmd, frameId)
+            self._writeCentroidsToDB(cmd, frameId)
 
             #do the fibre identification
             if doFibreID:
@@ -813,7 +810,12 @@ class McsCmd(object):
 
             expTime = simHdr.get('EXPTIME', -9998.0)
             instrot = simHdr.get('INR-STR', -9998.0)
+            
+            # Redefine instrot to be 0.5 since we know this fact from ASRD test.
+            instrot = 0.5
             startTime = simHdr.get('UTC-STR', None)
+            
+            
             if startTime is None:
                 ctime = os.stat(filename).st_ctime
                 startTime = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(ctime))
@@ -831,8 +833,9 @@ class McsCmd(object):
                          'instrot': instrot}
 
         #self._writeTelescopeInfo(cmd, telescopeInfo)
-
         self._writeTelescopeInfowithInsert(cmd, telescopeInfo)
+
+
     def calcThresh(self, cmd, frameId, zenithAngle, insRot):
 
         """  Calculate thresholds for finding/centroiding from image 
