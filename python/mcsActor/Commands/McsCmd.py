@@ -427,8 +427,7 @@ class McsCmd(object):
         imgHdu = pyfits.CompImageHDU(image.astype('uint16'),name='IMAGE', compression_type='RICE_1')
         
         #imgHdu = pyfits.PrimaryHDU(image.astype('uint16'))
-        cmd.inform(f'text="image mean={np.mean(image)}, std={np.std(image)}"')
-        #imgHdu.header.extend(imgHdr)
+        imgHdu.header.extend(imgHdr)
         hduList = pyfits.HDUList([phdu, imgHdu])
 
         # Patch core FITS card comments to match Subaru requirements.
@@ -791,9 +790,6 @@ class McsCmd(object):
             posAngle, instrot = rot
             startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
-            axes=self.actor.models['gen2'].keyVarDict['tel_axes'].valueList[0]
-
-            cmd.inform(f'text="{axes}"')
 
             # We are reading images from disk: get the geometry from the headers.
             simPath = str(filename)
@@ -1031,8 +1027,6 @@ class McsCmd(object):
             telescopeInfo['altitude'],telescopeInfo['azimuth'],telescopeInfo['instrot'],
             adc_pa,dome_temperature,dome_pressure,dome_humidity,outside_temperature,outside_pressure,
             outside_humidity,mcs_cover_temperature,mcs_m1_temperature,taken_at,taken_in_hst_at)
-
-        cmd.inform(f'text="{line}"')
 
         buf = io.StringIO()
         buf.write(line)
