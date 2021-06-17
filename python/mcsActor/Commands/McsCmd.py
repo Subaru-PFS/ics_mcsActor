@@ -51,6 +51,7 @@ class McsCmd(object):
         self.newTable = None
         self.simulationPath = None
         self._connectionToDB = None
+        self._conn = None
         self._db = None
 
         self.findThresh = None
@@ -61,7 +62,8 @@ class McsCmd(object):
         self.geometrySet = False
         self.geomFile = None
         self.dotFile = None
-        
+        self.fibreMode = 'asrd'
+
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -114,7 +116,6 @@ class McsCmd(object):
                                         keys.Key("fibreMode", types.String(), help="flag for testing different inputs")
                                         )
 
-
     def connectToDB(self, cmd):
 
         """connect to the database if not already connected"""
@@ -135,7 +136,7 @@ class McsCmd(object):
                                    port=port,
                                    dbname=dbname,
                                    username=username,
-                                   passwd=None)
+                                   passwd='pfspass')
             
         except:
             raise RuntimeError("unable to connect to the database")
@@ -167,9 +168,6 @@ class McsCmd(object):
         self.actor.connectCamera(cmd)
         self.actor.camera.setExposureTime(cmd,self.expTime)
 
-        gen2Keys = self.actor.models['gen2'].keyVarDict
-        
-        print(f'{gen2Keys}')
 
         #cmd.inform(f'text={gen2Keys['INST-PA']}')
 
@@ -218,14 +216,13 @@ class McsCmd(object):
         imagePath = files[idx]
         cmd.inform('text="frameIds2 = %s." '%{imagePath})
         image,hdr = pyfits.getdata(imagePath, 0,header=True)
-        cmd.inform('text="imageSize = %s." '%{image.shape[1]})
 
         self.simulationPath = (path, idx+1, imagePath)
         imagePath = pathlib.Path(imagePath)
         frameId = int(imagePath.stem[4:], base=10)
         self.visitId = frameId // 100
 
-        cmd.debug('text="returning simulation file %s"' % (imagePath))
+        cmd.inform('text="returning simulation file %s"' % (imagePath))
         return imagePath, image
 
     def requestNextFilename(self, cmd, frameId):
@@ -247,6 +244,11 @@ class McsCmd(object):
 
 
     def _insertPFSVisitID(self, visitid):
+        connString = "dbname='opdb' user='pfs' host=db-ics"
+        # Skipself.actor.logger.info(f'connecting to {connString}')
+        conn = psycopg2.connect(connString)
+        self.conn = conn
+
         with self.conn:
             with self.conn.cursor() as curs:
                 postgres_insert_query = """ INSERT INTO pfs_visit (pfs_visit_id, pfs_visit_description) VALUES (%s,%s)"""
@@ -262,12 +264,14 @@ class McsCmd(object):
         """
 
         if frameId is None:
+
             ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit', timeLim=10.0)
             if ret.didFail:
                 raise RuntimeError("getNextFilename failed getting a visit number in 10s!")
-
             visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
             frameId = visit * 100
+            
+            cmd.inform(f'text="getNextFilename = {frameId}"')
 
             ## DANGER!!! This **CANNOT** be run at Subaru:
             self._insertPFSVisitID(visit)
@@ -391,18 +395,16 @@ class McsCmd(object):
 
     def _doExpose(self, cmd, expTime, expType, frameId, mask=None):
         """ Take an exposure and save it to disk. """
-
-        if self.simulationPath is not None:
-            return self.getNextSimulationImage(cmd)
-
+        
         nameQ = self.requestNextFilename(cmd, frameId)
-
         cmd.diag(f'text="new exposure"')
-        filename = 'scratchFile'
-        image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
-        cmd.diag(f'text="done: {image.shape}"')
-
-        cmd.diag('text="reading filename"')
+        if self.simulationPath is None:
+            filename = 'scratchFile'
+            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
+        else:
+            imagePath, image = self.getNextSimulationImage(cmd)
+        cmd.inform(f'text="done: image shape = {image.shape}"')
+        
 
         try:
             filename = nameQ.get(timeout=5.0)
@@ -425,9 +427,11 @@ class McsCmd(object):
         except Exception as e:
             cmd.warn(f'text="FAILED to generate WCS header: {e}"')
             imgHdr = pyfits.Header()
-
-        imgHdu = pyfits.CompImageHDU(image, name='IMAGE', compression_type='RICE_1')
-        imgHdu.header.extend(imgHdr)
+        imgHdu = pyfits.CompImageHDU(image.astype('uint16'),name='IMAGE', compression_type='RICE_1')
+        
+        #imgHdu = pyfits.PrimaryHDU(image.astype('uint16'))
+        cmd.inform(f'text="image mean={np.mean(image)}, std={np.std(image)}"')
+        #imgHdu.header.extend(imgHdr)
         hduList = pyfits.HDUList([phdu, imgHdu])
 
         # Patch core FITS card comments to match Subaru requirements.
@@ -443,7 +447,7 @@ class McsCmd(object):
         pHdr.set('EXTEND', comment='Presence of FITS Extension')
 
         hduList.writeto(filename, checksum=False, overwrite=True)
-        cmd.inform('filename="%s"' % (filename))
+        cmd.inform(f'text="write image to filename={filename}"')
 
         return filename, image
 
@@ -486,9 +490,6 @@ class McsCmd(object):
         else:
             simDot = False
 
-
-
-        cmd.inform('text="doCentroid = %s." '%{doCentroid})
         cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID}')
 
         #get frame ID if explicitly set, otherise reset
@@ -539,21 +540,21 @@ class McsCmd(object):
             cmd.inform('text="instrument rotation=%s"'%(insRot))
             
             #get the geometry if it hasn't been loaded yet
-            cmd.inform('text="loading geometry"')
-            self.getGeometry(cmd)
+            #cmd.inform('text="loading geometry"')
+            #self.getGeometry(cmd)
             
-            cmd.inform('text="Setting centroid parameters." ')
-            self.setCentroidParams(cmd)
+            #cmd.inform('text="Setting centroid parameters." ')
+            #self.setCentroidParams(cmd)
    
             #self.calcThresh(cmd)
-            if self.findThresh is None:
-                cmd.inform('text="Calculating threshold." ')
-                self.calcThresh(cmd,frameId,zenithAngle,insRot)
+            #if self.findThresh is None:
+            #    cmd.inform('text="Calculating threshold." ')
+            #    self.calcThresh(cmd,frameId,zenithAngle,insRot)
 
             cmd.inform('text="Running centroid on current image" ')
-            #self.runCentroidSEP(cmd)
+            self.runCentroidSEP(cmd)
  
-            self.runCentroid(cmd)
+            #self.runCentroid(cmd)
 
             #if the threshold has changed, recalculate: this was added during commissioning run
             if (self.nCentroid < 2000):
@@ -583,13 +584,30 @@ class McsCmd(object):
 
         cmd.inform('text="filename=%s"'%(filename))
         
-        if doFibreID:
+        #if doFibreID:
             #self.runFibreID(cmd, doFinish=False)
-            self.dumpCentroidtoDB(cmd, frameId)
+        #self.dumpCentroidtoDB(cmd, frameId)
 
 
         cmd.finish('exposureState=done')
 
+    def dumpCentroidtoDB(self, cmd, frameId):
+        """Connect to database and return json string to an attribute."""
+        
+        conn = self.conn
+        cmd.diag(f'text="dumping centroids to db {conn}"')
+        
+        # The section should be removed, replaced by the createTables command.
+        if self.newTable:
+            self._makeTables(conn, doDrop=True)
+            cmd.inform('text="Centroid table created. "')
+        else:
+            #self._makeTables(conn, doDrop=False)
+            cmd.inform('text="Attaching centroid to exsiting table. "')
+        
+        buf = self._writeCentroids(self.centroids,1,frameId,1,conn)
+
+        cmd.inform('text="Centroids of exposure ID %08d dumped."' % (frameId))
 
     def switchFibreMode(self,cmd):
         cmdKeys = cmd.cmd.keywords
@@ -775,12 +793,24 @@ class McsCmd(object):
             posAngle, instrot = rot
             startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
+            axes=self.actor.models['gen2'].keyVarDict['tel_axes'].valueList[0]
+
+            cmd.inform(f'text="{axes}"')
+
             # We are reading images from disk: get the geometry from the headers.
             simPath = str(filename)
             simHdr = fitsio.read_header(str(simPath), 0)
             cmd.inform('text="loaded telescope info from %s"'% (simPath))
+            
+
             az = simHdr.get('AZIMUTH', -9998.0)
             alt = simHdr.get('ALTITUDE', -9998.0)
+
+            if az is None:
+                az = -9998.0
+            if alt is None:
+                alt = -9998.0
+
             expTime = simHdr.get('EXPTIME', -9998.0)
             instrot = simHdr.get('INR-STR', -9998.0)
             startTime = simHdr.get('UTC-STR', None)
@@ -800,8 +830,9 @@ class McsCmd(object):
                          'azimuth': az,
                          'instrot': instrot}
 
-        self._writeTelescopeInfo(cmd, telescopeInfo)
+        #self._writeTelescopeInfo(cmd, telescopeInfo)
 
+        self._writeTelescopeInfowithInsert(cmd, telescopeInfo)
     def calcThresh(self, cmd, frameId, zenithAngle, insRot):
 
         """  Calculate thresholds for finding/centroiding from image 
@@ -967,6 +998,47 @@ class McsCmd(object):
         self.nCentroid = len(points)    
         cmd.inform('text="%d centroids"'% (len(centroids)))
         cmd.inform('state="centroids measured"')
+
+    def _writeTelescopeInfowithInsert(self, cmd, telescopeInfo):
+        db = self.connectToDB(cmd)
+        res = db.session.execute('select * FROM "mcs_exposure" where false')
+        colnames = res.keys()
+        realcolnames = colnames[0:]
+
+        adc_pa = 0
+        dome_temperature = 5
+        dome_pressure = 101
+        dome_humidity = 0.3
+        outside_temperature = 5
+        outside_pressure = 101
+        outside_humidity = 0.3        
+        mcs_cover_temperature = 5
+        mcs_m1_temperature =6
+        taken_at = telescopeInfo['starttime']
+        taken_in_hst_at = telescopeInfo['starttime']
+
+        dataInfo= {realcolnames[0]:telescopeInfo['frameid'],
+                realcolnames[1]:telescopeInfo['visitid'],
+                realcolnames[2]:telescopeInfo['exptime']/1000.0,
+                realcolnames[3]: telescopeInfo['altitude'],
+                realcolnames[4]:telescopeInfo['azimuth'],
+                realcolnames[5]:telescopeInfo['instrot'],
+                realcolnames[6]:adc_pa,
+                realcolnames[7]:dome_temperature,
+                realcolnames[8]:dome_pressure,
+                realcolnames[9]:dome_humidity,
+                realcolnames[10]:outside_temperature,
+                realcolnames[11]:outside_pressure,
+                realcolnames[12]:outside_humidity,
+                realcolnames[13]:mcs_cover_temperature,
+                realcolnames[14]:mcs_m1_temperature,
+                realcolnames[15]:telescopeInfo['starttime'],
+                realcolnames[16]:telescopeInfo['starttime'],    
+                }
+
+        db.insert('mcs_exposure',pd.DataFrame(data=dataInfo,index=[0]))
+        cmd.inform('text="Telescope information for frame %s populated with INSERT."' % (telescopeInfo['frameid']))
+
 
     def _writeTelescopeInfo(self, cmd, telescopeInfo, conn = None):
 
