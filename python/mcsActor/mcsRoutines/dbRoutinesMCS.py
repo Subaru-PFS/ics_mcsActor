@@ -64,7 +64,12 @@ def loadTelescopeParametersFromDB(db,frameId):
 
     sql=f'SELECT mcs_exposure.insrot,mcs_exposure.altitude FROM mcs_exposure WHERE mcs_exposure.mcs_frame_id={frameId}'
     df=db.fetch_query(sql)
-    zenithAngle=90-df['altitude'][0]
+    
+    if df['altitude'][0] < -99:
+        zenithAngle=90
+    else:
+        zenithAngle=90-df['altitude'][0]
+
     insRot=df['insrot'][0]
 
     return zenithAngle,insRot
@@ -75,8 +80,8 @@ def loadBoresightFromDB(db,pfsVisitId):
     read boresight informatino from database
     table = mcs_boresight
     """
-
-    sql=f'SELECT mcs_boresight.mcs_boresight_x_pix,mcs_boresight.mcs_boresight_y_pix from mcs_boresight where mcs_boresight.pfs_visit_id={pfsVisitId}'
+    sql= f'''SELECT * FROM mcs_boresight ORDER BY calculated_at ASC FETCH FIRST ROW ONLY'''
+    #sql=f'SELECT mcs_boresight.mcs_boresight_x_pix,mcs_boresight.mcs_boresight_y_pix from mcs_boresight where mcs_boresight.pfs_visit_id={pfsVisitId}'
     df=db.fetch_query(sql)
     return [df['mcs_boresight_x_pix'][0],df['mcs_boresight_y_pix'][0]]
 

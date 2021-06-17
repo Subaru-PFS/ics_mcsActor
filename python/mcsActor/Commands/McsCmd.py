@@ -529,18 +529,9 @@ class McsCmd(object):
             #connect to DB
             db = self.connectToDB(cmd)
 
-            #load telescope values from the DB
-            cmd.inform(f'text="loading telescope parameters for frame={frameId}"')
-            zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
             
-            cmd.inform('text="zenith angle=%s"'%(zenithAngle))
-            cmd.inform('text="instrument rotation=%s"'%(insRot))
             
-            #get the geometry if it hasn't been loaded yet
-            #cmd.inform('text="loading geometry"')
-            #self.getGeometry(cmd)
-            
-            #cmd.inform('text="Setting centroid parameters." ')
+            cmd.inform('text="Setting centroid parameters." ')
             #self.setCentroidParams(cmd)
    
             #self.calcThresh(cmd)
@@ -561,22 +552,32 @@ class McsCmd(object):
             cmd.inform('text="Sending centroid data to database" ')
             self._writeCentroidsToDB(cmd, frameId)
 
-            #do the fibre identification
-            if doFibreID:
-
-                #read FF from the database, get list of adjacent fibres if they haven't been calculated yet.
-                if(self.adjacentCobras == None):
-                    adjacentCobras=mcsToolsNew.makeAdjacentList(self.centrePos[:,1:3],self.armLength)
-                    cmd.inform(f'text="made adjacent lists"')
-                    self.fidPos=dbTools.loadFiducialsFromDB(db)
-                    cmd.inform(f'text="loaded fiducial fibres"')
-                    
+        #do the fibre identification
+        if doFibreID:
+            #load telescope values from the DB
+            cmd.inform(f'text="loading telescope parameters for frame={frameId}"')
+            zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
+            
+            cmd.inform('text="zenith angle=%s"'%(zenithAngle))
+            cmd.inform('text="instrument rotation=%s"'%(insRot))
+            
+            #get the geometry if it hasn't been loaded yet
+            #cmd.inform('text="loading geometry"')
+            #self.getGeometry(cmd)
+            
+            #read FF from the database, get list of adjacent fibres if they haven't been calculated yet.
+            if(self.adjacentCobras == None):
+                adjacentCobras=mcsToolsNew.makeAdjacentList(self.centrePos[:,1:3],self.armLength)
+                cmd.inform(f'text="made adjacent lists"')
+                self.fidPos=dbTools.loadFiducialsFromDB(db)
+                cmd.inform(f'text="loaded fiducial fibres"')
                 
-                #transform centroids to MM
-                self.transformations(cmd,frameId,zenithAngle,insRot)
-                
-                #fibreID
-                self.fibreID(cmd,frameId,zenithAngle,insRot)
+            
+            #transform centroids to MM
+            self.transformations(cmd,frameId,zenithAngle,insRot)
+            
+            #fibreID
+            self.fibreID(cmd,frameId,zenithAngle,insRot)
 
 
         cmd.inform('text="filename=%s"'%(filename))
