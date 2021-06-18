@@ -28,15 +28,11 @@ import sys
 
 import pandas as pd
 from scipy.stats import sigmaclip
-from opdb import opdb
 import copy
+from opdb import opdb
 
 
 def connectToDB(hostname='',port='',dbname='opdb_api_test',username='pfs',passwd=None):
-
-    """
-    connect to DB
-    """
     
     db = opdb.OpDB(hostname, port, dbname, username, passwd)
     db.connect()
@@ -76,7 +72,8 @@ def loadBoresightFromDB(db,pfsVisitId):
     table = mcs_boresight
     """
 
-    sql=f'SELECT mcs_boresight.mcs_boresight_x_pix,mcs_boresight.mcs_boresight_y_pix from mcs_boresight where mcs_boresight.pfs_visit_id={pfsVisitId}'
+
+    sql=f'SELECT mcs_boresight.mcs_boresight_x_pix,mcs_boresight.mcs_boresight_y_pix FROM mcs_boresight ORDER BY calculated_at DESC LIMIT 1'
     df=db.fetch_query(sql)
     return [df['mcs_boresight_x_pix'][0],df['mcs_boresight_y_pix'][0]]
 

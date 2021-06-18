@@ -26,11 +26,12 @@ from scipy.spatial import cKDTree
 import psycopg2
 import psycopg2.extras
 from xml.etree.ElementTree import dump
-#
+
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsToolsNew
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
 from importlib import reload
+reload(dbTools)
 reload(mcsToolsNew)
 
 import pandas as pd
@@ -52,11 +53,11 @@ class McsCmd(object):
         self.simulationPath = None
         self._connectionToDB = None
         self._db = None
-
+        
         self.findThresh = None
         self.centThresh =  None
-
-        self.setCentroidParams(None)
+        
+        #self.setCentroidParams(None)
         self.adjacentCobras = None
         self.geometrySet = False
         self.geomFile = None
@@ -117,7 +118,9 @@ class McsCmd(object):
 
     def connectToDB(self, cmd):
 
+
         """connect to the database if not already connected"""
+
         if self._db is not None:
             return self._db
 
@@ -136,7 +139,9 @@ class McsCmd(object):
                                    dbname=dbname,
                                    username=username,
                                    passwd=None)
-            
+        #try:
+        #    db=dbTools.connectToDB(hostname='localhost',port='5432',dbname="opdb",username='karr')
+            self._db=db
         except:
             raise RuntimeError("unable to connect to the database")
 
@@ -226,6 +231,7 @@ class McsCmd(object):
         self.visitId = frameId // 100
 
         cmd.debug('text="returning simulation file %s"' % (imagePath))
+        cmd.inform("ccc")
         return imagePath, image
 
     def requestNextFilename(self, cmd, frameId):
@@ -393,7 +399,10 @@ class McsCmd(object):
         """ Take an exposure and save it to disk. """
 
         if self.simulationPath is not None:
-            return self.getNextSimulationImage(cmd)
+            cmd.inform("eee")
+            filename, image = self.getNextSimulationImage(cmd)
+            return filename,image
+
 
         nameQ = self.requestNextFilename(cmd, frameId)
 
@@ -518,6 +527,8 @@ class McsCmd(object):
             filename = pathlib.Path(filename)
             frameId = int(filename.stem[4:], base=10)
 
+        cmd.inform("bbb")
+
         self.handleTelescopeGeometry(cmd, filename, frameId, expTime)
 
         #set visitID
@@ -546,19 +557,19 @@ class McsCmd(object):
             self.setCentroidParams(cmd)
    
             #self.calcThresh(cmd)
-            if self.findThresh is None:
+            if self.findThresh is None: 
                 cmd.inform('text="Calculating threshold." ')
-                self.calcThresh(cmd,frameId,zenithAngle,insRot)
+                self.calcThresh(cmd,frameId,zenithAngle,insRot,self.centParms)
 
             cmd.inform('text="Running centroid on current image" ')
             #self.runCentroidSEP(cmd)
  
-            self.runCentroid(cmd)
+            self.runCentroid(cmd,self.centParms)
 
             #if the threshold has changed, recalculate: this was added during commissioning run
             if (self.nCentroid < 2000):
-                self.calcThresh(cmd,frameId,zenithAngle,insRot)
-                self.runCentroid(cmd)       
+                self.calcThresh(cmd,frameId,zenithAngle,insRot,self.centParms)
+                self.runCentroid(cmd,self.centParms)       
             
             cmd.inform('text="Sending centroid data to database" ')
             self.writeCentroidsToDB(cmd, frameId)
@@ -635,14 +646,16 @@ class McsCmd(object):
             #read xmlFile
             #where is inst_data
             
-            
+
             instPath=os.path.join(os.environ['PFS_INSTDATA_DIR'])
             if(self.geomFile == None):
                 self.geomFile = os.path.join(instPath,"data/pfi/modules/ALL/ALL_final.xml")
                 #self.geomFile = "/home/pfs/karr/Set1/ALL_new.xml"
             if(self.dotFile == None):
                 self.dotFile = os.path.join(instPath,"data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
-                
+
+            cmd.inform(f'text="{instPath} {self.geomFile} {self.dotFile}"')
+
             #xmlFile="/Users/karr/Science/PFS/cobraData/Full2D/20210219_002/output/ALL_new.xml"
             #dotFile="/Users/karr/software/mhs/products/DarwinX86/pfs_instdata/1.0.1/data/pfi/dot_measurements_20210428_el90_rot+00_ave.csv"
             cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
@@ -777,6 +790,8 @@ class McsCmd(object):
         else:
             # We are reading images from disk: get the geometry from the headers.
             simPath = str(filename)
+            cmd.inform(f'text="filename= {simPath}"')
+
             simHdr = fitsio.read_header(str(simPath), 0)
             cmd.inform('text="loaded telescope info from %s"'% (simPath))
             az = simHdr.get('AZIMUTH', -9998.0)
@@ -802,7 +817,7 @@ class McsCmd(object):
 
         self._writeTelescopeInfo(cmd, telescopeInfo)
 
-    def calcThresh(self, cmd, frameId, zenithAngle, insRot):
+    def calcThresh(self, cmd, frameId, zenithAngle, insRot, centParms):
 
         """  Calculate thresholds for finding/centroiding from image 
 
@@ -829,88 +844,25 @@ class McsCmd(object):
             centrePosPix=self.centrePos
 
         np.save("cpos.npy",centrePosPix)
-        self.findThresh,self.centThresh = mcsToolsNew.getThresh(image,centrePosPix,self.threshMode,self.threshSigma,self.threshFact,self.findSigma,self.centSigma)
-        
-        cmd.inform('text="findThresh = %d, centThresh = %d." '%(self.findThresh,self.centThresh))    
+        self.findThresh,self.centThresh = mcsToolsNew.getThresh(image,centrePosPix,'full',self.centParms['threshSigma'],self.centParms['findSigma'],self.centParms['centSigma'])
+
+        a1=self.centParms['threshSigma']
+        a2=self.centParms['findSigma']
+        a3=self.centParms['centSigma']
+        cmd.inform(f'text="findThresh ={self.findThresh:.2}, centThresh = {self.centThresh:.2}"')
+        cmd.inform(f'text="{a1} {a2} {a3}"')
          
     def setCentroidParams(self, cmd):
 
         """
-
-        Set the parameters for centroiding; placeholder for later routine to read from configuration file. 
-        For each parameter it will check the command for keywords, and if it doesn't work, will go to a default.
-
-        For the threshold, it will first check the command, then calculate from the image, then go to a default
-        that won't crash the system. 
+        top level routine for setting centroid parameters. REads the defaults from teh config fil,e
+        then changes any specified in the keywords argument. 
 
         """
 
+        self.centParms = mcsToolsNew.getCentroidParams(cmd)
+                
         
-        try:
-            self.fhwmx = cmd.cmd.keywords["fwhmx"].values[0]
-        except:
-            self.fwhmx = 0
-
-        try:
-            self.fhwmy = cmd.cmd.keywords["fwhmy"].values[0]
-        except:
-            self.fwhmy = 0
-
-        try:
-            self.boxFind = cmd.cmd.keywords["boxFind"].values[0]
-        except:
-            self.boxFind = 10
-            
-        try:
-            self.boxCent = cmd.cmd.keywords["boxCent"].values[0]
-        except:
-            self.boxCent = 6
-
-        try:
-            self.findSigma = cmd.cmd.keywords["findSigma"].values[0]
-        except:
-            self.findSigma = 35
-            
-        try:
-            self.centSigma = cmd.cmd.keywords["centSigma"].values[0]
-        except:
-            self.centSigma = 15
-
-        try:
-            self.nmin = cmd.cmd.keywords["nmin"].values[0]
-        except:
-            self.nmin = 10
-            
-        try:
-            self.nmax = cmd.cmd.keywords["nmax"].values[0]
-        except:
-            self.nmax = 90
-            
-        try:
-            self.maxIt = cmd.cmd.keywords["maxIt"].values[0]
-        except:
-            self.maxIt = 20
-            
-        try:
-            self.matchRad = cmd.cmd.keywords["matchRad"].values[0]
-        except:
-            self.matchRad = 20
-
-        try:
-            self.threshSigma = cmd.cmd.keywords["threshSigma"].values[0]
-        except:
-            self.threshSigma = 4
-
-        try:
-            self.threshFact = cmd.cmd.keywords["threshFact"].values[0]
-        except:
-            self.threshFact = 4
-
-        try:
-            self.threshMode = cmd.cmd.keywords["threshMode"].values[0]
-        except:
-            self.threshMode = 'full'
-
     def runCentroidSEP(self, cmd):
         cmdKeys = cmd.cmd.keywords
         self.newTable = "newTable" in cmdKeys
@@ -939,7 +891,7 @@ class McsCmd(object):
         cmd.inform('state="centroids measured"')
         
 
-    def runCentroid(self, cmd):
+    def runCentroid(self, cmd,centParms):
 
         
         """ Measure centroids on the last acquired image. """
@@ -953,8 +905,8 @@ class McsCmd(object):
         
         cmd.inform(f'state="measuring cached image: {image.shape}"')
         a = centroid.centroid_only(image.astype('<i4'),
-                                   self.fwhmx, self.fwhmy, self.findThresh, self.centThresh, self.boxFind, self.boxCent, 
-                                   self.nmin, self.nmax, self.maxIt, 0)
+                                   centParms['fwhmx'], centParms['fwhmy'], self.findThresh, self.centThresh, centParms['boxFind'], centParms['boxCent'],
+                                   centParms['nmin'], centParms['nmax'], centParms['maxIt'], 0) 
 
         centroids=np.frombuffer(a,dtype='<f8')
         centroids=np.reshape(centroids,(len(centroids)//7,7))
@@ -964,6 +916,7 @@ class McsCmd(object):
         points[:,1:]=centroids[:,0:]
         
         self.centroids=points
+        
         self.nCentroid = len(points)    
         cmd.inform('text="%d centroids"'% (len(centroids)))
         cmd.inform('state="centroids measured"')
