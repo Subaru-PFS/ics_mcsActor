@@ -94,6 +94,7 @@ class McsCmd(object):
                                         keys.Key("expTime", types.Float(), help="The exposure time, seconds"),
                                         keys.Key("expType", types.String(), help="The exposure type"),
                                         keys.Key("frameId", types.Int(), help="exposure frameID"),
+                                        keys.Key("filename", types.String(), help="exposure filename"),
                                         keys.Key("path", types.String(), help="Simulated image directory"),
                                         keys.Key("getArc", types.Int(), help="flag for arc image"),
                                         keys.Key("fwhmx", types.Float(), help="X fwhm for centroid routine"),
@@ -167,9 +168,6 @@ class McsCmd(object):
         self.actor.camera.sendStatusKeys(cmd)
         self.actor.connectCamera(cmd)
         self.actor.camera.setExposureTime(cmd,self.expTime)
-
-
-        #cmd.inform(f'text={gen2Keys['INST-PA']}')
 
         cmd.inform('text="MCS camera present!"')
         cmd.finish()
@@ -274,7 +272,8 @@ class McsCmd(object):
             cmd.inform(f'text="getNextFilename = {frameId}"')
 
             ## DANGER!!! This **CANNOT** be run at Subaru:
-            self._insertPFSVisitID(visit)
+        visit = frameId / 100   
+        self._insertPFSVisitID(visit)
 
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d', time.gmtime()))
         path = os.path.expandvars(os.path.expanduser(path))
@@ -520,18 +519,16 @@ class McsCmd(object):
         #set visitID
         self.visitId = frameId // 100
         self.actor.image = image
-        #cmd.inform(f'text="image stats {image.mean()}"')
-        
+        cmd.inform(f'frameId={frameId}')
+        cmd.inform(f'filename={filename}')
         #if the centroid flag is set
         if doCentroid:
 
             #connect to DB
             db = self.connectToDB(cmd)
 
-            
-            
             cmd.inform('text="Setting centroid parameters." ')
-            #self.setCentroidParams(cmd)
+            self.setCentroidParams(cmd)
    
             #self.calcThresh(cmd)
             #if self.findThresh is None:
@@ -544,9 +541,9 @@ class McsCmd(object):
             #self.runCentroid(cmd)
 
             #if the threshold has changed, recalculate: this was added during commissioning run
-            if (self.nCentroid < 2000):
-                self.calcThresh(cmd,frameId,zenithAngle,insRot)
-                self.runCentroid(cmd)       
+            #if (self.nCentroid < 2000):
+                #self.calcThresh(cmd,frameId,zenithAngle,insRot)
+                #self.runCentroid(cmd)       
             
             cmd.inform('text="Sending centroid data to database" ')
             self._writeCentroidsToDB(cmd, frameId)
