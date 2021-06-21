@@ -7,7 +7,7 @@ from importlib import reload
 import sys
 from pfs.utils import coordinates
 import pickle
-#import pfi as pfi
+
 from pfs.utils import coordinates
 from pfs.utils.coordinates import CoordTransp
 
@@ -15,21 +15,67 @@ import pandas as pd
 from scipy.stats import sigmaclip
 import centroid as centroid
 
-from ics.cobraCharmer import pfi
+
+import ics.cobraCharmer.pfi as pfi
 
 from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist
 import cv2
 import copy
+import os
+import yaml
 
+
+def getCentroidParams(cmd):
+
+    try:
+        cmdKeys=cmd.cmd.keywords
+    except:
+        cmdKeys=[]
+        
+    fileName=os.path.join(os.environ['ICS_MCSACTOR_DIR'],'etc','mcsDefaultCentroidParameters.yaml')
+
+    with open(fileName, 'r') as inFile:
+        defaultParms=yaml.safe_load(inFile)
+
+    
+    #returns just the values dictionary
+    centParms = defaultParms['values']
+
+    if('fwhmx' in cmdKeys):
+        centParms['fwhmx']=cmd.cmd.keywords["fwhmx"].values[0]
+    if('fwhmy' in cmdKeys):
+        centParms['fwhmy']=cmd.cmd.keywords["fwhmy"].values[0]
+
+    if('boxFind' in cmdKeys):
+        centParms['boxFind']=cmd.cmd.keywords["boxFind"].values[0]
+    if('boxCent' in cmdKeys):
+        centParms['boxCent']=cmd.cmd.keywords["boxCent"].values[0]
+
+    if('findSigma' in cmdKeys):
+        centParms['findSigma']=cmd.cmd.keywords["findSigma"].values[0]
+    if('centSigma' in cmdKeys):
+        centParms['centSigma']=cmd.cmd.keywords["centSigma"].values[0]
+    if('threshSigma' in cmdKeys):
+        centParms['threshSigma']=cmd.cmd.keywords["threshSigma"].values[0]
+
+    if('nmin' in cmdKeys):
+        centParms['nmin']=cmd.cmd.keywords["nmin"].values[0]
+    if('nmax' in cmdKeys):
+        centParms['nmax']=cmd.cmd.keywords["nmax"].values[0]
+    if('nmax' in cmdKeys):
+        centParms['maxIt']=cmd.cmd.keywords["maxIt"].values[0]
+
+
+    return centParms
 def readCobraGeometryFake():
 
     """
     creates fake cobra geometry for pinhole mask images, fo testing purposes. The centre is the mask position,
     the arm length is set to 4mm, the dot positions are offset and arbitrary. All "cobras" are good.
     """
-
-    centrePos=np.loadtxt("/home/pfs/karr/Set3/scienceFibres.dat",delimiter=",")
+    
+    centrePos=np.loadtxt(os.path.join(os.environ['ICS_MCSACTOR_DIR'],'etc','scienceFibres.dat'),delimiter=",")
     centrePos[:,0]+=1
     armLength=np.repeat(3,centrePos.shape[0])
     nCobras=len(armLength)
@@ -57,7 +103,7 @@ def readCobraGeometry(xmlFile,dotFile):
 
     pfic=pfi.PFI(fpgaHost='localhost',doConnect=False,logDir=None)
     aa=pfic.loadModel([pathlib.Path(xmlFile)])
-    
+
     #first figure out the good cobras (bad positions are set to 0)
     centersAll=pfic.calibModel.centers
     goodIdx=np.array(np.where(centersAll.real != 0)).astype('int').ravel()
@@ -640,7 +686,7 @@ def applyAffineTransform(points,afCoeff):
     return np.array([points[:,0],xx,yy]).T
 
   
-def getThresh(image,cobraPos,threshMethod,sigmaThresh,threshFact,findSigma,centSigma):
+def getThresh(image,cobraPos,threshMethod,sigmaThresh,findSigma,centSigma):
 
     """
     wrapper for getting threshold
@@ -671,7 +717,7 @@ def getThresh(image,cobraPos,threshMethod,sigmaThresh,threshFact,findSigma,centS
 
     #engineering mode
     if(threshMethod=='calib'):
-        xrange,yrange=getRegion(image,threshSigma,threshFact)
+        xrange,yrange=getRegion(image,threshSigma)
         a=getManualThresh(image,xrange,yrange,threshSigma)
     else:
 
@@ -719,7 +765,7 @@ def getManualThresh(image,xrange,yrange,sigmaThresh):
 
 
 
-def getRegion(image,high,factor):
+def getRegion(image,high):
 
     """
 
@@ -740,7 +786,7 @@ def getRegion(image,high,factor):
 
     #and a second iteration
     im,a,b=sigmaclip(image[xlow:xhigh,ylow:yhigh],high=high)
-    rrms=im.std()/factor
+    rrms=im.std()/4
     xlow,xhigh,ylow,yhigh=getBoundary(image,a,b,rrms)
 
     return [xlow,xhigh],[ylow,yhigh]
@@ -870,3 +916,4 @@ def checkAdjacentCobras(iCobra,adjacentCobras,unaCobras):
             allAss=False
 
     return allAss
+

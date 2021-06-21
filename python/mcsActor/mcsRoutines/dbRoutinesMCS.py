@@ -28,15 +28,11 @@ import sys
 
 import pandas as pd
 from scipy.stats import sigmaclip
-from opdb import opdb
 import copy
+from opdb import opdb
 
 
 def connectToDB(hostname='',port='',dbname='opdb_api_test',username='pfs',passwd=None):
-
-    """
-    connect to DB
-    """
     
     db = opdb.OpDB(hostname, port, dbname, username, passwd)
     db.connect()
