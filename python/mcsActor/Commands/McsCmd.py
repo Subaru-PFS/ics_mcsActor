@@ -259,9 +259,7 @@ class McsCmd(object):
 
     def getNextFilename(self, cmd, frameId):
         """ Fetch next image filename. 
-
         In real life, we will instantiate a Subaru-compliant image pathname generating object.  
-
         """
 
         if frameId is None:
@@ -364,17 +362,14 @@ class McsCmd(object):
 
     def _makeImageHeader(self, cmd):
         """ Create a complete WCS header.
-
         Notes
         ----
         - We need to get image center from config file.
         - So far, just spit out MCS-to-PFI linear conversion. Later, add SIP terms, and MCS-to-sky.
         - Needs to be pulled out into actorcore or pfs_utils.
-
         Returns
         -------
         hdr : pyfits.Header instance.
-
         """
 
         gen2Keys = self.actor.models['gen2'].keyVarDict
@@ -527,15 +522,18 @@ class McsCmd(object):
         self.actor.image = image
         cmd.inform(f'frameId={frameId}')
         cmd.inform(f'filename={filename}')
+
+        cmd.inform('text="Setting centroid parameters." ')
+        self.setCentroidParams(cmd)
+        zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(self._db,int(frameId))
+
         #if the centroid flag is set
         if doCentroid:
 
             #connect to DB
             db = self.connectToDB(cmd)
 
-            cmd.inform('text="Setting centroid parameters." ')
-            self.setCentroidParams(cmd)
-   
+            
             #self.calcThresh(cmd)
             if self.findThresh is None: 
                 cmd.inform('text="Calculating threshold." ')
@@ -841,12 +839,9 @@ class McsCmd(object):
     def calcThresh(self, cmd, frameId, zenithAngle, insRot, centParms):
 
         """  Calculate thresholds for finding/centroiding from image 
-
         3 methods: fieldID uses the known system geometry to figure out the right region
                    calib is for calibration when the system is not known, calculates from the image characteristics
                    direct sets teh values manually (backup method)
-
-
         """
         image = self.actor.image
         db = self.connectToDB(cmd)
@@ -878,7 +873,6 @@ class McsCmd(object):
         """
         top level routine for setting centroid parameters. REads the defaults from teh config fil,e
         then changes any specified in the keywords argument. 
-
         """
 
         self.centParms = mcsToolsNew.getCentroidParams(cmd)
@@ -993,7 +987,9 @@ class McsCmd(object):
         session = db.session
         with session.connection().connection.cursor() as cursor:
             cursor.copy_expert(sql, dataBuf)
-        cursor.close()
+            cursor.close()
+        session.execute('commit')
+
 
     def _readData(self, sql):
         """Wrap a direct COPY_TO via sqlalchemy. """
@@ -1106,4 +1102,4 @@ class McsCmd(object):
         dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
 
         mask = dist_from_center <= radius
-        return mask        
+        return mask    
