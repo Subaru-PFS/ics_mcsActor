@@ -40,6 +40,9 @@ from pfs.utils.coordinates import CoordTransp
 reload(CoordTransp)
 
 import numpy as np
+import logging
+
+
 
 Bool=bool
 
@@ -63,7 +66,12 @@ class McsCmd(object):
         self.geometrySet = False
         self.geomFile = None
         self.dotFile = None
-        self.fibreMode = 'asrd'
+        self.fibreMode = 'full'
+
+        logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
+                    datefmt="%Y-%m-%dT%H:%M:%S")
+        self.logger = logging.getLogger('mcscmd')
+        self.logger.setLevel(logging.INFO)
 
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -76,6 +84,7 @@ class McsCmd(object):
             ('expose', '@(bias|test) [<frameId>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose', '@object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot]', self.expose),
+            ('buildTransMatrix', '[<frameId>]', self.buildTransMatrix),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
@@ -527,6 +536,15 @@ class McsCmd(object):
         self.actor.image = image
         cmd.inform(f'frameId={frameId}')
         cmd.inform(f'filename={filename}')
+        
+        #load telescope values from the DB
+        cmd.inform(f'text="loading telescope parameters for frame={frameId}"')
+        zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(self._db,int(frameId))
+
+        #get the geometry if it hasn't been loaded yet
+        cmd.inform('text="loading geometry"')
+        self.getGeometry(cmd)
+        
         #if the centroid flag is set
         if doCentroid:
 
@@ -536,7 +554,6 @@ class McsCmd(object):
             cmd.inform('text="Setting centroid parameters." ')
             self.setCentroidParams(cmd)
    
-            #self.calcThresh(cmd)
             if self.findThresh is None: 
                 cmd.inform('text="Calculating threshold." ')
                 self.calcThresh(cmd,frameId,zenithAngle,insRot,self.centParms)
@@ -544,7 +561,7 @@ class McsCmd(object):
             cmd.inform('text="Running centroid on current image" ')
             self.runCentroidSEP(cmd)
  
-            self.runCentroid(cmd,self.centParms)
+            #self.runCentroid(cmd,self.centParms)
 
             #if the threshold has changed, recalculate: this was added during commissioning run
             if (self.nCentroid < 2000):
@@ -552,20 +569,15 @@ class McsCmd(object):
                 self.runCentroid(cmd,self.centParms)       
             
             cmd.inform('text="Sending centroid data to database" ')
-            self._writeCentroidsToDB(cmd, frameId)
+            self.dumpCentroidtoDB(cmd, frameId)
 
         #do the fibre identification
         if doFibreID:
-            #load telescope values from the DB
-            cmd.inform(f'text="loading telescope parameters for frame={frameId}"')
-            zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
+            
             
             cmd.inform('text="zenith angle=%s"'%(zenithAngle))
             cmd.inform('text="instrument rotation=%s"'%(insRot))
             
-            #get the geometry if it hasn't been loaded yet
-            #cmd.inform('text="loading geometry"')
-            #self.getGeometry(cmd)
 
             #read FF from the database, get list of adjacent fibres if they haven't been calculated yet.
             if(self.adjacentCobras == None):
@@ -993,7 +1005,8 @@ class McsCmd(object):
         session = db.session
         with session.connection().connection.cursor() as cursor:
             cursor.copy_expert(sql, dataBuf)
-        cursor.close()
+            cursor.close()
+        session.execute('commit')
 
     def _readData(self, sql):
         """Wrap a direct COPY_TO via sqlalchemy. """
@@ -1023,7 +1036,7 @@ class McsCmd(object):
         # Let the database handle the primary key
         db = self.connectToDB(None)
         colnames = db.session.execute('select * FROM "mcs_data" where false')
-        realcolnames = colnames[:]
+        realcolnames = colnames.keys()[0:]
         
         colname = []
         for i in realcolnames:
@@ -1107,3 +1120,13 @@ class McsCmd(object):
 
         mask = dist_from_center <= radius
         return mask        
+
+    def buildTransMatrix(self, cmd):
+        """ Buiding transformation matrix using FF"""
+        cmdKeys = cmd.cmd.keywords
+        if 'frameId' in cmdKeys:
+            frameId = cmdKeys['frameId'].values[0]
+
+        self.logger.info(f'Build transformation matrix with FF on frame {frameId}')
+
+        cmd.finish('text="Building tranformation matrix finished"')
