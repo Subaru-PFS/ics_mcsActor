@@ -533,7 +533,7 @@ class McsCmd(object):
             #connect to DB
             db = self.connectToDB(cmd)
 
-            
+            self.getGeometry(cmd)
             #self.calcThresh(cmd)
             if self.findThresh is None: 
                 cmd.inform('text="Calculating threshold." ')
@@ -563,7 +563,7 @@ class McsCmd(object):
             
             #get the geometry if it hasn't been loaded yet
             #cmd.inform('text="loading geometry"')
-            #self.getGeometry(cmd)
+            self.getGeometry(cmd)
 
             #read FF from the database, get list of adjacent fibres if they haven't been calculated yet.
             if(self.adjacentCobras == None):
@@ -802,13 +802,13 @@ class McsCmd(object):
             cmd.inform('text="loaded telescope info from %s"'% (simPath))
             
 
-            az = simHdr.get('AZIMUTH', -9998.0)
-            alt = simHdr.get('ALTITUDE', -9998.0)
+            az = simHdr.get('AZIMUTH', 30)
+            alt = simHdr.get('ALTITUDE', 30)
 
             if az is None:
-                az = -9998.0
+                az = 30
             if alt is None:
-                alt = -9998.0
+                alt = 30
 
             expTime = simHdr.get('EXPTIME', -9998.0)
             instrot = simHdr.get('INR-STR', -9998.0)
@@ -849,8 +849,8 @@ class McsCmd(object):
         cmd.inform('text="loading telescope parameters"')
 
         zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
-        cmd.diag(f'text="zenithAngle={zenithAngle}, insRot={insRot}"')
-
+        cmd.inform(f'text="zenithAngle={zenithAngle}, insRot={insRot}"')
+        cmd.inform(f'text="centre positions {self.centrePos[:,2].min()},{self.centrePos[:,2].max()}, {self.centrePos[:,1].min()}, {self.centrePos[:,1].max()}"')
         #different transforms for different setups: with and w/o field elements
         if(self.fibreMode == 'full'):
             centrePosPix=mcsToolsNew.transformToPix(self.centrePos,self.rotCent,self.offset,zenithAngle,insRot,fieldElement=True,pixScale=0)
@@ -919,7 +919,7 @@ class McsCmd(object):
         image = self.actor.image
         
         cmd.inform(f'state="measuring cached image: {image.shape}"')
-        a = centroid.centroid_only(image.astype('<i4'),
+        a = centroid.centroid_only(np.ascontiguousarray(image.astype('<i4')),
                                    centParms['fwhmx'], centParms['fwhmy'], self.findThresh, self.centThresh, centParms['boxFind'], centParms['boxCent'],
                                    centParms['nmin'], centParms['nmax'], centParms['maxIt'], 0) 
 
@@ -929,8 +929,11 @@ class McsCmd(object):
         points=np.empty((nSpots,8))
         points[:,0]=np.arange(nSpots)
         points[:,1:]=centroids[:,0:]
-        
+                
         self.centroids=points
+
+
+
         
         self.nCentroid = len(points)    
         cmd.inform('text="%d centroids"'% (len(centroids)))

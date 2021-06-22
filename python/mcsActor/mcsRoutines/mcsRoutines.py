@@ -158,7 +158,7 @@ def transformToMM(posPix,rotCent,offset,zenithAngle,insRot,fieldElement,pixScale
     if(insRot < 0):
         insRot=insRot+360
 
-    xyout=CoordTransp.CoordinateTransform(posPix[:,1:3],zenithAngle,'mcs_pfi',inr=insRot,cent=rotCent)
+    xyout=CoordTransp.CoordinateTransform(posPix[:,1:3].T,zenithAngle,'mcs_pfi',inr=insRot,cent=rotCent)
     xyout[0,:]+=offset[0]
     xyout[1,:]+=offset[1]
     return np.array([posPix[:,0],xyout[0,:],xyout[1,:]]).T
@@ -200,7 +200,7 @@ def transformToPix(posMM,rotCent,offset,zenithAngle,insRot,fieldElement,pixScale
         
     xyin=np.array([posMM[:,1]-offset[0],posMM[:,2]-offset[1]])
     #call the routine
-    xyout=CoordTransp.CoordinateTransform(xyin,zenithAngle,fElem,inr=insRot,cent=rotCent).T
+    xyout=CoordTransp.CoordinateTransform(xyin.T,zenithAngle,fElem,inr=insRot,cent=rotCent).T
 
     return np.array([posMM[:,0],xyout[:,0],xyout[:,1]]).T
 
@@ -283,7 +283,8 @@ def makeAdjacentList(ff,armLength):
     #use cKDTree for faster distances
 
     
-    cobraTree=cKDTree(ff)
+    cobraTree=cKDTree(np.ascontiguousarray(ff),copy_data=True)
+
 
     for i in range(len(ff[:,0])):
         #list of adjacent centers
