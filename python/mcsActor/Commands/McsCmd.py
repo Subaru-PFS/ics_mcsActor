@@ -7,6 +7,7 @@ import pathlib
 import queue
 import threading
 import sep
+import math
 
 import os
 import astropy.io.fits as pyfits
@@ -42,6 +43,7 @@ reload(CoordTransp)
 import numpy as np
 import logging
 
+import cv2
 
 
 Bool=bool
@@ -84,7 +86,6 @@ class McsCmd(object):
             ('expose', '@(bias|test) [<frameId>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose', '@object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot]', self.expose),
-            ('buildTransMatrix', '[<frameId>]', self.buildTransMatrix),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
@@ -1121,12 +1122,3 @@ class McsCmd(object):
         mask = dist_from_center <= radius
         return mask        
 
-    def buildTransMatrix(self, cmd):
-        """ Buiding transformation matrix using FF"""
-        cmdKeys = cmd.cmd.keywords
-        if 'frameId' in cmdKeys:
-            frameId = cmdKeys['frameId'].values[0]
-
-        self.logger.info(f'Build transformation matrix with FF on frame {frameId}')
-
-        cmd.finish('text="Building tranformation matrix finished"')
