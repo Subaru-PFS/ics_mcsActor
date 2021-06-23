@@ -25,4 +25,4 @@ values:
   nmin: 10
   threshFact: 4
   threshMode: full
-  threshSigma: 15
+  threshSigma: 4
