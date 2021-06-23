@@ -158,7 +158,7 @@ def transformToMM(posPix,rotCent,offset,zenithAngle,insRot,fieldElement,pixScale
     if(insRot < 0):
         insRot=insRot+360
 
-    xyout=CoordTransp.CoordinateTransform(posPix[:,1:3],zenithAngle,'mcs_pfi',inr=insRot,cent=rotCent)
+    xyout=CoordTransp.CoordinateTransform(posPix[:,1:3].T,zenithAngle,'mcs_pfi',inr=insRot,cent=rotCent)
     xyout[0,:]+=offset[0]
     xyout[1,:]+=offset[1]
     return np.array([posPix[:,0],xyout[0,:],xyout[1,:]]).T
@@ -200,7 +200,7 @@ def transformToPix(posMM,rotCent,offset,zenithAngle,insRot,fieldElement,pixScale
         
     xyin=np.array([posMM[:,1]-offset[0],posMM[:,2]-offset[1]])
     #call the routine
-    xyout=CoordTransp.CoordinateTransform(xyin,zenithAngle,fElem,inr=insRot,cent=rotCent).T
+    xyout=CoordTransp.CoordinateTransform(xyin.T,zenithAngle,fElem,inr=insRot,cent=rotCent).T
 
     return np.array([posMM[:,0],xyout[:,0],xyout[:,1]]).T
 
@@ -281,19 +281,22 @@ def makeAdjacentList(ff,armLength):
     adjacent=[]
 
     #use cKDTree for faster distances
-
+    #temproary fix for system issues, change back!!!
     
-    cobraTree=cKDTree(ff)
+    #cobraTree=cKDTree(np.ascontiguousarray(ff),copy_data=True)
+
 
     for i in range(len(ff[:,0])):
         #list of adjacent centers
-
-        #factor of 2.2 pads in case of variation in arm length from measurement to measurement
-        ind1=cobraTree.query_ball_point(ff[i],armLength[i]*2.2)
-        #remove the central value 
-        ind2=cobraTree.query_ball_point(ff[i],1)
-        ind1.remove(ind2[0])
+        dd=np.sqrt((ff[i,0]-ff[:,0])**2+(ff[i,1]-ff[:,1])**2)
+        ind1=np.where(np.all([dd > 0,dd < armLength[i]*2.2],axis=0))
         adjacent.append(ind1)
+        #factor of 2.2 pads in case of variation in arm length from measurement to measurement
+        #ind1=cobraTree.query_ball_point(ff[i],armLength[i]*2.2)
+        #remove the central value 
+        #ind2=cobraTree.query_ball_point(ff[i],1)
+        #ind1.remove(ind2[0])
+        #adjacent.append(ind1)
     return(adjacent)
 
 
@@ -378,12 +381,15 @@ def nearestNeighbourMatching(points,targets,nTarg):
     """
 
     #use cKDTree for speed
-    pointTree=cKDTree(points[:,1:3])
+    #pointTree=cKDTree(points[:,1:3])
 
     matchPoint=np.zeros((nTarg,3))
     for i in range(nTarg):
-        dd,ii=pointTree.query(targets[i,1:3],k=1)
+        dd=np.sqrt((points[:,1]-targets[i,1])**2+(points[:,2]-targets[i,2])**2)
+        #dd,ii=pointTree.query(targets[i,1:3],k=1)
+        ii=np.argmin(dd)
         matchPoint[i]=points[ii]
+
 
     return matchPoint
     
