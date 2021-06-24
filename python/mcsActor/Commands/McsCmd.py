@@ -31,6 +31,9 @@ from xml.etree.ElementTree import dump
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsToolsNew
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
+from ics.fpsActor import fpsFunction as fpstool
+
+
 from importlib import reload
 reload(dbTools)
 reload(mcsToolsNew)
@@ -212,8 +215,11 @@ class McsCmd(object):
 
         path, idx, lastname = self.simulationPath
         cmd.inform('text="frameIds1 = %s." '%{path})
-        files = sorted(glob.glob(os.path.join(path, '*.fits')))
-
+        files = sorted(glob.glob(os.path.join(path, 'PFSC*.fits')))
+        
+        
+            
+            
         cmd.debug('text="%i of %i files in %s..."' % (idx, len(files), path))
         if len(files) == 0:
             raise RuntimeError(f"no .fits files in {path}")
@@ -233,8 +239,19 @@ class McsCmd(object):
         frameId = int(imagePath.stem[4:], base=10)
         self.visitId = frameId // 100
 
+        try:
+            fwfile = sorted(glob.glob(os.path.join(path, 'thetaFW.npy')))
+            rvfile = sorted(glob.glob(os.path.join(path, 'thetaRV.npy')))
+            fw=np.load(fwfile[0])
+            rv=np.load(rvfile[0])
+            pos_array = np.append(fw,rv,axis=2)
+            targets = pos_array[:,0,idx]
+        except:
+            targets=np.zeros(2394)+np.zeros(2394)*1j
+
+
         cmd.inform('text="returning simulation file %s"' % (imagePath))
-        return imagePath, image
+        return imagePath, image, targets
 
     def requestNextFilename(self, cmd, frameId):
         """ Return a queue which will eventually contain a filename. """
@@ -411,7 +428,7 @@ class McsCmd(object):
             filename = 'scratchFile'
             image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
         else:
-            imagePath, image = self.getNextSimulationImage(cmd)
+            imagePath, image, target = self.getNextSimulationImage(cmd)
         cmd.inform(f'text="done: image shape = {image.shape}"')
         
 
@@ -419,9 +436,17 @@ class McsCmd(object):
             filename = nameQ.get(timeout=5.0)
         except queue.Empty:
             cmd.warn('text="failed to get a new filename in time"')
-            
-        cmd.diag(f'text="read filename: {filename}"')
+
+        frameId = int(pathlib.Path(filename).stem[4:], base=10)
         
+        # Now, after getting the filename, get predicted locations
+        if self.simulationPath is not None:
+            self._writeExpectTarget(cmd, frameId, target)
+        else: 
+            pass   
+
+        self.logger.info(f'read filename: {filename}')
+
         if mask is not None:
             cmd.inform(f'text="mask image shape: {mask.shape} type:{mask.dtype}"')
             cmd.inform(f'text="image shape: {image.shape} type:{image.dtype}"')
@@ -455,7 +480,7 @@ class McsCmd(object):
         pHdr.set('EXTEND', comment='Presence of FITS Extension')
 
         hduList.writeto(filename, checksum=False, overwrite=True)
-        cmd.inform('filename={filename}')
+        cmd.inform(f'filename={filename}')
         cmd.inform(f'text="write image to filename={filename}"')
 
         return filename, image
@@ -682,7 +707,7 @@ class McsCmd(object):
 
             self.centrePos,self.armLength,self.dotPos,self.goodIdx=mcsToolsNew.readCobraGeometry(self.geomFile,self.dotFile)
             cmd.inform('text="cobra geometry read"')
-
+            
         elif(self.fibreMode=="full"):
 
             #check this value
@@ -756,7 +781,7 @@ class McsCmd(object):
             
         if(self.fibreMode in ('comm','full')):
             db = self.connectToDB(cmd)
-
+            cmd.inform(f'text="tests centroid shape {self.centroids[:,1:3].shape}"')
             centroidsMM=mcsToolsNew.transformToMM(self.centroids,self.rotCent,self.offset,zenithAngle,fieldElement,insRot,pixScale=0)
             np.save("centroidsMM.npy",centroidsMM)
 
@@ -864,10 +889,10 @@ class McsCmd(object):
         image = self.actor.image
         db = self.connectToDB(cmd)
         
-        cmd.inform('text="loading telescope parameters"')
+        #cmd.inform('text="loading telescope parameters"')
 
-        zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
-        cmd.diag(f'text="zenithAngle={zenithAngle}, insRot={insRot}"')
+        #zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
+        #cmd.diag(f'text="zenithAngle={zenithAngle}, insRot={insRot}"')
 
         #different transforms for different setups: with and w/o field elements
         if(self.fibreMode == 'full'):
@@ -1121,4 +1146,45 @@ class McsCmd(object):
 
         mask = dist_from_center <= radius
         return mask        
+
+    def _writeExpectTarget(self, cmd, frameId, targets):
+        '''
+        Write the expect target to databse.
+        '''
+
+        mcs_f3c_model={'camMatrix': np.array([[8.36047142e+03, 0.00000000e+00, 5.01140651e+03],
+                        [0.00000000e+00, 8.75498927e+03, 3.53572485e+03],
+                        [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]]),
+                    'camDistor': np.array([[ 0.04236098, -0.11608623,  0.0012094 , -0.00031588,  0.08034843]]),
+                    'camRotVec': np.array([[-0.02458225],
+                        [-0.06933687],
+                        [-0.01775009]]),
+                    'camTranVec': np.array([[-72269.86663875],
+                        [-48804.84781669],
+                        [112015.99005353]])}
+
+        cobra_obj=np.array([targets.real,targets.imag,np.zeros(len(targets))]).T
+    
+    
+        imgpoints2, _ = cv2.projectPoints(cobra_obj.astype(np.float32), 
+                              mcs_f3c_model['camRotVec'], mcs_f3c_model['camTranVec'], 
+                            mcs_f3c_model['camMatrix'], mcs_f3c_model['camDistor'])
+        imgarr2=imgpoints2[:,0,:]
+        pfi_x=imgarr2[:,0]
+        pfi_y=imgarr2[:,1]
+
+        db = self.connectToDB(None)
+        colnames = db.session.execute('select * FROM "cobra_target" where false')
+        realcolnames = colnames.keys()[0:]
+
+        buf = io.StringIO()
+
+        for i in range(len(pfi_x)):
+            line='%d,%d,%d,%d, %f,%f,%f,%f,%d,%d,%d,%f,%d,%d,%d,%f,%d\n'%(frameId/100,1,i+1, 99 ,pfi_x[i],pfi_y[i],
+                pfi_x[i],pfi_y[i], 1, 1,99,99,1, 1,99,99,0)
+            buf.write(line)
+        buf.seek(0,0)
+
+        self._writeData('cobra_target', realcolnames, buf)
+        buf.seek(0,0)
 
