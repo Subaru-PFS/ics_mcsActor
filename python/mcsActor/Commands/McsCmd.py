@@ -113,7 +113,7 @@ class McsCmd(object):
             raise RuntimeError(f"could not get db password from {pwpath}")
 
         try:
-            connString = "dbname='opdb' user='pfs' host="+self.db+" password="+passstring
+            connString = "dbname='opdb_asrd' user='pfs' host="+self.db+" password="+passstring
             self.actor.logger.info(f'connecting to {connString}')
             conn = psycopg2.connect(connString)
             self._conn = conn
