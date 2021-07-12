@@ -12,15 +12,15 @@ from astropy.io import fits
 import mcsActor.Visualization.visRoutines as vis
 
 
+def applyAffineFPS(coord, trans):
 
-def applyAffineFPS(coord,trans):
- 
-    xf,yf=vis.transformPointsNew(coord[:,1],coord[:,2],trans['xTrans'],trans['yTrans'],trans['angle'],trans['xScale'],trans['yScale'])
-    
-    return np.array([coord[:,0],xf,yf]).T
+    xf, yf = vis.transformPointsNew(coord[:, 1], coord[:, 2], trans['xTrans'],
+                                    trans['yTrans'], trans['angle'], trans['xScale'], trans['yScale'])
 
-def getAffine(x1,x2,y1,y2):
+    return np.array([coord[:, 0], xf, yf]).T
 
+
+def getAffine(x1, x2, y1, y2):
     """
 
     Calculate and remove an affine transformation between two sets of
@@ -38,20 +38,19 @@ def getAffine(x1,x2,y1,y2):
 
     """
 
-    transform,xd,yd,sx,sy,rotation=vis.getTransform(x1,x2,y1,y2,1)
+    transform, xd, yd, sx, sy, rotation = vis.getTransform(x1, x2, y1, y2, 1)
 
-    trans={}
-    trans['xTrans']=xd
-    trans['yTrans']=yd
-    trans['xScale']=sx
-    trans['yScale']=sy
-    trans['angle']=rotation
-    
+    trans = {}
+    trans['xTrans'] = xd
+    trans['yTrans'] = yd
+    trans['xScale'] = sx
+    trans['yScale'] = sy
+    trans['angle'] = rotation
+
     return trans
-    
 
-def removeAffine(x1,y1,x2,y2):
 
+def removeAffine(x1, y1, x2, y2):
     """
 
     Calculate and remove an affine transformation between two sets of
@@ -69,21 +68,21 @@ def removeAffine(x1,y1,x2,y2):
 
     """
 
-    transform,xd,yd,sx,sy,rotation=vis.getTransform(x1,x2,y1,y2,1)
+    transform, xd, yd, sx, sy, rotation = vis.getTransform(x1, x2, y1, y2, 1)
 
-    trans={}
-    trans['xTrans']=xd
-    trans['yTrans']=yd
-    trans['xScale']=sx
-    trans['yScale']=sy
-    trans['angle']=rotation
-    
-    xf,yf=vis.transformPointsNew(x1,y1,xd,yd,rotation,sx,sy)
+    trans = {}
+    trans['xTrans'] = xd
+    trans['yTrans'] = yd
+    trans['xScale'] = sx
+    trans['yScale'] = sy
+    trans['angle'] = rotation
 
-    return xf,yf,trans
-    
+    xf, yf = vis.transformPointsNew(x1, y1, xd, yd, rotation, sx, sy)
+
+    return xf, yf, trans
+
+
 def getFieldDefinition(fieldID):
-
     """
 
     program to read in the set of cobras. Currently a dummy program
@@ -91,109 +90,108 @@ def getFieldDefinition(fieldID):
 
     """
 
-    fiducials=np.loadtxt('fiducials.dat',delimiter=',')
-    scienceFibres=np.loadtxt('scienceFibres.dat',delimiter=',')
+    fiducials = np.loadtxt('fiducials.dat', delimiter=',')
+    scienceFibres = np.loadtxt('scienceFibres.dat', delimiter=',')
 
-    return fiducials,scienceFibres
+    return fiducials, scienceFibres
+
 
 def getInstConfig(fname):
-
     """
 
     Routine to retrieve configureation of telescope, including zenith angle and instrument rotation.
 
     """
 
-    ###PUT CODE HERE!!!
+    # PUT CODE HERE!!!
 
-
-    hdu=fits.open(fname)
+    hdu = fits.open(fname)
     hdr = hdu[0].header
-    za=90-hdr['Altitude']
-    inr=hdr['inr-str']
+    za = 90-hdr['Altitude']
+    inr = hdr['inr-str']
 
-    return za,inr
+    return za, inr
 
 
-def getFibrePos(fiducials,scienceFibres,za,inr,rotCent,offset):
-
+def getFibrePos(fiducials, scienceFibres, za, inr, rotCent, offset):
     """
-    
+
     Convert a set of fiducials and science fibres (in mask coordinates)
     into expected pixel positons on the image. 
 
 
     """
 
-    #rotation adjustment
-    inr=inr-180
+    # rotation adjustment
+    inr = inr-180
     if(inr < 0):
-        inr=inr+360
-        
-    #concatenate - MCS doesn't care which is fiducial and which is science
+        inr = inr+360
 
-    xx=np.array([np.concatenate([fiducials[:,1],scienceFibres[:,1]])]).ravel()
-    yy=np.array([np.concatenate([fiducials[:,2],scienceFibres[:,2]])]).ravel()
+    # concatenate - MCS doesn't care which is fiducial and which is science
 
-    #now offset to centre of rotation
-    #xx-=offset[0]
-    #yy-=offset[1]
+    xx = np.array([np.concatenate([fiducials[:, 1], scienceFibres[:, 1]])]).ravel()
+    yy = np.array([np.concatenate([fiducials[:, 2], scienceFibres[:, 2]])]).ravel()
 
-    #correect input format
-    #xyin=np.array([xx,yy])
+    # now offset to centre of rotation
+    # xx-=offset[0]
+    # yy-=offset[1]
 
-    xyinFid=np.array([fiducials[:,1]-offset[0],fiducials[:,2]-offset[1]])
-    xyinSci=np.array([scienceFibres[:,1]-offset[0],scienceFibres[:,2]-offset[1]])
- 
-    #call the routine
-    xyoutFid=CoordTransp.CoordinateTransform(xyinFid,za,'pfi_mcs_wofe',inr=inr,cent=rotCent)
-    xyoutSci=CoordTransp.CoordinateTransform(xyinSci,za,'pfi_mcs_wofe',inr=inr,cent=rotCent)
+    # correect input format
+    # xyin=np.array([xx,yy])
 
-    #reassemble into the right format and return
-    
-    return np.array([fiducials[:,0],xyoutFid[0,:],xyoutFid[1,:]]).T,np.array([scienceFibres[:,0],xyoutSci[0,:],xyoutSci[1,:]]).T
+    xyinFid = np.array([fiducials[:, 1]-offset[0], fiducials[:, 2]-offset[1]])
+    xyinSci = np.array([scienceFibres[:, 1]-offset[0], scienceFibres[:, 2]-offset[1]])
 
-def getAllFibrePos(fiducials,scienceFibres,za,inr,rotCent,offset):
+    # call the routine
+    xyoutFid = CoordTransp.CoordinateTransform(xyinFid, za, 'pfi_mcs_wofe', inr=inr, cent=rotCent)
+    xyoutSci = CoordTransp.CoordinateTransform(xyinSci, za, 'pfi_mcs_wofe', inr=inr, cent=rotCent)
 
+    # reassemble into the right format and return
+
+    return np.array([fiducials[:, 0], xyoutFid[0, :], xyoutFid[1, :]]).T, np.array([scienceFibres[:, 0], xyoutSci[0, :], xyoutSci[1, :]]).T
+
+
+def getAllFibrePos(fiducials, scienceFibres, za, inr, rotCent, offset):
     """
-    
+
     Convert a set of fiducials and science fibres (in mask coordinates)
     into expected pixel positons on the image. 
 
 
     """
 
-    #rotation adjustment
-    inr=inr-180
+    # rotation adjustment
+    inr = inr-180
     if(inr < 0):
-        inr=inr+360
-        
-    #concatenate - MCS doesn't care which is fiducial and which is science
+        inr = inr+360
 
-    xx=np.array([np.concatenate([fiducials[:,1],scienceFibres[:,1]])]).ravel()
-    yy=np.array([np.concatenate([fiducials[:,2],scienceFibres[:,2]])]).ravel()
+    # concatenate - MCS doesn't care which is fiducial and which is science
 
-    #now offset to centre of rotation
-    xx-=offset[0]
-    yy-=offset[1]
+    xx = np.array([np.concatenate([fiducials[:, 1], scienceFibres[:, 1]])]).ravel()
+    yy = np.array([np.concatenate([fiducials[:, 2], scienceFibres[:, 2]])]).ravel()
 
-    #correect input format
-    xyin=np.array([xx,yy])
+    # now offset to centre of rotation
+    xx -= offset[0]
+    yy -= offset[1]
 
-    #call the routine
-    xyout=CoordTransp.CoordinateTransform(xyin,za,'pfi_mcs_wofe',inr=inr,cent=rotCent)
-    
-    return np.array([np.arange(len(xx)),xyout[0,:],xyout[1,:]]).T
+    # correect input format
+    xyin = np.array([xx, yy])
 
-def getDiff(centroids,fibrePos):
+    # call the routine
+    xyout = CoordTransp.CoordinateTransform(xyin, za, 'pfi_mcs_wofe', inr=inr, cent=rotCent)
 
-    dx=centroids[:,1]-fibrePos[:,1]
-    dy=centroids[:,2]-fibrePos[:,2]
+    return np.array([np.arange(len(xx)), xyout[0, :], xyout[1, :]]).T
 
-    return dx,dy
 
-def calcRotationCentre(centroids,frameIDs):
+def getDiff(centroids, fibrePos):
 
+    dx = centroids[:, 1]-fibrePos[:, 1]
+    dy = centroids[:, 2]-fibrePos[:, 2]
+
+    return dx, dy
+
+
+def calcRotationCentre(centroids, frameIDs):
     """ 
 
     Calculate the centre of rotation, given an array retrived by getAllCentroidsFromDB.
@@ -204,33 +202,35 @@ def calcRotationCentre(centroids,frameIDs):
 
     """
 
-    xCorner=[]
-    yCorner=[]
+    xCorner = []
+    yCorner = []
 
-    ###NEED TO RETRIEVE THE SET OF CENTROIDS FROM 
+    # NEED TO RETRIEVE THE SET OF CENTROIDS FROM
 
     for i in frameIDs:
-        ind=np.where(allCentroids[:,0]==i)
-        x=centroids[ind,2].ravel()
-        y=centroids[ind,3].ravel()
+        ind = np.where(allCentroids[:, 0] == i)
+        x = centroids[ind, 2].ravel()
+        y = centroids[ind, 3].ravel()
 
-        x0,x1,y0,y1=getCorners(x,y)
+        x0, x1, y0, y1 = getCorners(x, y)
         xCorner.append(x0)
         yCorner.append(y0)
 
-    xCorner=np.array(xCorner)
-    yCorner=np.array(yCorner)
+    xCorner = np.array(xCorner)
+    yCorner = np.array(yCorner)
 
-    coords=[xCorner,yCorner]
-    xc,yc,r,_=mcs.least_squares_circle(xCorner,yCorner)
+    coords = [xCorner, yCorner]
+    xc, yc, r, _ = mcs.least_squares_circle(xCorner, yCorner)
 
-    return xc,yc
-            
-def calc_R(x,y, xc, yc):
+    return xc, yc
+
+
+def calc_R(x, y, xc, yc):
     """
     calculate the distance of each 2D points from the center (xc, yc)
     """
     return np.sqrt((x-xc)**2 + (y-yc)**2)
+
 
 def f(c, x, y):
     """
@@ -240,7 +240,8 @@ def f(c, x, y):
     Ri = calc_R(x, y, *c)
     return Ri - Ri.mean()
 
-def least_squares_circle(x,y):
+
+def least_squares_circle(x, y):
     """
     Circle fit using least-squares solver.
     Inputs:
@@ -266,17 +267,17 @@ def least_squares_circle(x,y):
     x_m = np.mean(x)
     y_m = np.mean(y)
     center_estimate = x_m, y_m
-    center, ier = optimize.leastsq(f, center_estimate, args=(x,y))
+    center, ier = optimize.leastsq(f, center_estimate, args=(x, y))
     xc, yc = center
-    Ri       = calc_R(x, y, *center)
-    R        = Ri.mean()
-    residu   = np.sum((Ri - R)**2)
+    Ri = calc_R(x, y, *center)
+    R = Ri.mean()
+    residu = np.sum((Ri - R)**2)
     return xc, yc, R, residu
 
-def getCentroidsDB(conn,frameID,moveID):
 
+def getCentroidsDB(conn, frameID, moveID):
     """
-    
+
     retrieves a set of centroids from the database, for a sequence of frameIDs
 
     Input:  
@@ -285,13 +286,12 @@ def getCentroidsDB(conn,frameID,moveID):
 
     """
 
-    ###put code here
+    # put code here
 
     return centroids
 
 
-def getAllCentroidsDB(conn,frameIDs):
-
+def getAllCentroidsDB(conn, frameIDs):
     """
 
     retrieves a set of centroids from the database, for a sequence of frameIDs
@@ -301,48 +301,48 @@ def getAllCentroidsDB(conn,frameIDs):
        frameIDs: list of frame id numbers
 
     """
-    
-    #for commissioning with MCS
-    
+
+    # for commissioning with MCS
+
     moveId = 1
-    
-    #make a blank array for the centroid array
-    centroids=np.array([])
-    
-    i=0
-    
-    #cycle through each ID number
+
+    # make a blank array for the centroid array
+    centroids = np.array([])
+
+    i = 0
+
+    # cycle through each ID number
     for id in frameIDs:
-        
-        #SQL for getting a set of centroids
+
+        # SQL for getting a set of centroids
         #cmd_string = f"""select * from mcsEngTable where frameId={id} and moveId=1"""
-        #cmd_string=""
-        data=np.array([]) 
+        # cmd_string=""
+        data = np.array([])
         n = 0
         with conn.cursor() as curs:
-                curs.execute(cmd_string)
-                rows=curs.fetchall()
-                for idx, val in enumerate(rows):
-                    if idx == 0: data = val 
-                    if idx != 0: data = np.vstack([data,val])
+            curs.execute(cmd_string)
+            rows = curs.fetchall()
+            for idx, val in enumerate(rows):
+                if idx == 0:
+                    data = val
+                if idx != 0:
+                    data = np.vstack([data, val])
         conn.commit()
-        
-        
-        #some data massaging into the right form. 
-        cen=data[:,5:11]
-        cen1=np.zeros((cen.shape[0],7))
-        
-        #add an index to the first number
-        cen1[:,0]=i
-        
-        #copy over the centroids
-        cen1[:,1:7]=cen
-        
-        #create master array
-        if(i==0):
-            centroids=cen1
+
+        # some data massaging into the right form.
+        cen = data[:, 5:11]
+        cen1 = np.zeros((cen.shape[0], 7))
+
+        # add an index to the first number
+        cen1[:, 0] = i
+
+        # copy over the centroids
+        cen1[:, 1:7] = cen
+
+        # create master array
+        if(i == 0):
+            centroids = cen1
         else:
-            centroids=np.concatenate((centroids,cen1),axis=0)
+            centroids = np.concatenate((centroids, cen1), axis=0)
 
-    return centroids    
-
+    return centroids

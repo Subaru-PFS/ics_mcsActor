@@ -6,8 +6,10 @@ import astropy.io.fits as pyfits
 import os
 import shutil
 
+
 class Camera(object):
     pass
+
 
 class rmodCamera(Camera):
     def __init__(self):
@@ -18,7 +20,7 @@ class rmodCamera(Camera):
         self.name = 'RMOD_71M'
         self.expTime = 0
         self.coaddDir = '/tmp'
-        
+
     def _readoutTime(self):
         return 0.5
 
@@ -26,29 +28,29 @@ class rmodCamera(Camera):
         return 0.1
 
     def sendStatusKeys(self, cmd):
-        """ Send our status keys to the given command. """ 
+        """ Send our status keys to the given command. """
 
         cmd.inform('cameraName=%s; readNoise=%0.2f' % (self.name, self.readNoise))
-    
-    def initialCamera(self,cmd):
+
+    def initialCamera(self, cmd):
         """ Initial the MCS camera. """
 
         cmd.inform('text="Starting camera initialization."')
         p = sub.Popen(['/opt/EDTpdv/initcam', '-f', '/home/pfs/mhs/devel/ics_cobraCharmer/etc/illusnis-71mp.cfg'],
                       stdout=sub.PIPE, stderr=sub.PIPE)
         output, errors = p.communicate()
-        string=errors[23:-1]
+        string = errors[23:-1]
         if (string == 'done'):
             cmd.inform('text="Camera initialization message: %s"' % (string))
-    
+
     def setExposureTime(self, cmd, expTime):
         """ Initial the MCS camera. """
         self.expTime = expTime
-        p = sub.Popen(['rmodcontrol', '-e', f'{expTime}'],stdout=sub.PIPE, stderr=sub.PIPE)
+        p = sub.Popen(['rmodcontrol', '-e', f'{expTime}'], stdout=sub.PIPE, stderr=sub.PIPE)
         output, errors = p.communicate()
-        
+
         cmd.inform('expTime=%f ms' % (expTime))
-        
+
     def expose(self, cmd, expTime, expType, filename, doCopy=True):
         """ Generate an 'exposure' image. We don't have an actual camera, so generate some 
         plausible image. 
@@ -71,41 +73,37 @@ class rmodCamera(Camera):
             expType = 'test'
         if cmd:
             cmd.inform('exposureState="exposing"')
-        
-        if expType in ('dark','bias') and expTime > 0:
+
+        if expType in ('dark', 'bias') and expTime > 0:
             cmd.inform('text="ETYPE: %s"' % (expType))
-            t1=time.time()
-            
+            t1 = time.time()
+
             # Command camera to do exposure sequence
-            slicename=filename[0:33]+'.fits'
+            slicename = filename[0:33]+'.fits'
             cmd.inform('text="slice name: %s"' % (slicename))
-            p = sub.Popen(['rmodexposure', '-f', slicename, '-l', '1'],stdout=sub.PIPE, stderr=sub.PIPE)
+            p = sub.Popen(['rmodexposure', '-f', slicename, '-l', '1'], stdout=sub.PIPE, stderr=sub.PIPE)
             output, errors = p.communicate()
-            t2=time.time()
-           
-        
-        if expType in ('test','object') and expTime > 0:
-            t1=time.time()
-       
+            t2 = time.time()
+
+        if expType in ('test', 'object') and expTime > 0:
+            t1 = time.time()
+
             # Command camera to do exposure sequence
-            slicename=filename[0:33]+'_'
+            slicename = filename[0:33]+'_'
             cmd.inform('text="slice name: %s"' % (slicename))
-            p = sub.Popen(['rmodexposure', '-f', slicename, '-l', '1'],stdout=sub.PIPE, stderr=sub.PIPE)
+            p = sub.Popen(['rmodexposure', '-f', slicename, '-l', '1'], stdout=sub.PIPE, stderr=sub.PIPE)
 
             output, errors = p.communicate()
-            t2=time.time()
-        
+            t2 = time.time()
+
         if cmd:
             cmd.inform('exposureState="reading"')
-                
+
         f = pyfits.open(slicename)
-        
 
         image = f[0].data
-        t3=time.time()
-        cmd.inform('text="Time for exposure = %f." '% ((t2-t1)/1.))
-        cmd.inform('text="Time for image loading= %f." '% ((t3-t2)/1.))
+        t3 = time.time()
+        cmd.inform('text="Time for exposure = %f." ' % ((t2-t1)/1.))
+        cmd.inform('text="Time for image loading= %f." ' % ((t3-t2)/1.))
 
         return image
-        
-        
