@@ -1,11 +1,10 @@
 
-def approximateCoords(x,y,region):
-
+def approximateCoords(x, y, region):
     """
 
     Get lower left position and rotation angle from a set of pin-hole mask
     centroids.  This will possibly break if the rotation angle is too high. 
-    
+
     input
 
     x,y: 1D numpy arrays of coordinates (pixel)
@@ -16,25 +15,25 @@ def approximateCoords(x,y,region):
 
     """
 
-    #find points in the ergion
-    
-    ind=np.where((x > region[0]) & (x < region[1]) & (y > region[2]) & (y < region[3]))
+    # find points in the ergion
 
-    #find the minimum and maximum distance from the origin
-    
-    dd=x*x+y*y
+    ind = np.where((x > region[0]) & (x < region[1]) & (y > region[2]) & (y < region[3]))
 
-    ind1=np.where(dd == dd.max())
-    ind2=np.where(dd == dd.min())
+    # find the minimum and maximum distance from the origin
 
-    #calculate the angle of rotation wrt Y axis
-    
-    angle=np.arctan2((y[ind1]-y[ind2]),(x[ind1]-x[ind2]))-np.pi/4.
+    dd = x*x+y*y
 
-    return x[ind2],y[ind2],angle
+    ind1 = np.where(dd == dd.max())
+    ind2 = np.where(dd == dd.min())
 
-def scaleCentroids(x,y,x1,y1,scale):
+    # calculate the angle of rotation wrt Y axis
 
+    angle = np.arctan2((y[ind1]-y[ind2]), (x[ind1]-x[ind2]))-np.pi/4.
+
+    return x[ind2], y[ind2], angle
+
+
+def scaleCentroids(x, y, x1, y1, scale):
     """
 
     scale the centroids to mm at mask, and shift to the origin
@@ -48,14 +47,14 @@ def scaleCentroids(x,y,x1,y1,scale):
     returns: transformed x,y
 
     """
-    
-    xc=(x-x1)/scale
-    yc=(y-y1)/scale
 
-    return xc,yc
- 
-def scaleMask(xx,yy,angle,flip):
+    xc = (x-x1)/scale
+    yc = (y-y1)/scale
 
+    return xc, yc
+
+
+def scaleMask(xx, yy, angle, flip):
     """
 
     rotate the mask as needed
@@ -69,32 +68,32 @@ def scaleMask(xx,yy,angle,flip):
     returns: transformed x,y
 
     """
-    
-    #apply any rotation (for matching purposes only)
 
-    #add 90 degrees to rotation
-    
-    if(flip==1):
-        angle=angle+np.pi/2
+    # apply any rotation (for matching purposes only)
 
-    #shift to centre, rotate, shift back
-    xx=xx-168
-    yy=yy-168
-        
-    xnew=xx*np.cos(angle)-yy*np.sin(angle)
-    ynew=xx*np.sin(angle)+yy*np.cos(angle)
-    
-    xx=xnew+168
-    yy=ynew+168
+    # add 90 degrees to rotation
 
-    return xx,yy
+    if(flip == 1):
+        angle = angle+np.pi/2
+
+    # shift to centre, rotate, shift back
+    xx = xx-168
+    yy = yy-168
+
+    xnew = xx*np.cos(angle)-yy*np.sin(angle)
+    ynew = xx*np.sin(angle)+yy*np.cos(angle)
+
+    xx = xnew+168
+    yy = ynew+168
+
+    return xx, yy
 
 
-def maskImage(infile,outfile,x1,y1,x2,y2):
+def maskImage(infile, outfile, x1, y1, x2, y2):
 
-    image=pf.getdata(infile)
-    image[0:x1,:]=0
-    image[x2:,:]=0
-    image[:,0:y1]=0
-    image[:,y2:]=0
-    pf.writeto(outfile,image,clobber=True)
+    image = pf.getdata(infile)
+    image[0:x1, :] = 0
+    image[x2:, :] = 0
+    image[:, 0:y1] = 0
+    image[:, y2:] = 0
+    pf.writeto(outfile, image, clobber=True)
