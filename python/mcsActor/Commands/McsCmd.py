@@ -289,7 +289,7 @@ class McsCmd(object):
 
             cmd.inform(f'text="gen2.getVisit = {visit}"')
 
-        path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d', time.gmtime()))
+        path = os.path.join('/data/raw', time.strftime('%Y-%m-%d', time.gmtime()), 'mcs')
         path = os.path.expandvars(os.path.expanduser(path))
         if not os.path.isdir(path):
             os.makedirs(path, 0o755)
