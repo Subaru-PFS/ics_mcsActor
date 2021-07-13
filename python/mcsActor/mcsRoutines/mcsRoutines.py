@@ -335,7 +335,7 @@ def fibreID(cc, points, targets, centers, arms, prevPos, dotPos, adjacentCobras)
 
     # set up variables
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch = prepWork(
-        points, nPoints, nCobras, centers, arms, goodIdx, armFudge=1/13.2)
+        points, nPoints, nCobras, centers, arms, goodIdx)
 
     # first pass - assign cobra/spot pairs based on the spots poiint of view
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = firstPass(
@@ -404,7 +404,7 @@ def nearestNeighbourMatching(points, targets, nTarg):
     return matchPoint
 
 
-def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, armFudge=1):
+def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, armFudge=0.08):
     """
     Create initial list of potential cobra/pooint matches
     and assigned/unasigned cobras. 
