@@ -106,8 +106,20 @@ def readCobraGeometry(xmlFile, dotFile):
 
     # first figure out the good cobras (bad positions are set to 0)
     centersAll = pfic.calibModel.centers
-    goodIdx = np.array(np.where(centersAll.real != 0)).astype('int').ravel()
 
+    #get the list of good cobras
+    cobs = pfic.calibModel.findCobraByCobraIndex(np.arange(0,2394))
+    goodIdx=[]
+    #cycle through the indices, get the module/cobra number, and check its status
+    for i in range(2394):
+        cob = pfic.calibModel.findCobraByCobraIndex([i])
+        status = pfic.calibModel.cobraStatus(cob[0][1],cob[0][0])
+        if(status == 1):
+            goodIdx.append(i)
+    #return a numpy array for ease of later use
+    goodIdx = np.array(goodIdx).astype('int')
+
+    
     # then extract the parameters for good fibres only
     centrePos = np.array([goodIdx+1, centersAll[goodIdx].real, centersAll[goodIdx].imag]).T
     armLength = (pfic.calibModel.L1[goodIdx]+pfic.calibModel.L2[goodIdx])
@@ -124,10 +136,8 @@ def readCobraGeometry(xmlFile, dotFile):
     dotPos[:, 2] = dotData['y_tran'].values[goodIdx]
     dotPos[:, 3] = dotData['r_tran'].values[goodIdx]
 
-    with open('dumpGeom.pkl', 'wb') as output:
-        pickle.dump([centrePos, armLength, dotPos, goodIdx], output)
 
-    return centrePos, armLength, dotPos, goodIdx
+    return centrePos, armLength, dotPos, goodIdx, pfic
 
 
 def transformToMM(posPix, rotCent, offset, zenithAngle, insRot, fieldElement, pixScale=0):
@@ -153,10 +163,11 @@ def transformToMM(posPix, rotCent, offset, zenithAngle, insRot, fieldElement, pi
     if(pixScale != 0):
         return np.array([posPix[:, 0], posPix[:, 1]*pixScale, posPix[:, 2]*pixScale]).T
 
+    # this part was for pinhole mask, don't need otherwise
     # rotation adjustment
-    insRot = insRot-180
-    if(insRot < 0):
-        insRot = insRot+360
+    # insRot = insRot-180
+    # if(insRot < 0):
+    #    insRot = insRot+360
 
     xyout = CoordTransp.CoordinateTransform(
         posPix[:, 1:3].T, zenithAngle, 'mcs_pfi', inr=insRot, cent=rotCent)
@@ -194,10 +205,10 @@ def transformToPix(posMM, rotCent, offset, zenithAngle, insRot, fieldElement, pi
         fElem = 'pfi_mcs'
     else:
         fElem = 'pfi_mcs_wofe'
-    # rotation adjustment
-    insRot = insRot-180
-    if(insRot < 0):
-        insRot = insRot+360
+    # rotation adjustment - only needed for pinhole mask
+    # insRot = insRot-180
+    # if(insRot < 0):
+    #    insRot = insRot+360
 
     xyin = np.array([posMM[:, 1]-offset[0], posMM[:, 2]-offset[1]])
     # call the routine
@@ -294,7 +305,7 @@ def makeAdjacentList(ff, armLength):
     return(adjacent)
 
 
-def fibreID(points, targets, centers, arms, dotPos, adjacentCobras, goodIdx):
+def fibreID(cc, points, targets, centers, arms, prevPos, dotPos, adjacentCobras):
     """
     runs the fibreID code for fibre identification
 
@@ -315,28 +326,31 @@ def fibreID(points, targets, centers, arms, dotPos, adjacentCobras, goodIdx):
 
     """
 
+    goodIdx=cc.goodIdx
     anyChange = 0
+
+    # these are the effective number of cobras (ie, goodIdx)
     nPoints = points.shape[0]
     nCobras = targets.shape[0]
 
     # set up variables
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch = prepWork(
-        points, nPoints, nCobras, centers, arms, goodIdx)
+        points, nPoints, nCobras, centers, arms, goodIdx, armFudge=1/13.2)
 
     # first pass - assign cobra/spot pairs based on the spots poiint of view
-    aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = firstPassNew(
+    aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = firstPass(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange)
 
     # second pass - assign cobra/spot pairs based on the cobra point of view
-    aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = secondPassNew(
+    aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = secondPass(
         aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras, anyChange)
 
     # last pass - figure out the spots that can belong to more than one cobra, and things hidden by dots
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = lastPassDist(
-        aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, 'point', anyChange)
+        aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, prevPos, 't', anyChange, goodIdx)
 
     # some final tidying up
-    aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = secondPassNew(
+    aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = secondPass(
         aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras, anyChange)
 
     # turn the results into an array to be written to teh database
@@ -379,7 +393,7 @@ def nearestNeighbourMatching(points, targets, nTarg):
 
     # use cKDTree for speed
     # pointTree=cKDTree(points[:,1:3])
-
+    # !!! change back to cKDTree
     matchPoint = np.zeros((nTarg, 3))
     for i in range(nTarg):
         dd = np.sqrt((points[:, 1]-targets[i, 1])**2+(points[:, 2]-targets[i, 2])**2)
@@ -429,7 +443,7 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, armFudge=1):
     D = cdist(points[:, 1:3], centers[:, 1:3])
 
     # find the cobras which are within arm length of each point and add to the list
-    print(D.shape, arms.shape)
+    
     for i in range(nPoints):
         ind1 = np.where(D[i, :] < (arms+armFudge))
 
@@ -443,7 +457,7 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, armFudge=1):
     return aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch
 
 
-def firstPassNew(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange):
+def firstPass(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange):
     """
 
     first run through the points, assigning anything that can be done logically from the point side.
@@ -516,7 +530,7 @@ def firstPassNew(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     return aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange
 
 
-def secondPassNew(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras, anyChange):
+def secondPass(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras, anyChange):
     """
     the second pass deals with things from the cobra's perpective. This is a little tricker due to dots;
     if a point oly matchest with a single cobra, it is unique, but a cobra matched with a single point
@@ -532,8 +546,7 @@ def secondPassNew(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMat
     # set the change variables
     change = 1
     nLoop = 0
-    with open('dump.pkl', 'wb') as output:
-        pickle.dump([unaCobras, potPointMatch, adjacentCobras], output)
+
     # loop until no more changes
     while(change == 1):
         change = 0
@@ -560,11 +573,14 @@ def secondPassNew(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMat
                 # check the assignment
                 allAss = checkAdjacentCobras(iCobra, adjacentCobras, unaCobras)
                 if(allAss == True):
+                    iPoint = potPointMatch[iCobra][0]
                     change = 1
                     anychange = 1
                     # update the lists
                     unaCobras.remove(iCobra)
                     aCobras.append(iCobra)
+                    unaPoints.remove(iPoint)
+                    aPoints.append(iPoint)
 
                     for l in unaPoints:
                         if(iCob in potCobraMatch[l]):
@@ -576,7 +592,7 @@ def secondPassNew(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMat
     return aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange
 
 
-def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, dFrom, anyChange):
+def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, prefPos, dFrom, anyChange, goodIdx):
     """
     final pass to deal with tricky assignments (more than one potential cobra assignment, dots)
 
@@ -598,32 +614,40 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     tempUnaCobras = copy.deepcopy(unaCobras)
     tempUnaPoints = copy.deepcopy(unaPoints)
 
-    # cycle through unassigned cobras
+    #cycle through unassigned points
+    for iPoint in tempUnaPoints:
 
-    # cycle through unassigned cobras
-    for iCob in tempUnaCobras:
-        elem = potPointMatch[iCob]
-
+        # check the cobras they can match with
+        elem = potCobraMatch[iPoint]
+        
         # is there more than one match for the point
         if(len(elem) > 1):
 
-            # two distance measures. "target" is from teh predicted intermediate target,
-            # "line" the distance from a line between the cobra center and predicted target (ie, radial move)
-            if(dFrom == "target"):
-                dTar = np.sqrt((points[elem, 1]-targets[iCob, 1])**2+(points[elem, 2]-targets[iCob, 2])**2)
-            elif(dFrom == "line"):
-                dTar = distancePointLine(targets[iCob, 1:2], centers[iCob, 1:2], points[elem, 1:2])
+            #three distance measures. "t" is from teh predicted intermediate target,
+            #"l" the distance from a line between the cobra center and predicted target (ie, radial move)
+            #"p" distance from previous position 
+            if(dFrom == "t"):
+                dTar = np.sqrt((points[iPoint,1]-targets[elem,1])**2+(points[iPoint,2]-targets[elem,2])**2)
+                #print("dTar",dTar)
+            elif(dFrom == "l"):
+                dTar = distancePointLine(targets[elem,1:2],centers[elem,1:2],points[iPoint,1:2])
+            elif(dFrom == "p"):
+                dTar = np.sqrt((points[iPoint,1]-prevPos[elem,1])**2+(points[iPoint,2]-prevPos[elem,2])**2)
             else:
                 print("dFrom invalid")
                 return
 
-            iPoint = elem[dTar.argmin()]
-
-            # update variables
-            unaCobras.remove(iCob)
-            aCobras.append(iCob)
-            unaPoints.remove(iPoint)
+            #choose the closest
+            iCob = elem[dTar.argmin()]
+                        
+            #update variables
+            if(iPoint in unaPoints):
+                unaPoints.remove(iPoint)
             aPoints.append(iPoint)
+            if(iCob in unaCobras):
+                unaCobras.remove(iCob)
+            aCobras.append(iCob)
+
 
             for l in tempUnaPoints:
                 if(iCob in potCobraMatch[l]):
@@ -631,14 +655,18 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
             for l in tempUnaCobras:
                 if(iPoint in potPointMatch[l]):
                     potPointMatch[l].remove(iPoint)
+                    
+            potCobraMatch[iPoint] = [iCob]
+            potPointMatch[iCob] = [iPoint]
 
-        # if only one point, we can update
+        #if only one point, we can simply update
         elif(len(elem) == 1):
-            iPoint = elem[0]
-            potPointMatch[iPoint] = [iPoint]
-            unaCobras.remove(iCob)
+            iCob = elem[0]
+            if(iCob in unaCobras):
+                unaCobras.remove(iCob)
             aCobras.append(iCob)
-            unaPoints.remove(iPoint)
+            if(iPoint in unaPoints):
+                unaPoints.remove(iPoint)
             aPoints.append(iPoint)
 
             for l in tempUnaPoints:
@@ -647,6 +675,10 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
             for l in tempUnaCobras:
                 if(iPoint in potPointMatch[l]):
                     potPointMatch[l].remove(iPoint)
+
+            potCobraMatch[iPoint] = [iCob]
+            potPointMatch[iCob] = [iPoint]
+
 
     return aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange
 
@@ -896,8 +928,7 @@ def checkAdjacentCobras(iCobra, adjacentCobras, unaCobras):
     """
 
     allAss = True
-    # print(iCobra,adjacentCobras[iCobra])
-    for i in adjacentCobras[iCobra]:
+    for i in adjacentCobras[iCobra][0]:
         if(i in unaCobras):
             allAss = False
 

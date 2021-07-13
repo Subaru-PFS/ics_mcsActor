@@ -35,14 +35,14 @@ import psycopg2.extras
 from xml.etree.ElementTree import dump
 
 import mcsActor.windowedCentroid.centroid as centroid
-import mcsActor.mcsRoutines.mcsRoutines as mcsToolsNew
+import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
 from ics.fpsActor import fpsFunction as fpstool
 
 
 from importlib import reload
 reload(dbTools)
-reload(mcsToolsNew)
+reload(mcsTools)
 
 reload(CoordTransp)
 
@@ -598,7 +598,7 @@ class McsCmd(object):
 
             # read FF from the database, get list of adjacent fibres if they haven't been calculated yet.
             if(self.adjacentCobras == None):
-                adjacentCobras = mcsToolsNew.makeAdjacentList(self.centrePos[:, 1:3], self.armLength)
+                adjacentCobras = mcsTools.makeAdjacentList(self.centrePos[:, 1:3], self.armLength)
                 cmd.inform(f'text="made adjacent lists"')
                 self.fidPos = dbTools.loadFiducialsFromDB(db)
                 cmd.inform(f'text="loaded fiducial fibres"')
@@ -691,7 +691,7 @@ class McsCmd(object):
             # dotFile="/Users/karr/software/mhs/products/DarwinX86/pfs_instdata/1.0.1/data/pfi/dot_measurements_20210428_el90_rot+00_ave.csv"
             cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
 
-            self.centrePos, self.armLength, self.dotPos, self.goodIdx = mcsToolsNew.readCobraGeometry(
+            self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.pfic = mcsTools.readCobraGeometry(
                 self.geomFile, self.dotFile)
             cmd.inform('text="cobra geometry read"')
 
@@ -714,7 +714,7 @@ class McsCmd(object):
                     instPath, "data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
 
             cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
-            self.centrePos, self.armLength, self.dotPos, self.goodIdx = mcsToolsNew.readCobraGeometry(
+            self.centrePos, self.armLength, self.dotPos, self.goodIdx = mcsTools.readCobraGeometry(
                 self.geomFile, self.dotFile)
             cmd.inform('text="cobra geometry read"')
 
@@ -735,7 +735,7 @@ class McsCmd(object):
             cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
 
             # get fake geometry
-            self.centrePos, self.armLength, self.dotPos, self.goodIdx = mcsToolsNew.readCobraGeometryFake()
+            self.centrePos, self.armLength, self.dotPos, self.goodIdx = mcsTools.readCobraGeometryFake()
             cmd.inform('text="cobra geometry read"')
 
         cmd.inform('text="fiducial fibres read"')
@@ -768,21 +768,21 @@ class McsCmd(object):
         if(self.fibreMode in ('comm', 'full')):
             db = self.connectToDB(cmd)
             cmd.inform(f'text="tests centroid shape {self.centroids[:,1:3].shape}"')
-            centroidsMM = mcsToolsNew.transformToMM(
+            centroidsMM = mcsTools.transformToMM(
                 self.centroids, self.rotCent, self.offset, zenithAngle, fieldElement, insRot, pixScale=0)
             np.save("centroidsMM.npy", centroidsMM)
 
             # match FF to the transformed centroids
             nFid = len(self.fidPos[:, 0])
-            matchPoint = mcsToolsNew.nearestNeighbourMatching(centroidsMM, self.fidPos, nFid)
+            matchPoint = mcsTools.nearestNeighbourMatching(centroidsMM, self.fidPos, nFid)
             cmd.inform(f'text="fiducial fibres matched"')
 
-            afCoeff, xd, yd, sx, sy, rotation = mcsToolsNew.calcAffineTransform(matchPoint, self.fidPos)
+            afCoeff, xd, yd, sx, sy, rotation = mcsTools.calcAffineTransform(matchPoint, self.fidPos)
             dbTools.writeAffineToDB(db, afCoeff, int(frameId))
 
             cmd.inform(f'text="transform calculated {xd} {yd} {sx} {sy} {rotation}"')
 
-            self.centroidsMMTrans = mcsToolsNew.applyAffineTransform(centroidsMM, afCoeff)
+            self.centroidsMMTrans = mcsTools.applyAffineTransform(centroidsMM, afCoeff)
             cmd.inform(f'text="affine applied to centroids"')
 
         elif(self.fibreMode == 'asrd'):
@@ -799,8 +799,8 @@ class McsCmd(object):
 
         tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
         cmd.inform(f'text="loaded target postitions from DB"')
-        cobraMatch = mcsToolsNew.fibreID(self.centroidsMMTrans, tarPos, self.centrePos,
-                                         self.armLength, self.dotPos, self.adjacentCobras, self.goodIdx)
+        cobraMatch = mcsTools.fibreID(self.pfic, self.centroidsMMTrans, tarPos, self.centrePos,
+                                         self.armLength, self.prevPos, self.dotPos, self.adjacentCobras)
         cmd.inform(f'text="identified fibres"')
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
 
@@ -881,16 +881,16 @@ class McsCmd(object):
 
         # different transforms for different setups: with and w/o field elements
         if(self.fibreMode == 'full'):
-            centrePosPix = mcsToolsNew.transformToPix(
+            centrePosPix = mcsTools.transformToPix(
                 self.centrePos, self.rotCent, self.offset, zenithAngle, insRot, fieldElement=True, pixScale=0)
         elif(self.fibreMode == 'comm'):
-            centrePosPix = mcsToolsNew.transformToPix(
+            centrePosPix = mcsTools.transformToPix(
                 self.centrePos, self.rotCent, self.offset, zenithAngle, insRot, fieldElement=False, pixScale=0)
         elif(self.fibreMode == 'asrd'):
             centrePosPix = self.centrePos
 
         np.save("cpos.npy", centrePosPix)
-        self.findThresh, self.centThresh = mcsToolsNew.getThresh(
+        self.findThresh, self.centThresh = mcsTools.getThresh(
             image, centrePosPix, 'full', self.centParms['threshSigma'], self.centParms['findSigma'], self.centParms['centSigma'])
 
         a1 = self.centParms['threshSigma']
@@ -906,7 +906,7 @@ class McsCmd(object):
 
         """
 
-        self.centParms = mcsToolsNew.getCentroidParams(cmd)
+        self.centParms = mcsTools.getCentroidParams(cmd)
 
     def runCentroidSEP(self, cmd):
         cmdKeys = cmd.cmd.keywords
