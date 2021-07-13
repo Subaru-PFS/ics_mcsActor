@@ -273,18 +273,6 @@ class McsCmd(object):
 
         return q
 
-    def _insertPFSVisitID(self, visitid):
-        connString = "dbname='opdb' user='pfs' host=db-ics"
-        # Skipself.actor.logger.info(f'connecting to {connString}')
-        conn = psycopg2.connect(connString)
-        self.conn = conn
-
-        with self.conn:
-            with self.conn.cursor() as curs:
-                postgres_insert_query = """ INSERT INTO pfs_visit (pfs_visit_id, pfs_visit_description) VALUES (%s,%s)"""
-                record_to_insert = (visitid, "MCS exposure")
-                curs.execute(postgres_insert_query, record_to_insert)
-
     def getNextFilename(self, cmd, frameId):
         """ Fetch next image filename. 
 
@@ -293,18 +281,13 @@ class McsCmd(object):
         """
 
         if frameId is None:
-
-            ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit', timeLim=10.0)
+            ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit', timeLim=15.0)
             if ret.didFail:
-                raise RuntimeError("getNextFilename failed getting a visit number in 10s!")
+                raise RuntimeError("getNextFilename failed getting a visit number in 15s!")
             visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
             frameId = visit * 100
 
-            cmd.inform(f'text="getNextFilename = {frameId}"')
-
-            # DANGER!!! This **CANNOT** be run at Subaru:
-        visit = frameId / 100
-        self._insertPFSVisitID(visit)
+            cmd.inform(f'text="gen2.getVisit = {visit}"')
 
         path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d', time.gmtime()))
         path = os.path.expandvars(os.path.expanduser(path))
