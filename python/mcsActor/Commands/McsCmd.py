@@ -37,8 +37,6 @@ from xml.etree.ElementTree import dump
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsToolsNew
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
-from ics.fpsActor import fpsFunction as fpstool
-
 
 from importlib import reload
 reload(dbTools)
