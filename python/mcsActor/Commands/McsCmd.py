@@ -148,7 +148,7 @@ class McsCmd(object):
 
         try:
             config = self.actor.config
-            hostname = config.get('db', 'hostname')
+            hostname = config.get('db', 'hostname', fallback='db-ics')
             dbname = config.get('db', 'dbname', fallback='opdb')
             port = config.get('db', 'port', fallback=5432)
             username = config.get('db', 'username', fallback='pfs')
