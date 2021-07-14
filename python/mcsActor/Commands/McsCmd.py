@@ -290,7 +290,7 @@ class McsCmd(object):
         path = os.path.join('/data/raw', time.strftime('%Y-%m-%d', time.gmtime()), 'mcs')
         path = os.path.expandvars(os.path.expanduser(path))
         if not os.path.isdir(path):
-            os.makedirs(path, 0o755)
+            os.makedirs(path, 0o755, exist_ok=True)
 
         newpath = os.path.join(path, 'PFSC%08d.fits' % (frameId))
         cmd.inform(f'text="newpath={newpath}"')
