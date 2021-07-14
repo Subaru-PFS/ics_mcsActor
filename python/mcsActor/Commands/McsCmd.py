@@ -796,7 +796,7 @@ class McsCmd(object):
             gen2Model = self.actor.models['gen2'].keyVarDict
 
             axes = gen2Model['tel_axes'].getValue()
-            az, alt = axes
+            az, alt, *_ = axes
 
             rot = gen2Model['tel_rot'].getValue()
             posAngle, instrot = rot
