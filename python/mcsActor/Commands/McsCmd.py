@@ -529,8 +529,6 @@ class McsCmd(object):
         # set visitID
         self.visitId = frameId // 100
         self.actor.image = image
-        cmd.inform(f'frameId={frameId}')
-        cmd.inform(f'filename={filename}')
 
         # load telescope values from the DB
         cmd.inform(f'text="loading telescope parameters for frame={frameId}"')
@@ -585,7 +583,7 @@ class McsCmd(object):
             # fibreID
             self.fibreID(cmd, frameId, zenithAngle, insRot)
 
-        cmd.inform('text="filename=%s"'%(filename))
+        cmd.inform(f'frameId={frameId}; filename={filename}')
 
         # if doFibreID:
         #self.runFibreID(cmd, doFinish=False)
@@ -596,7 +594,7 @@ class McsCmd(object):
     def dumpCentroidtoDB(self, cmd, frameId):
         """Connect to database and return json string to an attribute."""
 
-        conn = self.conn
+        conn = self.connectToDB()
         cmd.diag(f'text="dumping centroids to db {conn}"')
 
         # The section should be removed, replaced by the createTables command.
@@ -692,6 +690,7 @@ class McsCmd(object):
             self.centrePos, self.armLength, self.dotPos, self.goodIdx = mcsToolsNew.readCobraGeometry(
                 self.geomFile, self.dotFile)
             cmd.inform('text="cobra geometry read"')
+            self.geometrySet = True
 
         elif(self.fibreMode == "comm"):
 
