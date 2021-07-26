@@ -273,14 +273,20 @@ class McsCmd(object):
         """
 
         if frameId is None:
-            ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit', timeLim=15.0)
+            ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit caller=mcs', timeLim=15.0)
             if ret.didFail:
                 raise RuntimeError("getNextFilename failed getting a visit number in 15s!")
             visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
             frameId = visit * 100
 
             cmd.inform(f'text="gen2.getVisit = {visit}"')
+        else:
+            if False:           # Need to make this async for safety.
+                ret = self.actor.cmdr.call(actor='gen2', cmdStr='updateTelStatus caller=mcs', timeLim=15.0)
+                if ret.didFail:
+                    raise RuntimeError("getNextFilename failed getting a visit number in 15s!")
 
+        # CPL -- switch to some ics.utils function
         path = os.path.join('/data/raw', time.strftime('%Y-%m-%d', time.gmtime()), 'mcs')
         path = os.path.expandvars(os.path.expanduser(path))
         if not os.path.isdir(path):
