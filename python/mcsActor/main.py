@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
-from __future__ import absolute_import
-import actorcore.ICC
+from importlib import reload
+import os
+import pathlib
+
+import
 import aitCamera
 import mcsCamera
 import fakeCamera
 import rmodCamera
-from past.builtins import reload
-
 
 class Mcs(actorcore.ICC.ICC):
     def __init__(self, name, productName=None, configFile=None, debugLevel=30):
@@ -27,14 +28,18 @@ class Mcs(actorcore.ICC.ICC):
         reload(rmodCamera)
         reload(mcsCamera)
 
+        configDir = pathlib.Path(os.environ['ICS_MCSACTOR_DIR'], 'etc')
+
         try:
-            if camera is 'rmod':
+            if camera == 'rmod':
+                configPath = pathlib.Path(configDir, 'illunis-71mp.cfg')
                 self.camera = rmodCamera.rmodCamera()
-                self.camera.initialCamera(cmd)
+                self.camera.initialCamera(cmd, configPath=configPath)
                 cmd.inform('text="loaded RMOD-71M camera"')
-            if camera is 'mcs':
+            if camera == 'mcs':
+                configPath = pathlib.Path(configDir, 'canon-8960x5778.cfg')
                 self.camera = mcsCamera.mcsCamera()
-                self.camera.initialCamera(cmd)
+                self.camera.initialCamera(cmd, configPath=configPath)
                 cmd.inform('text="loaded real MCS camera"')
         except Exception as e:
             cmd.warn('text="failed to load MCS camera, loading fakeCamera: %s"' % (e))
