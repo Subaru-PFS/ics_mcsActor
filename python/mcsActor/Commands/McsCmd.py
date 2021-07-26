@@ -13,12 +13,10 @@ import pathlib
 import queue
 import threading
 import sep
-import math
 
 import os
 import astropy.io.fits as pyfits
 import fitsio
-import sys
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
@@ -28,7 +26,6 @@ from opscore.utility.qstr import qstr
 
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
 from scipy.spatial import cKDTree
-
 
 import psycopg2
 import psycopg2.extras
@@ -41,12 +38,7 @@ import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
 from importlib import reload
 reload(dbTools)
 reload(mcsToolsNew)
-
 reload(CoordTransp)
-
-
-Bool = bool
-
 
 class McsCmd(object):
 
@@ -86,7 +78,7 @@ class McsCmd(object):
             ('expose', '@(bias|test) [<frameId>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose',
-             '@object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot]', self.expose),
+             'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
@@ -300,10 +292,7 @@ class McsCmd(object):
     def _getInstHeader(self, cmd):
         """ Gather FITS cards from all actors we are interested in. """
 
-        # For now, do _not_ add gen2 cards, since we still have the gen2Actor generate them.
         modelNames = set(self.actor.models.keys())
-        # modelNames.discard("gen2")
-
         cmd.debug('text="fetching MHS cards for %s..."' % (modelNames))
         cards = fitsUtils.gatherHeaderCards(cmd, self.actor,
                                             modelNames=modelNames, shortNames=True)
@@ -527,8 +516,6 @@ class McsCmd(object):
             filename = pathlib.Path(filename)
             frameId = int(filename.stem[4:], base=10)
 
-        cmd.inform("bbb")
-
         self.handleTelescopeGeometry(cmd, filename, frameId, expTime)
 
         # set visitID
@@ -661,7 +648,6 @@ class McsCmd(object):
             instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
             if(self.geomFile == None):
                 self.geomFile = os.path.join(instPath, "data/pfi/modules/ALL/ALL_final.xml")
-                #self.geomFile = "/home/pfs/karr/Set1/ALL_new.xml"
             if(self.dotFile == None):
                 self.dotFile = os.path.join(
                     instPath, "data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
@@ -855,7 +841,8 @@ class McsCmd(object):
         image = self.actor.image
         db = self.connectToDB(cmd)
 
-        #cmd.inform('text="loading telescope parameters"')
+        cmd.inform(f'text="loading telescope parameters for frame={frameId} with fibreMode={self.fibreMode}'
+                   ' at z={zenithAngle) rot={insRot}"')
 
         # zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
         #cmd.diag(f'text="zenithAngle={zenithAngle}, insRot={insRot}"')
@@ -928,7 +915,8 @@ class McsCmd(object):
 
         cmd.inform(f'state="measuring cached image: {image.shape}"')
         a = centroid.centroid_only(image.astype('<i4'),
-                                   centParms['fwhmx'], centParms['fwhmy'], self.findThresh, self.centThresh, centParms['boxFind'], centParms['boxCent'],
+                                   centParms['fwhmx'], centParms['fwhmy'], self.findThresh, self.centThresh,
+                                   centParms['boxFind'], centParms['boxCent'],
                                    centParms['nmin'], centParms['nmax'], centParms['maxIt'], 0)
 
         centroids = np.frombuffer(a, dtype='<f8')
@@ -967,10 +955,18 @@ class McsCmd(object):
         taken_at = telescopeInfo['starttime']
         taken_in_hst_at = telescopeInfo['starttime']
         line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%s,%s' % (telescopeInfo['frameid'],
-                                                                       telescopeInfo['visitid'], telescopeInfo['exptime']/1000.0,
-                                                                       telescopeInfo['altitude'], telescopeInfo['azimuth'], telescopeInfo['instrot'],
-                                                                       adc_pa, dome_temperature, dome_pressure, dome_humidity, outside_temperature, outside_pressure,
-                                                                       outside_humidity, mcs_cover_temperature, mcs_m1_temperature, taken_at, taken_in_hst_at)
+                                                                       telescopeInfo['visitid'],
+                                                                       telescopeInfo['exptime']/1000.0,
+                                                                       telescopeInfo['altitude'],
+                                                                       telescopeInfo['azimuth'],
+                                                                       telescopeInfo['instrot'],
+                                                                       adc_pa, dome_temperature,
+                                                                       dome_pressure, dome_humidity,
+                                                                       outside_temperature, outside_pressure,
+                                                                       outside_humidity,
+                                                                       mcs_cover_temperature,
+                                                                       mcs_m1_temperature,
+                                                                       taken_at, taken_in_hst_at)
 
         buf = io.StringIO()
         buf.write(line)
