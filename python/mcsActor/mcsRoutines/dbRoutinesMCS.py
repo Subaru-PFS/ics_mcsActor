@@ -32,9 +32,11 @@ import copy
 from opdb import opdb
 
 
-def connectToDB(hostname='', port='', dbname='opdb_api_test', username='pfs', passwd=None):
+def connectToDB(hostname='', port='', dbname='opdb_api_test', username='pfs'):
 
-    db = opdb.OpDB(hostname, port, dbname, username, passwd)
+    db = opdb.OpDB(hostname=hostname, port=port,
+                   dbname=dbname,
+                   username=username)
     db.connect()
 
     return db

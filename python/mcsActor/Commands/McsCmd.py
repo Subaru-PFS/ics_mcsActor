@@ -132,11 +132,14 @@ class McsCmd(object):
                                                  help="flag for testing different inputs")
                                         )
 
-    def connectToDB(self, cmd):
+    def connectToDB(self, cmd=None):
         """connect to the database if not already connected"""
 
         if self._db is not None:
             return self._db
+
+        if cmd is None:
+            cmd = self.actor.bcast
 
         try:
             config = self.actor.config
@@ -147,15 +150,14 @@ class McsCmd(object):
         except Exception as e:
             raise RuntimeError(f'failed to load opdb configuration: {e}')
 
+        cmd.diag(f'text="connecting to db, {username}@{hostname}:{port}, db={dbname}"')
         try:
             db = dbTools.connectToDB(hostname=hostname,
                                      port=port,
                                      dbname=dbname,
-                                     username=username,
-                                     passwd='pfspass')
-
-        except:
-            raise RuntimeError("unable to connect to the database")
+                                     username=username)
+        except Exception as e:
+            raise RuntimeError(f"unable to connect to the database: {e}")
 
         if cmd is not None:
             cmd.inform('text="Connected to Database"')
