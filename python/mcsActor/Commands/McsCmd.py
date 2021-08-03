@@ -404,7 +404,7 @@ class McsCmd(object):
         nameQ = self.requestNextFilename(cmd, frameId)
         cmd.diag(f'text="new exposure"')
         if self.simulationPath is None:
-            filename = 'scratchFile'
+            filename = '/tmp/scratchFile'
             image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
         else:
             imagePath, image, target = self.getNextSimulationImage(cmd)
