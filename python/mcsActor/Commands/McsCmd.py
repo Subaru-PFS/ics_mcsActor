@@ -13,12 +13,10 @@ import pathlib
 import queue
 import threading
 import sep
-import math
 
 import os
 import astropy.io.fits as pyfits
 import fitsio
-import sys
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
@@ -29,7 +27,6 @@ from opscore.utility.qstr import qstr
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
 from scipy.spatial import cKDTree
 
-
 import psycopg2
 import psycopg2.extras
 from xml.etree.ElementTree import dump
@@ -37,18 +34,11 @@ from xml.etree.ElementTree import dump
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsToolsNew
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
-from ics.fpsActor import fpsFunction as fpstool
-
 
 from importlib import reload
 reload(dbTools)
 reload(mcsToolsNew)
-
 reload(CoordTransp)
-
-
-Bool = bool
-
 
 class McsCmd(object):
 
@@ -88,7 +78,7 @@ class McsCmd(object):
             ('expose', '@(bias|test) [<frameId>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose',
-             '@object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot]', self.expose),
+             'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
@@ -142,30 +132,32 @@ class McsCmd(object):
                                                  help="flag for testing different inputs")
                                         )
 
-    def connectToDB(self, cmd):
+    def connectToDB(self, cmd=None):
         """connect to the database if not already connected"""
 
         if self._db is not None:
             return self._db
 
+        if cmd is None:
+            cmd = self.actor.bcast
+
         try:
             config = self.actor.config
-            hostname = config.get('db', 'hostname')
+            hostname = config.get('db', 'hostname', fallback='db-ics')
             dbname = config.get('db', 'dbname', fallback='opdb')
             port = config.get('db', 'port', fallback=5432)
             username = config.get('db', 'username', fallback='pfs')
         except Exception as e:
             raise RuntimeError(f'failed to load opdb configuration: {e}')
 
+        cmd.diag(f'text="connecting to db, {username}@{hostname}:{port}, db={dbname}"')
         try:
             db = dbTools.connectToDB(hostname=hostname,
                                      port=port,
                                      dbname=dbname,
-                                     username=username,
-                                     passwd='pfspass')
-
-        except:
-            raise RuntimeError("unable to connect to the database")
+                                     username=username)
+        except Exception as e:
+            raise RuntimeError(f"unable to connect to the database: {e}")
 
         if cmd is not None:
             cmd.inform('text="Connected to Database"')
@@ -273,18 +265,6 @@ class McsCmd(object):
 
         return q
 
-    def _insertPFSVisitID(self, visitid):
-        connString = "dbname='opdb' user='pfs' host=db-ics"
-        # Skipself.actor.logger.info(f'connecting to {connString}')
-        conn = psycopg2.connect(connString)
-        self.conn = conn
-
-        with self.conn:
-            with self.conn.cursor() as curs:
-                postgres_insert_query = """ INSERT INTO pfs_visit (pfs_visit_id, pfs_visit_description) VALUES (%s,%s)"""
-                record_to_insert = (visitid, "MCS exposure")
-                curs.execute(postgres_insert_query, record_to_insert)
-
     def getNextFilename(self, cmd, frameId):
         """ Fetch next image filename. 
 
@@ -293,23 +273,24 @@ class McsCmd(object):
         """
 
         if frameId is None:
-
-            ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit', timeLim=10.0)
+            ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit caller=mcs', timeLim=15.0)
             if ret.didFail:
-                raise RuntimeError("getNextFilename failed getting a visit number in 10s!")
+                raise RuntimeError("getNextFilename failed getting a visit number in 15s!")
             visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
             frameId = visit * 100
 
-            cmd.inform(f'text="getNextFilename = {frameId}"')
+            cmd.inform(f'text="gen2.getVisit = {visit}"')
+        else:
+            if False:           # Need to make this async for safety.
+                ret = self.actor.cmdr.call(actor='gen2', cmdStr='updateTelStatus caller=mcs', timeLim=15.0)
+                if ret.didFail:
+                    raise RuntimeError("getNextFilename failed getting a visit number in 15s!")
 
-            # DANGER!!! This **CANNOT** be run at Subaru:
-        visit = frameId / 100
-        self._insertPFSVisitID(visit)
-
-        path = os.path.join("$ICS_MHS_DATA_ROOT", 'mcs', time.strftime('%Y-%m-%d', time.gmtime()))
+        # CPL -- switch to some ics.utils function
+        path = os.path.join('/data/raw', time.strftime('%Y-%m-%d', time.gmtime()), 'mcs')
         path = os.path.expandvars(os.path.expanduser(path))
         if not os.path.isdir(path):
-            os.makedirs(path, 0o755)
+            os.makedirs(path, 0o755, exist_ok=True)
 
         newpath = os.path.join(path, 'PFSC%08d.fits' % (frameId))
         cmd.inform(f'text="newpath={newpath}"')
@@ -319,10 +300,7 @@ class McsCmd(object):
     def _getInstHeader(self, cmd):
         """ Gather FITS cards from all actors we are interested in. """
 
-        # For now, do _not_ add gen2 cards, since we still have the gen2Actor generate them.
         modelNames = set(self.actor.models.keys())
-        # modelNames.discard("gen2")
-
         cmd.debug('text="fetching MHS cards for %s..."' % (modelNames))
         cards = fitsUtils.gatherHeaderCards(cmd, self.actor,
                                             modelNames=modelNames, shortNames=True)
@@ -546,15 +524,11 @@ class McsCmd(object):
             filename = pathlib.Path(filename)
             frameId = int(filename.stem[4:], base=10)
 
-        cmd.inform("bbb")
-
         self.handleTelescopeGeometry(cmd, filename, frameId, expTime)
 
         # set visitID
         self.visitId = frameId // 100
         self.actor.image = image
-        cmd.inform(f'frameId={frameId}')
-        cmd.inform(f'filename={filename}')
 
         # load telescope values from the DB
         cmd.inform(f'text="loading telescope parameters for frame={frameId}"')
@@ -609,7 +583,7 @@ class McsCmd(object):
             # fibreID
             self.fibreID(cmd, frameId, zenithAngle, insRot)
 
-        cmd.inform('text="filename=%s"'%(filename))
+        cmd.inform(f'frameId={frameId}; filename={filename}')
 
         # if doFibreID:
         #self.runFibreID(cmd, doFinish=False)
@@ -620,7 +594,7 @@ class McsCmd(object):
     def dumpCentroidtoDB(self, cmd, frameId):
         """Connect to database and return json string to an attribute."""
 
-        conn = self.conn
+        conn = self.connectToDB()
         cmd.diag(f'text="dumping centroids to db {conn}"')
 
         # The section should be removed, replaced by the createTables command.
@@ -680,7 +654,6 @@ class McsCmd(object):
             instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
             if(self.geomFile == None):
                 self.geomFile = os.path.join(instPath, "data/pfi/modules/ALL/ALL_final.xml")
-                #self.geomFile = "/home/pfs/karr/Set1/ALL_new.xml"
             if(self.dotFile == None):
                 self.dotFile = os.path.join(
                     instPath, "data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
@@ -717,6 +690,7 @@ class McsCmd(object):
             self.centrePos, self.armLength, self.dotPos, self.goodIdx = mcsToolsNew.readCobraGeometry(
                 self.geomFile, self.dotFile)
             cmd.inform('text="cobra geometry read"')
+            self.geometrySet = True
 
         elif(self.fibreMode == "comm"):
 
@@ -815,7 +789,7 @@ class McsCmd(object):
             gen2Model = self.actor.models['gen2'].keyVarDict
 
             axes = gen2Model['tel_axes'].getValue()
-            az, alt = axes
+            az, alt, *_ = axes
 
             rot = gen2Model['tel_rot'].getValue()
             posAngle, instrot = rot
@@ -874,7 +848,8 @@ class McsCmd(object):
         image = self.actor.image
         db = self.connectToDB(cmd)
 
-        #cmd.inform('text="loading telescope parameters"')
+        cmd.inform(f'text="loading telescope parameters for frame={frameId} with fibreMode={self.fibreMode}'
+                   ' at z={zenithAngle) rot={insRot}"')
 
         # zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
         #cmd.diag(f'text="zenithAngle={zenithAngle}, insRot={insRot}"')
@@ -947,7 +922,8 @@ class McsCmd(object):
 
         cmd.inform(f'state="measuring cached image: {image.shape}"')
         a = centroid.centroid_only(image.astype('<i4'),
-                                   centParms['fwhmx'], centParms['fwhmy'], self.findThresh, self.centThresh, centParms['boxFind'], centParms['boxCent'],
+                                   centParms['fwhmx'], centParms['fwhmy'], self.findThresh, self.centThresh,
+                                   centParms['boxFind'], centParms['boxCent'],
                                    centParms['nmin'], centParms['nmax'], centParms['maxIt'], 0)
 
         centroids = np.frombuffer(a, dtype='<f8')
@@ -986,10 +962,18 @@ class McsCmd(object):
         taken_at = telescopeInfo['starttime']
         taken_in_hst_at = telescopeInfo['starttime']
         line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%s,%s' % (telescopeInfo['frameid'],
-                                                                       telescopeInfo['visitid'], telescopeInfo['exptime']/1000.0,
-                                                                       telescopeInfo['altitude'], telescopeInfo['azimuth'], telescopeInfo['instrot'],
-                                                                       adc_pa, dome_temperature, dome_pressure, dome_humidity, outside_temperature, outside_pressure,
-                                                                       outside_humidity, mcs_cover_temperature, mcs_m1_temperature, taken_at, taken_in_hst_at)
+                                                                       telescopeInfo['visitid'],
+                                                                       telescopeInfo['exptime']/1000.0,
+                                                                       telescopeInfo['altitude'],
+                                                                       telescopeInfo['azimuth'],
+                                                                       telescopeInfo['instrot'],
+                                                                       adc_pa, dome_temperature,
+                                                                       dome_pressure, dome_humidity,
+                                                                       outside_temperature, outside_pressure,
+                                                                       outside_humidity,
+                                                                       mcs_cover_temperature,
+                                                                       mcs_m1_temperature,
+                                                                       taken_at, taken_in_hst_at)
 
         buf = io.StringIO()
         buf.write(line)
@@ -1008,23 +992,31 @@ class McsCmd(object):
         columns = ','.join('"{}"'.format(k) for k in columnNames)
         sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(
             tableName, columns)
-        db = self.connectToDB(None)
-        session = db.session
-        with session.connection().connection.cursor() as cursor:
-            cursor.copy_expert(sql, dataBuf)
-            cursor.close()
-        session.execute('commit')
+
+        try:
+            db = self.connectToDB(None)
+            session = db.session
+            with session.connection().connection.cursor() as cursor:
+                cursor.copy_expert(sql, dataBuf)
+                cursor.close()
+            session.execute('commit')
+        except Exception as e:
+            self.logger.warn(f"failed to write with {sql}: {e}")
 
     def _readData(self, sql):
         """Wrap a direct COPY_TO via sqlalchemy. """
 
         dataBuf = io.StringIO()
-        db = self.connectToDB(None)
-        session = db.session
-        with session.connection().connection.cursor() as cursor:
-            cursor.copy_expert(sql, dataBuf)
-        dataBuf.seek(0, 0)
-        return dataBuf
+
+        try:
+            db = self.connectToDB(None)
+            session = db.session
+            with session.connection().connection.cursor() as cursor:
+                cursor.copy_expert(sql, dataBuf)
+            dataBuf.seek(0, 0)
+            return dataBuf
+        except Exception as e:
+            self.logger.warn(f"failed to read with {sql}: {e}")
 
     def _writeCentroids(self, centArr, nextRowId, frameId, moveId, conn=None):
         """ Write all measurements for a given (frameId, moveId) """

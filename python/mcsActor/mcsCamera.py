@@ -32,11 +32,11 @@ class mcsCamera(Camera):
 
         cmd.inform('cameraName=%s; readNoise=%0.2f' % (self.name, self.readNoise))
 
-    def initialCamera(self, cmd):
+    def initialCamera(self, cmd, configPath):
         """ Initial the MCS camera. """
 
         cmd.inform('text="Starting camera initialization."')
-        p = sub.Popen(['/opt/EDTpdv/initcam', '-f', '/home/chyan/Canon50M/canon-8960x5778.cfg'],
+        p = sub.Popen(['/opt/EDTpdv/initcam', '-f',  configPath],
                       stdout=sub.PIPE, stderr=sub.PIPE)
         output, errors = p.communicate()
         string = errors[23:-1]
