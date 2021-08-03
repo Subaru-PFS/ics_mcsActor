@@ -944,7 +944,7 @@ class McsCmd(object):
         # Let the database handle the primary key
         db = self.connectToDB(cmd)
         res = db.session.execute('select * FROM "mcs_exposure" where false')
-        colnames = res.keys()
+        colnames = tuple(res.keys())
         realcolnames = colnames[0:]
 
         """
@@ -1035,7 +1035,7 @@ class McsCmd(object):
         # Let the database handle the primary key
         db = self.connectToDB(None)
         colnames = db.session.execute('select * FROM "mcs_data" where false')
-        realcolnames = colnames.keys()[0:]
+        realcolnames = tuple(colnames.keys())[0:]
 
         colname = []
         for i in realcolnames:
@@ -1145,7 +1145,7 @@ class McsCmd(object):
 
         db = self.connectToDB(None)
         colnames = db.session.execute('select * FROM "cobra_target" where false')
-        realcolnames = colnames.keys()[0:]
+        realcolnames = tuple(colnames.keys())[0:]
 
         buf = io.StringIO()
 
