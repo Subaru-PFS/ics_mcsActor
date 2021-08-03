@@ -992,23 +992,31 @@ class McsCmd(object):
         columns = ','.join('"{}"'.format(k) for k in columnNames)
         sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(
             tableName, columns)
-        db = self.connectToDB(None)
-        session = db.session
-        with session.connection().connection.cursor() as cursor:
-            cursor.copy_expert(sql, dataBuf)
-            cursor.close()
-        session.execute('commit')
+
+        try:
+            db = self.connectToDB(None)
+            session = db.session
+            with session.connection().connection.cursor() as cursor:
+                cursor.copy_expert(sql, dataBuf)
+                cursor.close()
+            session.execute('commit')
+        except Exception as e:
+            self.logger.warn(f"failed to write with {sql}: {e}")
 
     def _readData(self, sql):
         """Wrap a direct COPY_TO via sqlalchemy. """
 
         dataBuf = io.StringIO()
-        db = self.connectToDB(None)
-        session = db.session
-        with session.connection().connection.cursor() as cursor:
-            cursor.copy_expert(sql, dataBuf)
-        dataBuf.seek(0, 0)
-        return dataBuf
+
+        try:
+            db = self.connectToDB(None)
+            session = db.session
+            with session.connection().connection.cursor() as cursor:
+                cursor.copy_expert(sql, dataBuf)
+            dataBuf.seek(0, 0)
+            return dataBuf
+        except Exception as e:
+            self.logger.warn(f"failed to read with {sql}: {e}")
 
     def _writeCentroids(self, centArr, nextRowId, frameId, moveId, conn=None):
         """ Write all measurements for a given (frameId, moveId) """
