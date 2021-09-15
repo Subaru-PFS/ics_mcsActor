@@ -1,5 +1,4 @@
 import os
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
@@ -16,7 +15,7 @@ from scipy.stats import sigmaclip
 import mcsActor.windowedCentroid.centroid as centroid
 
 
-import ics.cobraCharmer.pfi as pfi
+#import ics.cobraCharmer.pfi as pfi
 
 from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist
@@ -25,8 +24,7 @@ import copy
 import os
 import yaml
 
-
-
+from ics.cobraCharmer import pfiDesign
 
 def getCentroidParams(cmd):
 
@@ -103,19 +101,20 @@ def readCobraGeometry(xmlFile, dotFile):
 
     # geometry XML file
 
-    pfic = pfi.PFI(fpgaHost = 'localhost', doConnect = False, logDir = None)
-    aa = pfic.loadModel([pathlib.Path(xmlFile)])
+    #pfic = pfi.PFI(fpgaHost = 'localhost', doConnect = False, logDir = None)
+    #aa = pfic.loadModel([pathlib.Path(xmlFile)])
 
+    des  = pfiDesign.PFIDesign(pathlib.Path(xmlFile))
     # first figure out the good cobras (bad positions are set to 0)
-    centersAll = pfic.calibModel.centers
+    centersAll = des.centers
 
     #get the list of good cobras
-    cobs = pfic.calibModel.findCobraByCobraIndex(np.arange(0, 2394))
+    cobs = des.findCobraByCobraIndex(np.arange(0, 2394))
     goodIdx = []
     #cycle through the indices, get the module/cobra number, and check its status
     for i in range(2394):
-        cob = pfic.calibModel.findCobraByCobraIndex([i])
-        status = pfic.calibModel.cobraStatus(cob[0][1], cob[0][0])
+        cob = des.findCobraByCobraIndex([i])
+        status = des.cobraStatus(cob[0][1], cob[0][0])
         if(status == 1):
             goodIdx.append(i)
     #return a numpy array for ease of later use
@@ -124,13 +123,13 @@ def readCobraGeometry(xmlFile, dotFile):
     
     # then extract the parameters for good fibres only
     centrePos = np.array([goodIdx+1, centersAll[goodIdx].real, centersAll[goodIdx].imag]).T
-    armLength = (pfic.calibModel.L1[goodIdx]+pfic.calibModel.L2[goodIdx])
+    armLength = (des.L1[goodIdx]+des.L2[goodIdx])
 
     # number of cobras
     nCobras = len(armLength)
 # PFS_INSTDATA_DIR
     # at the moment read dots from CSV file
-    dotData = pd.read_csv(dotFile, delimiter = ", ")
+    dotData = pd.read_csv(dotFile, delimiter = ",", header=0)
     dotPos = np.zeros((len(goodIdx), 4))
 
     dotPos[:, 0] = goodIdx+1
@@ -139,7 +138,7 @@ def readCobraGeometry(xmlFile, dotFile):
     dotPos[:, 3] = dotData['r_tran'].values[goodIdx]
 
 
-    return centrePos, armLength, dotPos, goodIdx, pfic
+    return centrePos, armLength, dotPos, goodIdx
 
 
 def transformToMM(posPix, rotCent, offset, zenithAngle, insRot, fieldElement, pixScale = 0):

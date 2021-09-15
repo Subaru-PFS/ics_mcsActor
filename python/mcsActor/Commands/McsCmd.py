@@ -555,13 +555,6 @@ class McsCmd(object):
             cmd.inform('text="Running centroid on current image" ')
             self.runCentroidSEP(cmd)
 
-            # self.runCentroid(cmd,self.centParms)
-
-            # if the threshold has changed, recalculate: this was added during commissioning run
-            if (self.nCentroid < 2000):
-                self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
-                self.runCentroid(cmd, self.centParms)
-
             cmd.inform('text="Sending centroid data to database" ')
             self.dumpCentroidtoDB(cmd, frameId)
 
@@ -606,7 +599,7 @@ class McsCmd(object):
             #self._makeTables(conn, doDrop=False)
             cmd.inform('text="Attaching centroid to exsiting table. "')
 
-        buf = self._writeCentroids(self.centroids, 1, frameId, 1, conn)
+        buf = self._writeCentroids(self.centroids, frameId, 1, conn)
 
         cmd.inform('text="Centroids of exposure ID %08d dumped."' % (frameId))
 
@@ -849,16 +842,17 @@ class McsCmd(object):
         image = self.actor.image
         db = self.connectToDB(cmd)
 
-        cmd.inform(f'text="loading telescope parameters for frame={frameId} with fibreMode={self.fibreMode}'
-                   ' at z={zenithAngle) rot={insRot}"')
+        cmd.inform(f'text="loading telescope parameters for frame={frameId} '
+            f'with fibreMode={self.fibreMode} at z={zenithAngle} rot={insRot}"')
 
         # zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
         #cmd.diag(f'text="zenithAngle={zenithAngle}, insRot={insRot}"')
 
         # different transforms for different setups: with and w/o field elements
         if(self.fibreMode == 'full'):
-            centrePosPix = mcsTools.transformToPix(
-                self.centrePos, self.rotCent, self.offset, zenithAngle, insRot, fieldElement=True, pixScale=0)
+            #centrePosPix = mcsTools.transformToPix(
+            #    self.centrePos, self.rotCent, self.offset, zenithAngle, insRot, fieldElement=True, pixScale=0)
+            centrePosPix =self.centrePos
         elif(self.fibreMode == 'comm'):
             centrePosPix = mcsTools.transformToPix(
                 self.centrePos, self.rotCent, self.offset, zenithAngle, insRot, fieldElement=False, pixScale=0)
@@ -893,7 +887,7 @@ class McsCmd(object):
         image = self.actor.image
 
         cmd.inform(f'state="measuring cached image: {image.shape}"')
-        centroids = sep.extract(image.astype(float), 300)
+        centroids = sep.extract(image.astype(float), 1000)
         npoint = centroids.shape[0]
         tCentroids = np.zeros((npoint, 8))
 
@@ -1019,36 +1013,47 @@ class McsCmd(object):
         except Exception as e:
             self.logger.warn(f"failed to read with {sql}: {e}")
 
-    def _writeCentroids(self, centArr, nextRowId, frameId, moveId, conn=None):
+    def _writeCentroids(self, centArr, frameId, moveId, conn=None):
         """ Write all measurements for a given (frameId, moveId) """
+        
 
-        now = datetime.datetime.now()
-        now.strftime("%Y-%m-%d %H:%M:%S")
+        buf = io.StringIO()
+        for l_i in range(len(centArr)):
+            line = '%d,%d,%f,%f,%f,%f,%f,%f,%f\n' % (frameId, l_i+1, centArr[l_i,1], 
+                                        centArr[l_i,2], centArr[l_i,3], centArr[l_i,4], 
+                                        centArr[l_i,5], centArr[l_i,6], centArr[l_i,7])
+            buf.write(line)
+        buf.seek(0, 0)
+
+        #now = datetime.datetime.now()
+        #now.strftime("%Y-%m-%d %H:%M:%S")
 
         # Save measurements to a CSV buffer
-        measBuf = io.StringIO()
+        #measBuf = io.StringIO()
 
-        data = np.insert(centArr, 5, 0, axis=1)
-
-        np.savetxt(measBuf, data[:, 1:8], delimiter=',', fmt='%0.6g')
-        measBuf.seek(0, 0)
+        #data = np.insert(centArr, 5, 20, axis=1)
+        
+        #np.savetxt('/tmp/test.txt', data[:, 1:8], delimiter=',', fmt='%0.6g')
+        #np.savetxt(measBuf, centArr[:, 1:], delimiter=',', fmt='%0.6g')
+       
+        #measBuf.seek(0, 0)
 
         # Let the database handle the primary key
         db = self.connectToDB(None)
         colnames = db.session.execute('select * FROM "mcs_data" where false')
         realcolnames = tuple(colnames.keys())[0:]
 
-        colname = []
-        for i in realcolnames:
-            x = '"'+i+'"'
-            colname.append(x)
-        buf = io.StringIO()
-        for l_i in range(len(centArr)):
+        #colname = []
+        #for i in realcolnames:
+        #    x = '"'+i+'"'
+        #    colname.append(x)
+        #buf = io.StringIO()
+        #for l_i in range(len(centArr)):
             # line = '%s,%d,%d,%d,%s' % (now.strftime("%Y-%m-%d %H:%M:%S"),
             #                           frameId, moveId, l_i+1, measBuf.readline())
-            line = '%d,%d,%s' % (frameId, l_i+1, measBuf.readline())
-            buf.write(line)
-        buf.seek(0, 0)
+        #    line = '%d,%d,%s' % (frameId, l_i+1, measBuf.readline())
+        #    buf.write(line)
+        #buf.seek(0, 0)
 
         self._writeData('mcs_data', realcolnames, buf)
         buf.seek(0, 0)
