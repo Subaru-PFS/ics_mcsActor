@@ -173,7 +173,7 @@ class McsCmd(object):
         cmd.finish("text='Present and (probably) well'")
 
     def reconnect(self, cmd):
-        self.actor.connectCamera(cmd, camera='rmod')
+        self.actor.connectCamera(cmd)
         self.actor.camera.setExposureTime(cmd, self.expTime)
 
         cmd.finish('text="Camera connected!"')

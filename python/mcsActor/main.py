@@ -26,7 +26,7 @@ class Mcs(actorcore.ICC.ICC):
             if socket.gethostname() == 'pfic':
                 camera = 'rmod'
             else:
-                camera = 'canon'
+                camera = 'mcs'
 
         configDir = pathlib.Path(os.environ['ICS_MCSACTOR_DIR'], 'etc')
 
