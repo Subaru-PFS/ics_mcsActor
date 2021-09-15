@@ -215,6 +215,8 @@ def transformToPix(posMM, rotCent, offset, zenithAngle, insRot, fieldElement, pi
     xyin = np.array([posMM[:, 1]-offset[0], posMM[:, 2]-offset[1]])
     # call the routine
     xyout = CoordTransp.CoordinateTransform(xyin.T, zenithAngle, fElem, inr = insRot, cent = rotCent).T
+    #xyout = CoordTransp.CoordinateTransform(xyin, zenithAngle, fElem, inr=insRot, cent=rotCent).T
+
 
     return np.array([posMM[:, 0], xyout[:, 0], xyout[:, 1]]).T
 

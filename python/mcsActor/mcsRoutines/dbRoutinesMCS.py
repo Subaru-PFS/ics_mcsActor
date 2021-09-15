@@ -32,9 +32,11 @@ import copy
 from opdb import opdb
 
 
-def connectToDB(hostname='', port='', dbname='opdb_api_test', username='pfs', passwd=None):
+def connectToDB(hostname='', port='', dbname='opdb_api_test', username='pfs'):
 
-    db = opdb.OpDB(hostname, port, dbname, username, passwd)
+    db = opdb.OpDB(hostname=hostname, port=port,
+                   dbname=dbname,
+                   username=username)
     db.connect()
 
     return db
@@ -75,7 +77,7 @@ def loadBoresightFromDB(db, pfsVisitId):
     read boresight informatino from database
     table = mcs_boresight
     """
-    sql = f'''SELECT * FROM mcs_boresight ORDER BY calculated_at ASC FETCH FIRST ROW ONLY'''
+    sql = f'''SELECT * FROM mcs_boresight ORDER BY calculated_at DESC FETCH FIRST ROW ONLY'''
     #sql=f'SELECT mcs_boresight.mcs_boresight_x_pix,mcs_boresight.mcs_boresight_y_pix from mcs_boresight where mcs_boresight.pfs_visit_id={pfsVisitId}'
     df = db.fetch_query(sql)
     return [df['mcs_boresight_x_pix'][0], df['mcs_boresight_y_pix'][0]]
