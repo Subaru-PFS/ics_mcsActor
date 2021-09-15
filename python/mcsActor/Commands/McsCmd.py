@@ -1025,35 +1025,12 @@ class McsCmd(object):
             buf.write(line)
         buf.seek(0, 0)
 
-        #now = datetime.datetime.now()
-        #now.strftime("%Y-%m-%d %H:%M:%S")
-
-        # Save measurements to a CSV buffer
-        #measBuf = io.StringIO()
-
-        #data = np.insert(centArr, 5, 20, axis=1)
-        
-        #np.savetxt('/tmp/test.txt', data[:, 1:8], delimiter=',', fmt='%0.6g')
-        #np.savetxt(measBuf, centArr[:, 1:], delimiter=',', fmt='%0.6g')
-       
-        #measBuf.seek(0, 0)
 
         # Let the database handle the primary key
         db = self.connectToDB(None)
         colnames = db.session.execute('select * FROM "mcs_data" where false')
         realcolnames = tuple(colnames.keys())[0:]
 
-        #colname = []
-        #for i in realcolnames:
-        #    x = '"'+i+'"'
-        #    colname.append(x)
-        #buf = io.StringIO()
-        #for l_i in range(len(centArr)):
-            # line = '%s,%d,%d,%d,%s' % (now.strftime("%Y-%m-%d %H:%M:%S"),
-            #                           frameId, moveId, l_i+1, measBuf.readline())
-        #    line = '%d,%d,%s' % (frameId, l_i+1, measBuf.readline())
-        #    buf.write(line)
-        #buf.seek(0, 0)
 
         self._writeData('mcs_data', realcolnames, buf)
         buf.seek(0, 0)
