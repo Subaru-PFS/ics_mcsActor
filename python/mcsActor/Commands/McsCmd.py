@@ -887,7 +887,16 @@ class McsCmd(object):
         image = self.actor.image
 
         cmd.inform(f'state="measuring cached image: {image.shape}"')
-        centroids = sep.extract(image.astype(float), 1000)
+        
+        bkg = sep.Background(image.astype(float), bw=64, bh=64, fw=3, fh=3)
+        bkg_image = bkg.back()
+
+        data_sub = image - bkg
+
+        #sigma = np.std(data_sub)
+        centroids = sep.extract(data_sub.astype(float), 30 , err=bkg.globalrms, minarea=9)
+        
+        
         npoint = centroids.shape[0]
         tCentroids = np.zeros((npoint, 8))
 
