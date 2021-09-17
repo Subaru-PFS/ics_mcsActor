@@ -16,12 +16,14 @@ import sep
 
 import os
 import astropy.io.fits as pyfits
+import astropy
 import fitsio
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 
 from actorcore.utility import fits as fitsUtils
+from actorcore.utility import timecards
 from opscore.utility.qstr import qstr
 
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
@@ -323,7 +325,7 @@ class McsCmd(object):
 
         return pycards
 
-    def _constructHeader(self, cmd, filename, expType, expTime):
+    def _constructHeader(self, cmd, filename, expType, expTime, expStart):
         if expType == 'bias':
             expTime = 0.0
 
@@ -353,6 +355,21 @@ class McsCmd(object):
         hdr.append(('DETECTOR', detectorId, 'Name of the detector/CCD'))
         hdr.append(('GAIN', gain, '[e-/ADU] AD conversion factor'))
         hdr.append(('DET-TMP', detectorTemp, '[degC] Detector temperature'))
+
+        try:
+            expTimeSeconds = expTime / 1000.0
+            expStart = astropy.time.Time(expStart, format='unix', scale='utc')
+            timeCards = timecards.TimeCards(startTime=expStart)
+            timeCards.end(expTime=expTimeSeconds)
+            cards = timeCards.getCards()
+
+            # MCS is still pyfits based. So convert cards formats, grr.
+            hdr.append(('EXPTIME', expTimeSeconds, '[s] commanded exposure time'))
+            pyCards = [(c['name'], c['value'], c['comment']) for c in cards]
+            hdr.extend(pyCards)
+        except Exception as e:
+            cmd.warn(f'text="FAILED to gather time cards: {e}"')
+
         try:
             instCards = self._getInstHeader(cmd)
             hdr.add_comment('Subaru Device Dependent Header Block for PFS-MCS')
@@ -404,6 +421,7 @@ class McsCmd(object):
 
         nameQ = self.requestNextFilename(cmd, frameId)
         cmd.diag(f'text="new exposure"')
+        expStart = time.time()
         if self.simulationPath is None:
             filename = '/tmp/scratchFile'
             image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False, flip=flip)
@@ -431,7 +449,7 @@ class McsCmd(object):
             cmd.inform(f'text="image shape: {image.shape} type:{image.dtype}"')
             image = image*mask.astype('uint16')
 
-        hdr = self._constructHeader(cmd, filename, expType, expTime)
+        hdr = self._constructHeader(cmd, filename, expType, expTime, expStart)
         cmd.diag(f'text="hdr done: {len(hdr)}"')
         phdu = pyfits.PrimaryHDU(header=hdr)
 
@@ -458,7 +476,7 @@ class McsCmd(object):
         pHdr = phdu.header
         pHdr.set('EXTEND', comment='Presence of FITS Extension')
 
-        hduList.writeto(filename, checksum=False, overwrite=True)
+        hduList.writeto(filename, checksum=True, overwrite=True)
         cmd.inform(f'filename={filename}')
         cmd.inform(f'text="write image to filename={filename}"')
 
