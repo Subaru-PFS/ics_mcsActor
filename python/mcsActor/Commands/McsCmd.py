@@ -13,6 +13,7 @@ import pathlib
 import queue
 import threading
 import sep
+import sys
 
 import os
 import astropy.io.fits as pyfits
@@ -32,6 +33,8 @@ from scipy.spatial import cKDTree
 import psycopg2
 import psycopg2.extras
 from xml.etree.ElementTree import dump
+from procedures.moduleTest import calculation
+
 
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsTools
@@ -578,22 +581,26 @@ class McsCmd(object):
 
         # do the fibre identification
         if doFibreID:
+            
+            
 
             cmd.inform('text="zenith angle=%s"'%(zenithAngle))
             cmd.inform('text="instrument rotation=%s"'%(insRot))
 
             # read FF from the database, get list of adjacent fibres if they haven't been calculated yet.
-            if(self.adjacentCobras == None):
-                adjacentCobras = mcsTools.makeAdjacentList(self.centrePos[:, 1:3], self.armLength)
-                cmd.inform(f'text="made adjacent lists"')
-                self.fidPos = dbTools.loadFiducialsFromDB(db)
-                cmd.inform(f'text="loaded fiducial fibres"')
+            #if(self.adjacentCobras == None):
+            #    adjacentCobras = mcsTools.makeAdjacentList(self.centrePos[:, 1:3], self.armLength)
+            #    cmd.inform(f'text="made adjacent lists"')
+            #    self.fidPos = dbTools.loadFiducialsFromDB(db)
+            #    cmd.inform(f'text="loaded fiducial fibres"')
 
             # transform centroids to MM
-            self.transformations(cmd, frameId, zenithAngle, insRot)
+            #self.transformations(cmd, frameId, zenithAngle, insRot)
 
             # fibreID
-            self.fibreID(cmd, frameId, zenithAngle, insRot)
+            #self.fibreID(cmd, frameId, zenithAngle, insRot)
+
+            self.easyFiberID(cmd, frameId)
 
         cmd.inform(f'frameId={frameId}; filename={filename}')
 
@@ -665,7 +672,7 @@ class McsCmd(object):
 
             instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
             if(self.geomFile == None):
-                self.geomFile = os.path.join(instPath, "data/pfi/modules/ALL/ALL_final.xml")
+                self.geomFile = os.path.join('/data/MCS/20210910_002/output/2021-09-15-theta_newproj.xml')
             if(self.dotFile == None):
                 self.dotFile = os.path.join(
                     instPath, "data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
@@ -693,13 +700,13 @@ class McsCmd(object):
             # read xmlFile
             instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
             if(self.geomFile == None):
-                self.geomFile = os.path.join(instPath, "data/pfi/modules/ALL/ALL_final.xml")
+                self.geomFile = os.path.join('/data/MCS/20210910_002/output/2021-09-15-theta_newproj.xml')
             if(self.dotFile == None):
                 self.dotFile = os.path.join(
                     instPath, "data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
 
             cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
-            self.centrePos, self.armLength, self.dotPos, self.goodIdx = mcsTools.readCobraGeometry(
+            self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.calibModel = mcsTools.readCobraGeometry(
                 self.geomFile, self.dotFile)
             cmd.inform('text="cobra geometry read"')
             self.geometrySet = True
@@ -774,6 +781,41 @@ class McsCmd(object):
         elif(self.fibreMode == 'asrd'):
 
             self.centroidsMMTrans = self.centroids
+
+    def easyFiberID(self, cmd, frameId):
+        #sys.path.append('/software/devel/pfs/ics_fpsActor')
+        #os.environ['ICS_FPSACTOR_DIR'] = '/software/devel/pfs/ics_fpsActor/'
+        db = self.connectToDB(cmd)
+        dbTools.writeTargetToDB(db, int(frameId))
+        
+        
+        from ics.fpsActor import najaVenator
+        nv = najaVenator.NajaVenator()
+        mcsData = nv.readCentroid(frameId)
+
+        pos=mcsData['centroidx'].values+mcsData['centroidy'].values*(1j)
+        centers=self.calibModel.centers
+
+        target = calculation.lazyIdentification(centers, pos, radii=self.calibModel.L1)
+        mpos = np.zeros(len(target), dtype=complex)
+        for n, k in enumerate(target):
+            if k < 0:
+                # If the target failed to match, use last position (guess)
+                mpos[n] = centers[n]
+            else:
+                mpos[n] = pos[k]
+        indx = np.where(target < 0 )
+        
+        cobraMatch = np.zeros((2394, 5))
+        cobraMatch[:,0] = np.arange(2394)+1 
+        cobraMatch[:,1] = target+1 
+        cobraMatch[:,2] = mpos.real
+        cobraMatch[:,3] = mpos.imag
+        cobraMatch[indx,4] = 1
+
+        
+        dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
+
 
     def fibreID(self, cmd, frameId, zenithAngle, insRot):
 
@@ -912,7 +954,7 @@ class McsCmd(object):
         data_sub = image - bkg
 
         #sigma = np.std(data_sub)
-        centroids = sep.extract(data_sub.astype(float), 25 , err=bkg.globalrms, minarea=5)
+        centroids = sep.extract(data_sub.astype(float), 20 , err=bkg.globalrms, minarea=1)
         
         
         npoint = centroids.shape[0]

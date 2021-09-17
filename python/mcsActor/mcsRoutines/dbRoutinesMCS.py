@@ -114,6 +114,18 @@ def loadTargetsFromDB(db, frameId):
 
     return np.array([df['cobra_id'], df['pfi_nominal_x_mm'], df['pfi_nominal_y_mm']]).T
 
+def writeTargetToDB(db, frameId):
+    visitId = frameId // 100
+    iteration = frameId % 100
+
+    data = {'pfs_visit_id': np.repeat(visitId,2394),     
+            'iteration' : np.repeat(iteration,2394),   
+            'cobra_id':np.arange(2394)+1
+    }
+
+    df = pd.DataFrame(data=data)
+    db.insert("cobra_target", df)
+
 
 def writeCentroidsToDB(db, centroids, mcsFrameId):
     """

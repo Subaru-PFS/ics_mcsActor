@@ -138,7 +138,7 @@ def readCobraGeometry(xmlFile, dotFile):
     dotPos[:, 3] = dotData['r_tran'].values[goodIdx]
 
 
-    return centrePos, armLength, dotPos, goodIdx
+    return centrePos, armLength, dotPos, goodIdx, des
 
 
 def transformToMM(posPix, rotCent, offset, zenithAngle, insRot, fieldElement, pixScale = 0):
