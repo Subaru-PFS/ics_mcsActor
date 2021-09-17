@@ -1,5 +1,5 @@
 from builtins import object
-import numpy
+import numpy as np
 import time
 import subprocess as sub
 import astropy.io.fits as pyfits
@@ -140,7 +140,9 @@ class mcsCamera(Camera):
         cmd.inform('text="Time for exposure = %f." ' % ((t2-t1)/1.))
         cmd.inform('text="Time for image loading= %f." ' % ((t3-t2)/1.))
 
+
+        # Flip the coordinate to match ASRD camera.
         if flip is True:
-            image=(np.flip(image).T).copy(order='C')
+            image=(np.flip(image.T)).copy(order='C')
 
         return image

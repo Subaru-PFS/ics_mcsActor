@@ -399,14 +399,14 @@ class McsCmd(object):
 
         return hdr
 
-    def _doExpose(self, cmd, expTime, expType, frameId, mask=None):
+    def _doExpose(self, cmd, expTime, expType, frameId, mask=None, flip=False):
         """ Take an exposure and save it to disk. """
 
         nameQ = self.requestNextFilename(cmd, frameId)
         cmd.diag(f'text="new exposure"')
         if self.simulationPath is None:
             filename = '/tmp/scratchFile'
-            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
+            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False, flip=flip)
         else:
             imagePath, image, target = self.getNextSimulationImage(cmd)
         cmd.inform(f'text="done: image shape = {image.shape}"')
@@ -519,7 +519,7 @@ class McsCmd(object):
         if simDot is True:
             filename, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
         else:
-            filename, image = self._doExpose(cmd, expTime, expType, frameId)
+            filename, image = self._doExpose(cmd, expTime, expType, frameId, flip=False)
 
         if frameId is None:
             filename = pathlib.Path(filename)
@@ -550,7 +550,7 @@ class McsCmd(object):
 
             if self.findThresh is None:
                 cmd.inform('text="Calculating threshold." ')
-                self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
+                #self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
 
             cmd.inform('text="Running centroid on current image" ')
             self.runCentroidSEP(cmd)
@@ -894,7 +894,7 @@ class McsCmd(object):
         data_sub = image - bkg
 
         #sigma = np.std(data_sub)
-        centroids = sep.extract(data_sub.astype(float), 30 , err=bkg.globalrms, minarea=9)
+        centroids = sep.extract(data_sub.astype(float), 25 , err=bkg.globalrms, minarea=5)
         
         
         npoint = centroids.shape[0]
