@@ -476,7 +476,7 @@ class McsCmd(object):
         pHdr = phdu.header
         pHdr.set('EXTEND', comment='Presence of FITS Extension')
 
-        hduList.writeto(filename, checksum=False, overwrite=True)
+        hduList.writeto(filename, checksum=True, overwrite=True)
         cmd.inform(f'filename={filename}')
         cmd.inform(f'text="write image to filename={filename}"')
 
