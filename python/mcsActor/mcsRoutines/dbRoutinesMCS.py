@@ -114,13 +114,15 @@ def loadTargetsFromDB(db, frameId):
 
     return np.array([df['cobra_id'], df['pfi_nominal_x_mm'], df['pfi_nominal_y_mm']]).T
 
-def writeTargetToDB(db, frameId):
+def writeTargetToDB(db, frameId, target, mpos):
     visitId = frameId // 100
     iteration = frameId % 100
 
+    # To-Do here we need a better implementation.
     data = {'pfs_visit_id': np.repeat(visitId,2394),     
             'iteration' : np.repeat(iteration,2394),   
-            'cobra_id':np.arange(2394)+1
+            'cobra_id':np.arange(2394)+1,
+            
     }
 
     df = pd.DataFrame(data=data)
@@ -176,22 +178,28 @@ def writeMatchesToDB(db, cobraMatch, mcsFrameId):
     frame[:, 1] = iterations
     frame[:, 3:] = cobraMatch
 
-    ind = np.where(cobraMatch[:, 1] != -1)
-    np.save("frame.npy", frame)
-    # column names
     columns = ['pfs_visit_id', 'iteration', 'mcs_frame_id', 'cobra_id',
                'spot_id', 'pfi_center_x_mm', 'pfi_center_y_mm', 'flags']
-    df = pd.DataFrame(frame[ind[0], :], columns=columns)
+    
+    df = pd.DataFrame(data=frame, columns=columns)
     db.insert("cobra_match", df)
 
-    columns = ['pfs_visit_id', 'iteration', 'mcs_frame_id',
-               'cobra_id', 'pfi_center_x_mm', 'pfi_center_y_mm', 'flags']
-    ind = np.where(cobraMatch[:, 1] == -1)
-    if(len(ind[0]) > 0):
-        ff = frame[ind[0], :]
-        df = pd.DataFrame(ff[:, [0, 1, 2, 3, 5, 6, 7]], columns=columns)
+    #ind = np.where(cobraMatch[:, 1] != -1)
+    #np.save("frame.npy", frame)
+    # column names
+    #columns = ['pfs_visit_id', 'iteration', 'mcs_frame_id', 'cobra_id',
+    #           'spot_id', 'pfi_center_x_mm', 'pfi_center_y_mm', 'flags']
+    #df = pd.DataFrame(frame[ind[0], :], columns=columns)
+    #db.insert("cobra_match", df)
 
-        db.insert("cobra_match", df)
+    #columns = ['pfs_visit_id', 'iteration', 'mcs_frame_id',
+    #           'cobra_id', 'pfi_center_x_mm', 'pfi_center_y_mm', 'flags']
+    #ind = np.where(cobraMatch[:, 1] == -1)
+    #if(len(ind[0]) > 0):
+    #    ff = frame[ind[0], :]
+    #    df = pd.DataFrame(ff[:, [0, 1, 2, 3, 5, 6, 7]], columns=columns)
+
+    #    db.insert("cobra_match", df)
 
 
 def writeAffineToDB(db, afCoeff, frameId):
