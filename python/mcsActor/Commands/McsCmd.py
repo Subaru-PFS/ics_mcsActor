@@ -84,7 +84,8 @@ class McsCmd(object):
             ('expose', '@(bias|test) [<frameId>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose',
-             'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot]', self.expose),
+                'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot] '
+                '[@flipImage]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
@@ -518,6 +519,12 @@ class McsCmd(object):
         else:
             simDot = False
 
+        flipImageArg = 'flipImage' in cmdKeys
+        if flipImageArg:
+            flipImage = True
+        else:
+            flipImage = False
+
         cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID}')
 
         # get frame ID if explicitly set, otherise reset
@@ -540,7 +547,7 @@ class McsCmd(object):
         if simDot is True:
             filename, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
         else:
-            filename, image = self._doExpose(cmd, expTime, expType, frameId, flip=False)
+            filename, image = self._doExpose(cmd, expTime, expType, frameId, flip=flipImage)
 
         if frameId is None:
             filename = pathlib.Path(filename)
@@ -581,9 +588,7 @@ class McsCmd(object):
 
         # do the fibre identification
         if doFibreID:
-            
-            
-
+        
             cmd.inform('text="zenith angle=%s"'%(zenithAngle))
             cmd.inform('text="instrument rotation=%s"'%(insRot))
 
@@ -700,7 +705,7 @@ class McsCmd(object):
             # read xmlFile
             instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
             if(self.geomFile == None):
-                self.geomFile = os.path.join('/data/MCS/20210910_002/output/2021-09-15-theta_newproj.xml')
+                self.geomFile = os.path.join('/data/MCS/20210917_023/output/2021-09-17-theta_flip.xml')
             if(self.dotFile == None):
                 self.dotFile = os.path.join(
                     instPath, "data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
@@ -783,20 +788,26 @@ class McsCmd(object):
             self.centroidsMMTrans = self.centroids
 
     def easyFiberID(self, cmd, frameId):
+        reload(calculation)
+        
         #sys.path.append('/software/devel/pfs/ics_fpsActor')
         #os.environ['ICS_FPSACTOR_DIR'] = '/software/devel/pfs/ics_fpsActor/'
         db = self.connectToDB(cmd)
-        dbTools.writeTargetToDB(db, int(frameId))
-        
-        
+        cmd.inform(f'text="Running easy FibreID"')
+
         from ics.fpsActor import najaVenator
         nv = najaVenator.NajaVenator()
         mcsData = nv.readCentroid(frameId)
-
-        pos=mcsData['centroidx'].values+mcsData['centroidy'].values*(1j)
+        df=mcsData.loc[mcsData['fiberId'] > 0]
+        
+        pos=df['centroidx'].values[1:]+df['centroidy'].values[1:]*(1j)
         centers=self.calibModel.centers
+        cmd.inform(f'text="cobra centers = {centers}" ')
 
+        cmd.inform(f'text="Loading arm-length = {self.calibModel.L1}" ')
         target = calculation.lazyIdentification(centers, pos, radii=self.calibModel.L1)
+        cmd.inform(f'text="Using Chih-Yi lazy ID target = {target}" ')
+
         mpos = np.zeros(len(target), dtype=complex)
         for n, k in enumerate(target):
             if k < 0:
@@ -805,13 +816,17 @@ class McsCmd(object):
             else:
                 mpos[n] = pos[k]
         indx = np.where(target < 0 )
-        
+
+        dbTools.writeTargetToDB(db, int(frameId), target, mpos)
+    
         cobraMatch = np.zeros((2394, 5))
         cobraMatch[:,0] = np.arange(2394)+1 
-        cobraMatch[:,1] = target+1 
+        cobraMatch[:,1] = target+1
         cobraMatch[:,2] = mpos.real
         cobraMatch[:,3] = mpos.imag
         cobraMatch[indx,4] = 1
+
+
 
         
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
@@ -948,6 +963,8 @@ class McsCmd(object):
 
         cmd.inform(f'state="measuring cached image: {image.shape}"')
         
+        # Run centroid
+
         bkg = sep.Background(image.astype(float), bw=64, bh=64, fw=3, fh=3)
         bkg_image = bkg.back()
 
@@ -1057,6 +1074,14 @@ class McsCmd(object):
         sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(
             tableName, columns)
 
+        #try:
+        #    db = self.connectToDB(None)
+        #    with db.engine.connect() as conn:
+        #        with conn.connection.cursor() as cursor:
+        #            cursor.copy_expert(sql, dataBuf)
+        #except Exception as e:
+        #    self.logger.warn(f"failed to write with {sql}: {e}")
+        
         try:
             db = self.connectToDB(None)
             session = db.session
@@ -1092,6 +1117,11 @@ class McsCmd(object):
                                         centArr[l_i,2], centArr[l_i,3], centArr[l_i,4], 
                                         centArr[l_i,5], centArr[l_i,6], centArr[l_i,7])
             buf.write(line)
+        
+        line = line = '%d,%d,%f,%f,%f,%f,%f,%f,%f\n' % (frameId, -1, np.nan, 
+                                        np.nan, np.nan, np.nan, 
+                                        np.nan, np.nan, np.nan)
+        buf.write(line)
         buf.seek(0, 0)
 
 
