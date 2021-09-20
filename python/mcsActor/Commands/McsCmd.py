@@ -798,7 +798,7 @@ class McsCmd(object):
         from ics.fpsActor import najaVenator
         nv = najaVenator.NajaVenator()
         mcsData = nv.readCentroid(frameId)
-        df=mcsData.loc[mcsData['fiberId'] > 0]
+        df=mcsData.loc[mcsData['spot_id'] > 0]
         
         pos=df['centroidx'].values[1:]+df['centroidy'].values[1:]*(1j)
         centers=self.calibModel.centers
