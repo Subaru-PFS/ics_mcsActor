@@ -849,7 +849,11 @@ class McsCmd(object):
         cmd.inform(f'text="cobra centers = {centers}" ')
 
         cmd.inform(f'text="Loading arm-length = {self.calibModel.L1}" ')
-        target = calculation.lazyIdentification(centers, pos, radii=1.5*self.calibModel.L1)
+
+        # It should be one spot in patrol region. 
+        target = calculation.lazyIdentification(centers, pos, 
+            radii=self.calibModel.L1+self.calibModel.L2)
+        
         cmd.inform(f'text="Total ID target = {target}" ')
 
 
