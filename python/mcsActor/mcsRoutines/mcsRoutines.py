@@ -68,27 +68,6 @@ def getCentroidParams(cmd):
     return centParms
 
 
-def readCobraGeometryFake():
-    """
-    creates fake cobra geometry for pinhole mask images, fo testing purposes. The centre is the mask position, 
-    the arm length is set to 4mm, the dot positions are offset and arbitrary. All "cobras" are good.
-    """
-
-    centrePos = np.loadtxt(os.path.join(
-        os.environ['ICS_MCSACTOR_DIR'], 'etc', 'scienceFibres.dat'), delimiter = ", ")
-    centrePos[:, 0] += 1
-    armLength = np.repeat(3, centrePos.shape[0])
-    nCobras = len(armLength)
-
-    dotPos = np.zeros((centrePos.shape[0], 4))
-    dotPos[:, 0] = centrePos[:, 0]
-    dotPos[:, 1] = centrePos[:, 1]+1.19
-    dotPos[:, 2] = centrePos[:, 2]+1.19
-    dotPos[:, 3] = 1.5
-
-    goodIdx = np.copy(centrePos[:, 0])-1
-    return centrePos, armLength, dotPos, goodIdx
-
 
 def readCobraGeometry(xmlFile, dotFile):
     """
@@ -132,10 +111,10 @@ def readCobraGeometry(xmlFile, dotFile):
     dotData = pd.read_csv(dotFile, delimiter = ",", header=0)
     dotPos = np.zeros((len(goodIdx), 4))
 
-    dotPos[:, 0] = goodIdx+1
-    dotPos[:, 1] = dotData['x_tran'].values[goodIdx]
-    dotPos[:, 2] = dotData['y_tran'].values[goodIdx]
-    dotPos[:, 3] = dotData['r_tran'].values[goodIdx]
+    dotPos[:, 0] = dotData['spotId'].values[goodIdx]
+    dotPos[:, 1] = dotData['x'].values[goodIdx]
+    dotPos[:, 2] = dotData['y'].values[goodIdx]
+    dotPos[:, 3] = dotData['r'].values[goodIdx]
 
 
     return centrePos, armLength, dotPos, goodIdx, des
