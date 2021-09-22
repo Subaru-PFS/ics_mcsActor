@@ -154,6 +154,12 @@ def writeCentroidsToDB(db, centroids, mcsFrameId):
     df = pd.DataFrame(frame, columns=columns)
     db.insert("mcs_data", df)
 
+def readMatchFromDB(db, mcsFrameId):
+    
+    match = db.bulkSelect('cobra_match',f'select * from cobra_match where '
+                      'mcs_frame_id = {mcsFrameId}')
+    return match
+
 
 def writeMatchesToDB(db, cobraMatch, mcsFrameId):
     """
