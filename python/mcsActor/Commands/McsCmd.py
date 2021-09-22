@@ -27,6 +27,7 @@ from actorcore.utility import fits as fitsUtils
 from actorcore.utility import timecards
 from opscore.utility.qstr import qstr
 
+from pfs.utils.coordinates.transform import PfiTransform
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
 from scipy.spatial import cKDTree
 
@@ -39,6 +40,9 @@ from procedures.moduleTest import calculation
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
+from pfs.utils.butler import Butler
+
+from opdb import opdb
 
 from importlib import reload
 reload(dbTools)
@@ -85,7 +89,7 @@ class McsCmd(object):
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose',
                 'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot] '
-                '[@flipImage]', self.expose),
+                '[@newField]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
@@ -420,7 +424,7 @@ class McsCmd(object):
 
         return hdr
 
-    def _doExpose(self, cmd, expTime, expType, frameId, mask=None, flip=False):
+    def _doExpose(self, cmd, expTime, expType, frameId, mask=None):
         """ Take an exposure and save it to disk. """
 
         nameQ = self.requestNextFilename(cmd, frameId)
@@ -428,7 +432,7 @@ class McsCmd(object):
         expStart = time.time()
         if self.simulationPath is None:
             filename = '/tmp/scratchFile'
-            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False, flip=flip)
+            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
         else:
             imagePath, image, target = self.getNextSimulationImage(cmd)
         cmd.inform(f'text="done: image shape = {image.shape}"')
@@ -511,6 +515,7 @@ class McsCmd(object):
             doCentroid = True
 
         doFibreID = 'doFibreID' in cmdKeys
+        newField = 'newField' in cmdKeys
 
         simDotArg = 'simDot' in cmdKeys
         if simDotArg:
@@ -518,12 +523,6 @@ class McsCmd(object):
             dotmask = self._makeDotMask(cmd)
         else:
             simDot = False
-
-        flipImageArg = 'flipImage' in cmdKeys
-        if flipImageArg:
-            flipImage = True
-        else:
-            flipImage = False
 
         cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID}')
 
@@ -547,7 +546,7 @@ class McsCmd(object):
         if simDot is True:
             filename, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
         else:
-            filename, image = self._doExpose(cmd, expTime, expType, frameId, flip=flipImage)
+            filename, image = self._doExpose(cmd, expTime, expType, frameId)
 
         if frameId is None:
             filename = pathlib.Path(filename)
@@ -591,22 +590,38 @@ class McsCmd(object):
         
             cmd.inform('text="zenith angle=%s"'%(zenithAngle))
             cmd.inform('text="instrument rotation=%s"'%(insRot))
+            
+            # Get last two degits of frameID
+            iterNum = frameId % 100
+            if iterNum == 0:
+                newField = True
+                cmd.inform('text="New field because iterNum = {iterNum} "')
+            else:
+                newField = False
 
+            enableEasyID=True
+
+            if enableEasyID:
+                if newField:
+                    self.establishTranform(cmd, 90-zenithAngle, insRot, frameId)
+                
+                self.easyFiberID(cmd, frameId)
+
+            else:
             # read FF from the database, get list of adjacent fibres if they haven't been calculated yet.
-            #if(self.adjacentCobras == None):
-            #    adjacentCobras = mcsTools.makeAdjacentList(self.centrePos[:, 1:3], self.armLength)
-            #    cmd.inform(f'text="made adjacent lists"')
-            #    self.fidPos = dbTools.loadFiducialsFromDB(db)
-            #    cmd.inform(f'text="loaded fiducial fibres"')
+                if(self.adjacentCobras == None):
+                    adjacentCobras = mcsTools.makeAdjacentList(self.centrePos[:, 1:3], self.armLength)
+                    cmd.inform(f'text="made adjacent lists"')
+                    self.fidPos = dbTools.loadFiducialsFromDB(db)
+                    cmd.inform(f'text="loaded fiducial fibres"')
 
-            # transform centroids to MM
-            #self.transformations(cmd, frameId, zenithAngle, insRot)
+                #transform centroids to MM
+                self.transformations(cmd, frameId, zenithAngle, insRot)
 
-            # fibreID
-            #self.fibreID(cmd, frameId, zenithAngle, insRot)
+                # fibreID
+                self.fibreID(cmd, frameId, zenithAngle, insRot)
 
-            self.easyFiberID(cmd, frameId)
-
+            
         cmd.inform(f'frameId={frameId}; filename={filename}')
 
         # if doFibreID:
@@ -705,10 +720,10 @@ class McsCmd(object):
             # read xmlFile
             instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
             if(self.geomFile == None):
-                self.geomFile = os.path.join('/data/MCS/20210917_023/output/2021-09-17-theta_flip.xml')
+                self.geomFile = os.path.join(instPath, 'data/pfi/modules/ALL/ALL_final_20210920_mm.xml')
             if(self.dotFile == None):
                 self.dotFile = os.path.join(
-                    instPath, "data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
+                    instPath, "data/pfi/dot/black_dots_mm.csv")
 
             cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
             self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.calibModel = mcsTools.readCobraGeometry(
@@ -738,6 +753,28 @@ class McsCmd(object):
 
         cmd.inform('text="fiducial fibres read"')
 
+    def establishTranform(self, cmd, altitude, insrot, frameID):
+        butler = Butler(configRoot=os.path.join(os.environ["PFS_INSTDATA_DIR"], "data"))
+
+        # Read fiducial and spot geometry
+        fids = butler.get('fiducials')
+
+        db=opdb.OpDB(hostname='db-ics', port=5432,
+                   dbname='opdb',
+                   username='pfs')
+        mcsData = db.bulkSelect('mcs_data',f'select spot_id, mcs_center_x_pix, mcs_center_y_pix '
+                f'from mcs_data where mcs_frame_id = {frameID}')
+
+
+        pt = PfiTransform(altitude=altitude, insrot=insrot)
+        pt.updateTransform(mcsData, fids, matchRadius=2.0)
+
+        self.pfiTrans = pt
+
+
+        cmd.inform(f'text="PFI transformation method built"')
+
+
     def setDotFile(self, cmd):
 
         self.geomFile = cmd.cmd.keywords["dotFile"].values[0]
@@ -754,7 +791,7 @@ class McsCmd(object):
         cmd.inform(f'text="geometry file set to {self.geomFile}"')
 
     def transformations(self, cmd, frameId, zenithAngle, insRot):
-
+        
         # two caes here, the full mm version, and the asrd pixel version, with no ff
         cmd.inform(f'text="fibreMode {self.fibreMode}"')
 
@@ -798,21 +835,34 @@ class McsCmd(object):
         from ics.fpsActor import najaVenator
         nv = najaVenator.NajaVenator()
         mcsData = nv.readCentroid(frameId)
-        df=mcsData.loc[mcsData['spot_id'] > 0]
+        df=mcsData.loc[mcsData['fiberId'] > 0]
         
-        pos=df['centroidx'].values[1:]+df['centroidy'].values[1:]*(1j)
+        
+        '''
+            OK, here we transform all mcs_data to pfi
+        '''
+        x_mm, y_mm = self.pfiTrans.mcsToPfi(df['centroidx'].values,df['centroidy'].values)
+        
+        pos=x_mm+y_mm*(1j)
+        
         centers=self.calibModel.centers
         cmd.inform(f'text="cobra centers = {centers}" ')
 
         cmd.inform(f'text="Loading arm-length = {self.calibModel.L1}" ')
-        target = calculation.lazyIdentification(centers, pos, radii=self.calibModel.L1)
-        cmd.inform(f'text="Using Chih-Yi lazy ID target = {target}" ')
+        target = calculation.lazyIdentification(centers, pos, radii=1.5*self.calibModel.L1)
+        cmd.inform(f'text="Total ID target = {target}" ')
+
+
+        cmd.inform(f'text="Loading DOT file for missing IDs" ')
+
+        dotData = pd.read_csv(self.dotFile, delimiter = ",", header=0)
+        dotCenter = dotData['x'].values+dotData['y'].values*1j
 
         mpos = np.zeros(len(target), dtype=complex)
         for n, k in enumerate(target):
             if k < 0:
-                # If the target failed to match, use last position (guess)
-                mpos[n] = centers[n]
+                # If the target failed to match, we think it is highly possible in dot
+                mpos[n] = dotCenter[n]
             else:
                 mpos[n] = pos[k]
         indx = np.where(target < 0 )
@@ -825,9 +875,6 @@ class McsCmd(object):
         cobraMatch[:,2] = mpos.real
         cobraMatch[:,3] = mpos.imag
         cobraMatch[indx,4] = 1
-
-
-
         
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
 
@@ -971,7 +1018,8 @@ class McsCmd(object):
         data_sub = image - bkg
 
         #sigma = np.std(data_sub)
-        centroids = sep.extract(data_sub.astype(float), 20 , err=bkg.globalrms, minarea=1)
+        centroids = sep.extract(data_sub.astype(float), 20 , err=bkg.globalrms,
+            filter_type='conv', minarea=10)
         
         
         npoint = centroids.shape[0]
