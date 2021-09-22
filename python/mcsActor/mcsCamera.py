@@ -48,7 +48,7 @@ class mcsCamera(Camera):
         self.expTime = expTime
         cmd.inform('expTime=%f ms' % (expTime))
 
-    def expose(self, cmd, expTime, expType, filename, doCopy=True, flip=False):
+    def expose(self, cmd, expTime, expType, filename, doCopy=True):
         """ Generate an 'exposure' image. We don't have an actual camera, so generate some 
         plausible image. 
 
@@ -139,10 +139,5 @@ class mcsCamera(Camera):
         t3 = time.time()
         cmd.inform('text="Time for exposure = %f." ' % ((t2-t1)/1.))
         cmd.inform('text="Time for image loading= %f." ' % ((t3-t2)/1.))
-
-
-        # Flip the coordinate to match ASRD camera.
-        if flip is True:
-            image=(np.flip(image.T)).copy(order='C')
 
         return image
