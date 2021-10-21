@@ -30,7 +30,7 @@ import pandas as pd
 from scipy.stats import sigmaclip
 import copy
 from opdb import opdb
-
+from datetime import datetime, timezone
 
 def connectToDB(hostname='', port='', dbname='opdb', username='pfs'):
 
@@ -70,8 +70,7 @@ def loadTelescopeParametersFromDB(db, frameId):
     insRot = df['insrot'][0]
 
     return zenithAngle, insRot
-
-
+    
 def loadBoresightFromDB(db, pfsVisitId):
     """
     read boresight informatino from database
@@ -83,6 +82,13 @@ def loadBoresightFromDB(db, pfsVisitId):
     return [df['mcs_boresight_x_pix'][0], df['mcs_boresight_y_pix'][0]]
 
 
+def loadCentroidsFromDB(db, mcsFrameId):
+    """ retrieve a set of centroids from database and return as a numpy array"""
+    
+    sql = f'select mcs_data.spot_id, mcs_data.mcs_center_x_pix, mcs_data.mcs_center_y_pix from mcs_data where mcs_data.mcs_frame_id={mcsFrameId}'
+    df = db.fetch_query(sql)
+    return df.to_numpy()
+    
 def loadFiducialsFromDB(db):
     """
     load fiducial fibre positions from the DB
@@ -127,6 +133,16 @@ def writeTargetToDB(db, frameId, target, mpos):
 
     df = pd.DataFrame(data=data)
     db.insert("cobra_target", df)
+
+
+def writeBoresightToDB(db, pfsVisitId, boresight):
+    """ write boresight to database with current timestamp """
+    
+    dt = datetime.now(timezone.utc)
+   
+    df = pd.DataFrame({'pfs_visit_id': [pfsVisitId], 'mcs_boresight_x_pix': [boresight[0]], 'mcs_boresight_y_pix': [boresight[1]],
+                       'calculated_at': [dt]})
+    db.insert('mcs_boresight', df)
 
 
 def writeCentroidsToDB(db, centroids, mcsFrameId):
