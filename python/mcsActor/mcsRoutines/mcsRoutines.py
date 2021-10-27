@@ -35,7 +35,7 @@ def getCentroidParams(cmd):
     except:
         cmdKeys = []
 
-    fileName = os.path.join(os.environ['ICS_MCSACTOR_DIR'],  'etc',  'mcsDefaultCentroidParameters.yaml')
+    fileName = os.path.join(os.environ['PFS_INSTDATA_DIR'],  'data',  'mcsDefaultCentroidParameters.yaml')
 
     with open(fileName, 'r') as inFile:
         defaultParms = yaml.safe_load(inFile)
