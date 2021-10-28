@@ -27,7 +27,7 @@ from actorcore.utility import fits as fitsUtils
 from actorcore.utility import timecards
 from opscore.utility.qstr import qstr
 
-from pfs.utils.coordinates.transform import PfiTransform
+import pfs.utils.coordinates.transform as transformUtils
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
 from scipy.spatial import cKDTree
 
@@ -765,11 +765,10 @@ class McsCmd(object):
         mcsData = db.bulkSelect('mcs_data',f'select spot_id, mcs_center_x_pix, mcs_center_y_pix '
                 f'from mcs_data where mcs_frame_id = {frameID}')
 
+        pfiTransform = transformUtils.fromCameraName(self.actor.camera.name, altitude=altitude, insrot=insrot)
+        pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
 
-        pt = PfiTransform(altitude=altitude, insrot=insrot)
-        pt.updateTransform(mcsData, fids, matchRadius=2.0)
-
-        self.pfiTrans = pt
+        self.pfiTrans = pfiTransform
 
 
         cmd.inform(f'text="PFI transformation method built"')
