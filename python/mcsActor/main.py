@@ -14,7 +14,7 @@ class Mcs(actorcore.ICC.ICC):
         #
         super().__init__(name,
                          productName=productName,
-                         modelNames=('gen2', 'meb', 'mcs', 'peb'),
+                         modelNames=('gen2', 'meb', 'mcs', 'peb', 'sps'),
                          configFile=configFile)
 
         self.connectCamera(self.bcast)
