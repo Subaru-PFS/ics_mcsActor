@@ -750,6 +750,44 @@ class McsCmd(object):
         self.geomFile = cmd.cmd.keywords["geomFile"].values[0]
         cmd.inform(f'text="geometry file set to {self.geomFile}"')
 
+<<<<<<< HEAD
+=======
+    def transformations(self, cmd, frameId, zenithAngle, insRot):
+        
+        # this routine should now be redundant, delete later!!
+        cmd.inform(f'text="fibreMode {self.fibreMode}"')
+
+        if(self.fibreMode == 'comm'):
+            fieldElement = False
+        if(self.fibreMode == 'full'):
+            fieldElement = True
+
+        if(self.fibreMode in ('comm', 'full')):
+            db = self.connectToDB(cmd)
+            cmd.inform(f'text="tests centroid shape {self.centroids[:,1:3].shape}"')
+            centroidsMM = mcsTools.transformToMM(
+                self.centroids, self.rotCent, self.offset, zenithAngle, fieldElement, insRot, pixScale=0)
+            np.save("centroidsMM.npy", centroidsMM)
+
+            # match FF to the transformed centroids
+            nFid = len(self.fidPos[:, 0])
+            matchPoint = mcsTools.nearestNeighbourMatching(centroidsMM, self.fidPos, nFid)
+            cmd.inform(f'text="fiducial fibres matched"')
+
+            afCoeff, xd, yd, sx, sy, rotation = mcsTools.calcAffineTransform(matchPoint, self.fidPos)
+            dbTools.writeAffineToDB(db, afCoeff, int(frameId))
+
+            cmd.inform(f'text="transform calculated {xd} {yd} {sx} {sy} {rotation}"')
+
+            self.centroidsMMTrans = mcsTools.applyAffineTransform(centroidsMM, afCoeff)
+            cmd.inform(f'text="affine applied to centroids"')
+
+        elif(self.fibreMode == 'asrd'):
+
+            self.centroidsMMTrans = self.centroids
+
+
+>>>>>>> 1ae1940 (commits need to be done *after* saving changes.)
     def easyFiberID(self, cmd, frameId):
         reload(calculation)
         
