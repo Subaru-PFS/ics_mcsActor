@@ -3,7 +3,6 @@
 import cv2
 import logging
 import numpy as np
-from pfs.utils.coordinates import CoordTransp
 from pfs.utils import coordinates
 import pandas as pd
 import time
@@ -29,7 +28,6 @@ from opscore.utility.qstr import qstr
 
 import pfs.utils.coordinates.transform as transformUtils
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
-from scipy.spatial import cKDTree
 
 import psycopg2
 import psycopg2.extras
@@ -47,7 +45,6 @@ from importlib import reload
 reload(dbTools)
 reload(mcsTools)
 
-reload(CoordTransp)
 
 class McsCmd(object):
 
@@ -70,6 +67,7 @@ class McsCmd(object):
         self.geomFile = None
         self.dotFile = None
         self.fibreMode = 'full'
+        self.centParms = None
 
         logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
                             datefmt="%Y-%m-%dT%H:%M:%S")
@@ -82,6 +80,8 @@ class McsCmd(object):
         # associated methods when matched. The callbacks will be
         # passed a single argument, the parsed and typed command.
         #
+
+        
         self.vocab = [
             ('ping', '', self.ping),
             ('status', '', self.status),
@@ -583,14 +583,13 @@ class McsCmd(object):
 
             cmd.inform('text="Running centroid on current image" ')
 
-
             if(centMeth == 'sep'):
                 self.runCentroidSEP(cmd)
                 
             else:
-
-                cmd.inform('text="Setting centroid parameters." ')
-                self.setCentroidParams(cmd)
+                if(self.centParms != None):
+                    cmd.inform('text="Setting centroid parameters." ')
+                    self.setCentroidParams(cmd)
 
                 if self.findThresh is None:
                     cmd.inform('text="Calculating threshold." ')
@@ -604,8 +603,8 @@ class McsCmd(object):
         # do the fibre identification
         if doFibreID:
         
-            cmd.inform('text="zenith angle=%s"'%(zenithAngle))
-            cmd.inform('text="instrument rotation=%s"'%(insRot))
+            #cmd.inform('text="zenith angle=%s"'%(zenithAngle))
+            #cmd.inform('text="instrument rotation=%s"'%(insRot))
             
             # Get last two degits of frameID
             iterNum = frameId % 100
@@ -626,14 +625,18 @@ class McsCmd(object):
             else:
             # read FF from the database, get list of adjacent fibres if they haven't been calculated yet.
 
+                if newField:
+                    self.establishTranform(cmd, 90-zenithAngle, insRot, frameId)
+                
                 if(self.adjacentCobras == None):
+                    # on the first call, set up the global parameters
                     adjacentCobras = mcsTools.makeAdjacentList(self.centrePos[:, 1:3], self.armLength)
                     cmd.inform(f'text="made adjacent lists"')
                     self.fidPos = dbTools.loadFiducialsFromDB(db)
                     cmd.inform(f'text="loaded fiducial fibres"')
 
                 #transform centroid values to mm, in place to maintain structure of array
-                self.centroids[:,2],self.centroids[:,3]=self.pfiTrans.mcsToPfi(self.centroids[:,2],self.centroids[:,3])].values)
+                self.centroids[:,2],self.centroids[:,3]=self.pfiTrans.mcsToPfi(self.centroids[:,2],self.centroids[:,3])
                 
                 # fibreID
                 self.fibreID(cmd, frameId)
