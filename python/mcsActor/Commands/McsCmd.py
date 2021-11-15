@@ -77,6 +77,8 @@ class McsCmd(object):
         self.logger = logging.getLogger('mcscmd')
         self.logger.setLevel(logging.INFO)
 
+
+
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -175,6 +177,7 @@ class McsCmd(object):
 
         self._db = db
         return self._db
+    
 
     def ping(self, cmd):
         """Query the actor for liveness/happiness."""
@@ -197,7 +200,7 @@ class McsCmd(object):
         self.actor.connectCamera(cmd)
         self.actor.camera.setExposureTime(cmd, self.expTime)
 
-        cmd.inform('text="MCS camera present!"')
+        cmd.inform(f'text="MCS camera present! camera name = {self.actor.cameraName}"')
         cmd.finish()
 
     def simulateOff(self, cmd):
@@ -577,10 +580,11 @@ class McsCmd(object):
 
             if self.findThresh is None:
                 cmd.inform('text="Calculating threshold." ')
-                #self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
+                self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
 
             cmd.inform('text="Running centroid on current image" ')
-            self.runCentroidSEP(cmd)
+            self.runCentroid(cmd,self.centParms)
+            #self.runCentroidSEP(cmd)
 
             cmd.inform('text="Sending centroid data to database" ')
             self.dumpCentroidtoDB(cmd, frameId)
@@ -1093,7 +1097,12 @@ class McsCmd(object):
         mcs_m1_temperature = 6
         taken_at = telescopeInfo['starttime']
         taken_in_hst_at = telescopeInfo['starttime']
-        line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%s,%s' % (telescopeInfo['frameid'],
+        if self.actor.cameraName == 'canon_50m':
+            mcs_camera_id = 0
+        if self.actor.cameraName == 'rmod_71m':
+            mcs_camera_id = 1
+
+        line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%s,%s,%d' % (telescopeInfo['frameid'],
                                                                        telescopeInfo['visitid'],
                                                                        telescopeInfo['exptime']/1000.0,
                                                                        telescopeInfo['altitude'],
@@ -1105,7 +1114,8 @@ class McsCmd(object):
                                                                        outside_humidity,
                                                                        mcs_cover_temperature,
                                                                        mcs_m1_temperature,
-                                                                       taken_at, taken_in_hst_at)
+                                                                       taken_at, taken_in_hst_at,
+                                                                       mcs_camera_id)
 
         buf = io.StringIO()
         buf.write(line)

@@ -19,19 +19,21 @@ class Mcs(actorcore.ICC.ICC):
 
         self.connectCamera(self.bcast)
 
+        self.cameraName = None
+
     def connectCamera(self, cmd, camera=None, doFinish=True):
         # For the mcsActor at Subaru, we have two possible cameras:
         #  - on the pfic host from ASRD, use the rmod. Else use the canon.
         if camera is None:
             if socket.gethostname() == 'pfic':
-                camera = 'rmod'
+                camera = 'rmod_71m'
             else:
-                camera = 'mcs'
+                camera = 'canon_50m'
 
         configDir = pathlib.Path(os.environ['ICS_MCSACTOR_DIR'], 'etc')
 
         try:
-            if camera == 'rmod':
+            if camera == 'rmod_71m':
                 import rmodCamera
                 reload(rmodCamera)
 
@@ -39,7 +41,7 @@ class Mcs(actorcore.ICC.ICC):
                 self.camera = rmodCamera.rmodCamera()
                 self.camera.initialCamera(cmd, configPath=configPath)
                 cmd.inform('text="loaded RMOD-71M camera"')
-            if camera == 'mcs':
+            if camera == 'canon_50m':
                 import mcsCamera
                 reload(mcsCamera)
 
@@ -56,7 +58,8 @@ class Mcs(actorcore.ICC.ICC):
             self.camera.initialCamera(cmd)
 
         self.camera.sendStatusKeys(cmd)
-#
+        self.cameraName = camera
+        cmd.inform(f'text="camera name = {camera}"')
 # To work
 
 
