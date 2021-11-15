@@ -869,7 +869,7 @@ def applyAffineTransform(points, afCoeff):
     return np.array([points[:, 0], xx, yy]).T
 
 
-def getThresh(image, cobraPos, threshMethod, sigmaThresh, findSigma, centSigma):
+def getThresh(image, rotCent, threshMethod, sigmaThresh, findSigma, centSigma):
     """
     wrapper for getting threshold
 
@@ -905,8 +905,8 @@ def getThresh(image, cobraPos, threshMethod, sigmaThresh, findSigma, centSigma):
     else:
 
         # get the centre
-        mpx = cobraPos[:, 1].mean()
-        mpy = cobraPos[:, 2].mean()
+        mpx = rotCent[0]
+        mpy = rotCent[1]
         # grid of pixels value, and distance from the center
         xx, yy = np.meshgrid(np.arange(image.shape[0]), np.arange(image.shape[1]))
         dfromc = np.sqrt((xx-mpx)**2+(yy-mpy)**2)
