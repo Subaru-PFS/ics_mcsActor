@@ -120,12 +120,12 @@ int WriteFitsImage(char *filename, int height, int width, u_char * image_p, int 
     long naxes[2] = { width, height };   /* image is 640 pixels wide by 512 rows */
 
     /* allocate memory for the whole image */
-    array = (unsigned short *)malloc( naxes[0] * naxes[1]
-                                        * sizeof( unsigned short ) );
+    //array = (unsigned short *)malloc( naxes[0] * naxes[1]
+    //                                    * sizeof( unsigned short ) );
 
     /* initialize pointers to the start of each row of the image */
-    for( ii=1; ii<naxes[1]; ii++ )
-      array[ii] = array[ii-1] + naxes[0];
+    //for( ii=1; ii<naxes[1]; ii++ )
+    //  array[ii] = array[ii-1] + naxes[0];
 
     remove(filename);               /* Delete old file if it already exists */
 
@@ -154,17 +154,17 @@ int WriteFitsImage(char *filename, int height, int width, u_char * image_p, int 
     }
     nelements = naxes[0] * naxes[1];          /* number of pixels to write */
 
-    memcpy(array, image_p, nelements*sizeof(unsigned short));
+    //memcpy(array, image_p, nelements*sizeof(unsigned short));
 
-    for (ii=0;ii<nelements;ii++){
-    		if (array[ii] > 65535) array[ii]=65535;
-    }
+    //for (ii=0;ii<nelements;ii++){
+    //		if (array[ii] > 65535) array[ii]=65535;
+    //}
 
 
     fpixel = 1;                               /* first pixel to write      */
     /* write the array of unsigned integers to the FITS file */
-    fits_write_img(fptr, TUSHORT, fpixel, nelements, (unsigned short *)array, &status);
-    //fits_write_img(fptr, TUSHORT, fpixel, nelements, (unsigned short *)image_p, &status);
+    //fits_write_img(fptr, TUSHORT, fpixel, nelements, (unsigned short *)array, &status);
+    fits_write_img(fptr, TUSHORT, fpixel, nelements, (unsigned short *)image_p, &status);
     if (status != 0) {
     	fprintf(stderr, "Error: (%s:%s:%d) can not get close image in disk "
     			".\n", __FILE__, __func__, __LINE__);
