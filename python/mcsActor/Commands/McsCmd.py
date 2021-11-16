@@ -583,8 +583,8 @@ class McsCmd(object):
                 self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
 
             cmd.inform('text="Running centroid on current image" ')
-            self.runCentroid(cmd,self.centParms)
-            #self.runCentroidSEP(cmd)
+            #self.runCentroid(cmd,self.centParms)
+            self.runCentroidSEP(cmd)
 
             cmd.inform('text="Sending centroid data to database" ')
             self.dumpCentroidtoDB(cmd, frameId)
@@ -599,7 +599,7 @@ class McsCmd(object):
             iterNum = frameId % 100
             if iterNum == 0:
                 newField = True
-                cmd.inform('text="New field because iterNum = {iterNum} "')
+                cmd.inform(f'text="New field because iterNum = {iterNum} "')
             else:
                 newField = False
 
@@ -769,8 +769,10 @@ class McsCmd(object):
         mcsData = db.bulkSelect('mcs_data',f'select spot_id, mcs_center_x_pix, mcs_center_y_pix '
                 f'from mcs_data where mcs_frame_id = {frameID}')
 
-        pfiTransform = transformUtils.fromCameraName(self.actor.camera.name, altitude=altitude, insrot=insrot)
-        pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
+        pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, altitude=altitude, insrot=insrot)
+        for i in range(3):
+            pfiTransform.updateTransform(mcsData, fids, matchRadius=3.2,nMatchMin=0.2)
+        #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
 
         self.pfiTrans = pfiTransform
 
@@ -1068,6 +1070,12 @@ class McsCmd(object):
         points = np.empty((nSpots, 8))
         points[:, 0] = np.arange(nSpots)
         points[:, 1:] = centroids[:, 0:]
+
+        back=(self.findThresh*centParms['centSigma']-self.centThresh*centParms['findSigma'])/(centParms['centSigma']-centParms['findSigma'])
+        points[:,-1]=np.repeat(back,len(points))
+
+        # Swap last two fields
+        points[:,[-1,-2]] = points[:,[-2,-1]]
 
         self.centroids = points
 
