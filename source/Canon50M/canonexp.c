@@ -68,24 +68,35 @@ int setShutterStatus(int status)
 	return(0);
 }
 
+struct shutterArgs {
+    int time;
+    int verbose;
+};
 
 
-int OpenShutterTime(void* time)
+int OpenShutterTime(void* shutterArgs)
 {
 
 	int i, outputData;
 	int res;
-
+	int time, verbose;
 	int delay = 700;
+
+	time = ((struct shutterArgs*)shutterArgs)->time;
+	verbose = ((struct shutterArgs*)shutterArgs)->verbose;
 
 	i = open("/dev/ttyUSB0", O_RDWR);
 
 	/* Adding a delay so that the image readout will start before shutter is opened */
 	usleep(delay*1000);
-	printf("Opening shutter for %d msec.\n",*(int *)time);
+	
+	if (verbose){
+		printf("Opening shutter for %d msec.\n",time);
+	}
+	
 	outputData=S_OPEN;
 	res = ioctl(i, GP0_SET_VALUE,&outputData);
-	usleep(*(int *)time*1000);
+	usleep(time*1000);
 	outputData=S_CLOSE;
 
 	res = ioctl(i, GP0_SET_VALUE,&outputData);
@@ -236,7 +247,7 @@ int main(int argc, char *argv[]){
 	int    channel = 0 ;
 	int    s_height,s_width,s_depth;
 	int    imagesize;
-	int    verbose=0,loops;
+	int    verbose=0, loops;
 	int    i,ii;
 	int    exptime = 0;
 	int    ret;
@@ -263,7 +274,8 @@ int main(int argc, char *argv[]){
 
 	char etype_list[5][20]={"DARK","BIAS","FLAT","OBJECT","TEST"};
 
-	FILE *fp;
+	struct shutterArgs *args = (struct shutterArgs *)malloc(sizeof(struct shutterArgs));
+	//FILE *fp;
 
     double shutter_ts,start_ts,save_ts;
     double dtime;
@@ -322,7 +334,7 @@ int main(int argc, char *argv[]){
 		"\n", __FILE__, __func__, __LINE__);
 		file="exposure";
 	}
-
+	
 	/* Determin the total loops needed if exposure time is set */
 	nloops=ceil(((float)exptime/800.0))+1;
 	loops = (int)nloops;
@@ -421,9 +433,11 @@ int main(int argc, char *argv[]){
 	    	exit(1);
 		}
     }
-	
+	args->time = exptime;
+	args->verbose = verbose;
+
     if (exptime > 0){
-    	ret=pthread_create(&id,NULL,(void *) OpenShutterTime, (void *)&exptime);
+    	ret=pthread_create(&id,NULL,(void *) OpenShutterTime, (void *)args);
     }
 
 	(void) edt_dtime();		/* init time for check */
@@ -451,7 +465,9 @@ int main(int argc, char *argv[]){
 
 
     dtime = edt_dtime();
-    printf("Image reading finished with %f frames/sec\n",(double) (loops) / dtime);
+	if (verbose){
+    	printf("Image reading finished with %f frames/sec\n",(double) (loops) / dtime);
+	}
 	
 	/* Finishing the shutter thread */
     if (exptime > 0){
@@ -467,7 +483,8 @@ int main(int argc, char *argv[]){
 		coaddframe = (u_char *)calloc(imagesize, sizeof(u_char));
 		coaddshorts= (u_short *)coaddframe;
 
-		sprintf(string,"%s","coadd.fits");
+		//sprintf(string,"%s","coadd.fits");
+		sprintf(string,"%s",file);
 
 		for(i=0;i<nloops;i++) {
 			for (ii=0;ii<imagesize;ii+=2){
@@ -514,7 +531,9 @@ int main(int argc, char *argv[]){
 	free(stddev_sec);
 	pdv_close(pdv_p);
 
-	printf("Exposure sequence is done\n");
+	if (verbose){
+		printf("Exposure sequence is done\n");
+	}
 	return EXIT_SUCCESS;
 
 }
