@@ -226,7 +226,7 @@ void strupp(char* lower)
 static void
 printUsageSyntax(char *prgname) {
    fprintf(stderr,
-	   "Star guider sequence.\n"
+	   "Canon 50M image acquisition sequence.\n"
 	   "Usage: %s <INPUT> <OUTPUT> [options...]\n"
 		"	-h, --help   display help message\n"
 		"	-f, --file   name of FITS file to be saved.\n"
@@ -262,10 +262,11 @@ int main(int argc, char *argv[]){
 	float  *stddev_img = NULL;
 	float  *stddev_sec = NULL;
 
-	u_char *coaddframe=NULL;
+	u_char *coaddframe = NULL;
 	float  nloops = 0;
 
-    char   *file=NULL;
+    char   *file = NULL;
+	char   *basename = NULL;
 	char   *unitstr = "0";
 	char   edt_devname[256];
     char   errstr[64];
@@ -274,11 +275,15 @@ int main(int argc, char *argv[]){
 
 	char etype_list[5][20]={"DARK","BIAS","FLAT","OBJECT","TEST"};
 
+	u_short *coaddshorts = NULL;
+	u_short pixel;
+
 	struct shutterArgs *args = (struct shutterArgs *)malloc(sizeof(struct shutterArgs));
-	//FILE *fp;
 
     double shutter_ts,start_ts,save_ts;
     double dtime;
+
+
 	/** Check the total number of the arguments */
 	struct option longopts[] = {
 	     {"file" ,0, NULL, 'f'},
@@ -433,7 +438,11 @@ int main(int argc, char *argv[]){
 	//    	exit(1);
 	//	}
     //}
-	
+
+	/* allocate the memory for coadding frames */
+	coaddframe = (u_char *)calloc(imagesize, sizeof(u_char));
+	coaddshorts= (u_short *)coaddframe;
+
 	args->time = exptime;
 	args->verbose = verbose;
 
@@ -449,8 +458,7 @@ int main(int argc, char *argv[]){
 	    	printf("buffer allocation FAILED (probably too many images specified)\n");
 	    	exit(1);
 		}
-		
-		
+			
 		image_p = pdv_wait_image(pdv_p);
 		
 		/*   Try to detecting the image shifting by calculating the stand deviation of 
@@ -468,7 +476,12 @@ int main(int argc, char *argv[]){
 		} 
 
 		memcpy(bufs[i], image_p, imagesize);
-		
+
+		for (ii=0;ii<imagesize;ii+=2){
+			
+			pixel = bufs[i][ii] | (bufs[i][ii+1] << 8);
+			coaddshorts[ii/2] += pixel;
+		}
 	}
 
 	dtime = edt_dtime();
@@ -486,43 +499,43 @@ int main(int argc, char *argv[]){
 	if (coadd){
 		if (verbose) printf("Coadding all frames.\n");
 
-		u_short *coaddshorts; /* alias. */
+		//u_short *coaddshorts; /* alias. */
 
-
-		coaddframe = (u_char *)calloc(imagesize, sizeof(u_char));
-		coaddshorts= (u_short *)coaddframe;
+		//coaddframe = (u_char *)calloc(imagesize, sizeof(u_char));
+		//coaddshorts= (u_short *)coaddframe;
 
 		//sprintf(string,"%s","coadd.fits");
 		sprintf(string,"%s",file);
 
-		for(i=0;i<nloops;i++) {
-			for (ii=0;ii<imagesize;ii+=2){
-			  u_short pixel;
+		//for(i=0;i<nloops;i++) {
+		//	for (ii=0;ii<imagesize;ii+=2){
+		//	  u_short pixel;
 
-			  pixel = bufs[i][ii] | (bufs[i][ii+1] << 8);
-			  coaddshorts[ii/2] += pixel;
-			}
-		}
+		//	  pixel = bufs[i][ii] | (bufs[i][ii+1] << 8);
+		//	  coaddshorts[ii/2] += pixel;
+		//	}
+		//}
 
 		WriteFitsImage(string, s_height, s_width, coaddframe, exptime);
 	} else {
-
-		i=0;
-		while(loops) {
+		basename = strtok(file, ".");
+		//printf("%i\n",strcmp(file,"-"));
+		for (i=0; i<loops; i++){
 			start_ts = getClockTime();
 
-			sprintf(string,"%s%04i%s",file,i+1,".fits");
-
+			if (strcmp(file,"-") == 0){
+				sprintf(string,"%s",file);
+			} else{
+				sprintf(string,"%s-%04i%s",basename,i+1,".fits");
+			}
+			
 			/*process and/or display image previously acquired here*/
-			WriteFitsImage(string, s_height, s_width,bufs[i], 800);
+			WriteFitsImage(string, s_height, s_width, bufs[i], 800);
 
 			if (verbose){
 				save_ts=getClockTime();;
 				fprintf(stdout,"%02i Image saving runtime = %f\n",i+1, save_ts-start_ts);
 			}
-
-			loops--;
-			i++;
 
 		}
 	}
