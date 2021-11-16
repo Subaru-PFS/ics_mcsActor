@@ -80,7 +80,7 @@ int OpenShutterTime(void* shutterArgs)
 	int i, outputData;
 	int res;
 	int time, verbose;
-	int delay = 700;
+	int delay = 70;
 
 	time = ((struct shutterArgs*)shutterArgs)->time;
 	verbose = ((struct shutterArgs*)shutterArgs)->verbose;
@@ -427,12 +427,13 @@ int main(int argc, char *argv[]){
 	stddev_img = (float *)malloc(100 * sizeof(float));
 	stddev_sec = (float *)malloc(100 * sizeof(float));
 
-    for (i=0; i<loops; i++){
-		if ((bufs[i] = edt_alloc(imagesize)) == NULL){
-	    	printf("buffer allocation FAILED (probably too many images specified)\n");
-	    	exit(1);
-		}
-    }
+    //for (i=0; i<loops; i++){
+	//	if ((bufs[i] = edt_alloc(imagesize)) == NULL){
+	//    	printf("buffer allocation FAILED (probably too many images specified)\n");
+	//    	exit(1);
+	//	}
+    //}
+	
 	args->time = exptime;
 	args->verbose = verbose;
 
@@ -444,6 +445,12 @@ int main(int argc, char *argv[]){
 	pdv_start_images(pdv_p, loops);
 
     for (i=0; i<loops; i++){
+		if ((bufs[i] = edt_alloc(imagesize)) == NULL){
+	    	printf("buffer allocation FAILED (probably too many images specified)\n");
+	    	exit(1);
+		}
+		
+		
 		image_p = pdv_wait_image(pdv_p);
 		
 		/*   Try to detecting the image shifting by calculating the stand deviation of 
@@ -461,18 +468,20 @@ int main(int argc, char *argv[]){
 		} 
 
 		memcpy(bufs[i], image_p, imagesize);
-    }
-
-
-    dtime = edt_dtime();
-	if (verbose){
-    	printf("Image reading finished with %f frames/sec\n",(double) (loops) / dtime);
+		
 	}
+
+	dtime = edt_dtime();
+	if (verbose){
+		printf("Image reading finished with %f frames/sec\n",(double) (loops) / dtime);
+	}
+    
 	
 	/* Finishing the shutter thread */
     if (exptime > 0){
     		pthread_join(id,NULL);
     }
+
 	/* Stacking frames if the flag is set */
 	if (coadd){
 		if (verbose) printf("Coadding all frames.\n");
@@ -518,6 +527,10 @@ int main(int argc, char *argv[]){
 		}
 	}
 
+	dtime = edt_dtime();
+	if (verbose){
+		printf("Time used to save image = %f second. \n", dtime);
+	}
 
 	/* Free imaeg blocks */
 	for (i=0; i<loops; i++){
