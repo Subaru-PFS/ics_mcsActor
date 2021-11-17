@@ -163,10 +163,10 @@ def writeCentroidsToDB(db, centroids, mcsFrameId):
     frame = np.zeros((sz[0], 9))
     frame[:, 0] = mcsFrameIDs
     frame[:, 1:] = centroids
-    frame[:, 8] = np.zeros((sz[0]))
     # column names
     columns = ['mcs_frame_id', 'spot_id', 'mcs_center_x_pix', 'mcs_center_y_pix', 'mcs_second_moment_x_pix',
-               'mcs_second_moment_y_pix', 'mcs_second_moment_xy_pix', 'bgvalue', 'peakvalue']
+               'mcs_second_moment_y_pix', 'peakvalue', 'bgvalue', 'mcs_second_moment_xy_pix']
+
     df = pd.DataFrame(frame, columns=columns)
     db.insert("mcs_data", df)
 
