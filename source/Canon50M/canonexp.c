@@ -233,6 +233,7 @@ printUsageSyntax(char *prgname) {
 		"	-e, --etype  exposure type [flat|object|dark|object].\n"
 		"	-t, --exptime  shutter time.\n"
 		"	-c, --coadd  produce a co-added image.\n"
+		"	-n, --noheader  write to stdout without header.\n"
 		"	-v, --verbose  turn on verbose.\n"
 		, prgname);
 
@@ -250,7 +251,7 @@ int main(int argc, char *argv[]){
 	int    verbose=0, loops;
 	int    i,ii;
 	int    exptime = 0;
-	int    ret;
+	int    ret, noheader = 0;
 	int    coadd = 0;
 	int    flag = 0;
 
@@ -290,6 +291,7 @@ int main(int argc, char *argv[]){
 	     {"exptime" ,0, NULL, 't'},
 	     {"etype" ,0, NULL, 'e'},
 	     {"coadd" ,0, NULL, 'c'},
+	     {"noheader" ,0, NULL, 'n'},
 		 {"verbose",0, NULL, 'v'},
 		 {"help", 0, NULL, 'h'},
 		 {0,0,0,0}};
@@ -311,6 +313,9 @@ int main(int argc, char *argv[]){
 	               break;
 			 case 'c':
 	               coadd = 1;
+	               break;
+			 case 'n':
+	               noheader = 1;
 	               break;
 	         case 'h':
 	               printUsageSyntax(argv[0]);
@@ -499,24 +504,30 @@ int main(int argc, char *argv[]){
 	if (coadd){
 		if (verbose) printf("Coadding all frames.\n");
 
-		//u_short *coaddshorts; /* alias. */
+		if (noheader){
+			if (verbose) printf("Skipping FITS headers.\n");
+			fwrite(coaddframe, sizeof(coaddframe), imagesize, stdout);
+        	fflush(stdout);
+		} else {
+			//u_short *coaddshorts; /* alias. */
 
-		//coaddframe = (u_char *)calloc(imagesize, sizeof(u_char));
-		//coaddshorts= (u_short *)coaddframe;
+			//coaddframe = (u_char *)calloc(imagesize, sizeof(u_char));
+			//coaddshorts= (u_short *)coaddframe;
 
-		//sprintf(string,"%s","coadd.fits");
-		sprintf(string,"%s",file);
+			//sprintf(string,"%s","coadd.fits");
+			sprintf(string,"%s",file);
 
-		//for(i=0;i<nloops;i++) {
-		//	for (ii=0;ii<imagesize;ii+=2){
-		//	  u_short pixel;
+			//for(i=0;i<nloops;i++) {
+			//	for (ii=0;ii<imagesize;ii+=2){
+			//	  u_short pixel;
 
-		//	  pixel = bufs[i][ii] | (bufs[i][ii+1] << 8);
-		//	  coaddshorts[ii/2] += pixel;
-		//	}
-		//}
+			//	  pixel = bufs[i][ii] | (bufs[i][ii+1] << 8);
+			//	  coaddshorts[ii/2] += pixel;
+			//	}
+			//}
 
-		WriteFitsImage(string, s_height, s_width, coaddframe, exptime);
+			WriteFitsImage(string, s_height, s_width, coaddframe, exptime);
+		}
 	} else {
 		basename = strtok(file, ".");
 		//printf("%i\n",strcmp(file,"-"));
