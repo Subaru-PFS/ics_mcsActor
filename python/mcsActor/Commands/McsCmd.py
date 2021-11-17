@@ -991,7 +991,7 @@ class McsCmd(object):
             centrePosPix = self.centrePos
 
         np.save("cpos.npy", centrePosPix)
-        self.findThresh, self.centThresh = mcsTools.getThresh(
+        self.findThresh, self.centThresh, self.avBack = mcsTools.getThresh(
             image, centrePosPix, 'full', self.centParms['threshSigma'], self.centParms['findSigma'], self.centParms['centSigma'])
 
         a1 = self.centParms['threshSigma']
@@ -1071,8 +1071,7 @@ class McsCmd(object):
         points[:, 0] = np.arange(nSpots)
         points[:, 1:] = centroids[:, 0:]
 
-        back=(self.findThresh*centParms['centSigma']-self.centThresh*centParms['findSigma'])/(centParms['centSigma']-centParms['findSigma'])
-        points[:,-1]=np.repeat(back,len(points))
+        points[:,-1]=np.repeat(self.avBack,len(points))
 
         # Swap last two fields
         points[:,[-1,-2]] = points[:,[-2,-1]]

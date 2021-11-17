@@ -894,6 +894,7 @@ def getThresh(image, cobraPos, threshMethod, sigmaThresh, findSigma, centSigma):
     returns
        threshFind: threshold for finding spots, in pixel values
        threshCent: threshold for centroiding spots, in pixel values
+       avBack: average background value
 
     """
 
@@ -920,7 +921,7 @@ def getThresh(image, cobraPos, threshMethod, sigmaThresh, findSigma, centSigma):
         threshFind = a.mean()+a.std()*findSigma
         threshCent = a.mean()+a.std()*centSigma
 
-        return threshFind, threshCent
+        return threshFind, threshCent, a.mean()
 
 
 def getManualThresh(image, xrange, yrange, sigmaThresh):
