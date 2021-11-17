@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
-import logging
 import cv2
+import logging
 import numpy as np
+from pfs.utils.coordinates import CoordTransp
 from pfs.utils import coordinates
 import pandas as pd
 import time
@@ -28,6 +29,7 @@ from opscore.utility.qstr import qstr
 
 import pfs.utils.coordinates.transform as transformUtils
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
+from scipy.spatial import cKDTree
 
 import psycopg2
 import psycopg2.extras
@@ -45,6 +47,7 @@ from importlib import reload
 reload(dbTools)
 reload(mcsTools)
 
+reload(CoordTransp)
 
 class McsCmd(object):
 
@@ -60,6 +63,7 @@ class McsCmd(object):
 
         self.findThresh = None
         self.centThresh = None
+        self.cMethod = 'win'
 
         # self.setCentroidParams(None)
         self.adjacentCobras = None
@@ -67,7 +71,6 @@ class McsCmd(object):
         self.geomFile = None
         self.dotFile = None
         self.fibreMode = 'full'
-        self.centParms = None
 
         logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
                             datefmt="%Y-%m-%dT%H:%M:%S")
@@ -80,7 +83,6 @@ class McsCmd(object):
         # associated methods when matched. The callbacks will be
         # passed a single argument, the parsed and typed command.
         #
-
         self.vocab = [
             ('ping', '', self.ping),
             ('status', '', self.status),
@@ -88,7 +90,7 @@ class McsCmd(object):
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose',
                 'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot] '
-                '[@newField] <cMethod>', self.expose),
+                '[@newField]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
@@ -99,6 +101,7 @@ class McsCmd(object):
             ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
             ('switchFibreMode', '<fibreMode>', self.switchFibreMode),
+            ('switchCMethod', '<centMode>', self.switchCMethod),
             ('resetGeometry', '', self.resetGeometry),
             ('resetGeometryFile', '<geomFile>', self.resetGeometryFile)
         ]
@@ -136,9 +139,10 @@ class McsCmd(object):
                                         keys.Key("threshMode", types.Float(), help="mode for threshold"),
                                         keys.Key("geomFile", types.String(), help="file for geometry"),
                                         keys.Key("dotFile", types.String(), help="file for dot information"),
-                                        keys.Key("cMethod", types.String(), help="method to use for centroiding (win, sep)"),
                                         keys.Key("fieldID", types.String(),
                                                  help="fieldID for getting instrument parameters"),
+                                        keys.Key("cMethod", types.String(),
+                                                 help="method for centroiding (of 'win', 'cent', default 'win')"),
                                         keys.Key("fibreMode", types.String(),
                                                  help="flag for testing different inputs")
                                         )
@@ -536,12 +540,8 @@ class McsCmd(object):
         else:
             dotmask = None
 
-        cMethod = "win"
-        if 'cMethod' in cmdKeys:
-            cMethod = cmdKeys['cMethod'].values[0]
-            
         cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID}')
-
+        
         # get frame ID if explicitly set, otherise reset
         expType = cmdKeys[0].name
         if 'frameId' in cmdKeys:
@@ -579,36 +579,37 @@ class McsCmd(object):
         cmd.inform('text="loading geometry"')
         self.getGeometry(cmd)
 
-        
         # if the centroid flag is set
         if doCentroid:
+
             # connect to DB
             db = self.connectToDB(cmd)
 
+            cmd.inform('text="Setting centroid parameters." ')
+            self.setCentroidParams(cmd)
+
+            if self.findThresh is None:
+                cmd.inform('text="Calculating threshold." ')
+                self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
+
             cmd.inform('text="Running centroid on current image" ')
-            
-            if(cMethod == 'sep'):
+
+            # switch for different centorid methods. Call with switchCMethod
+            if(self.cMethod == 'sep'):
                 self.runCentroidSEP(cmd)
-                
+                self.dumpCentroidtoDB(cmd, frameId)
+
             else:
-                if(self.centParms == None):
-                    cmd.inform('text="Setting centroid parameters." ')
-                    self.setCentroidParams(cmd)
-
-                if self.findThresh is None:
-                    cmd.inform('text="Calculating threshold." ')
-                    self.calcThresh(cmd, frameId, self.centParms)
-
-                self.runCentroid(cmd)
+                self.runCentroid(cmd, self.centParms)
+                self._writeCentroidsToDB(cmd, frameId)
 
             cmd.inform('text="Sending centroid data to database" ')
-            self.dumpCentroidtoDB(cmd, frameId)
 
         # do the fibre identification
         if doFibreID:
         
-            #cmd.inform('text="zenith angle=%s"'%(zenithAngle))
-            #cmd.inform('text="instrument rotation=%s"'%(insRot))
+            cmd.inform('text="zenith angle=%s"'%(zenithAngle))
+            cmd.inform('text="instrument rotation=%s"'%(insRot))
             
             # Get last two degits of frameID
             iterNum = frameId % 100
@@ -622,26 +623,21 @@ class McsCmd(object):
 
             if enableEasyID:
                 if newField:
-                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
+                    self.establishTranform(cmd, 90-zenithAngle, insRot, frameId)
                 
                 self.easyFiberID(cmd, frameId)
 
             else:
             # read FF from the database, get list of adjacent fibres if they haven't been calculated yet.
-
-                if newField:
-                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
-                
                 if(self.adjacentCobras == None):
-                    # on the first call, set up the global parameters
                     adjacentCobras = mcsTools.makeAdjacentList(self.centrePos[:, 1:3], self.armLength)
                     cmd.inform(f'text="made adjacent lists"')
 
-                #transform centroid values to mm, in place to maintain structure of array
-                self.centroids[:,1],self.centroids[:,2]=self.pfiTrans.mcsToPfi(self.centroids[:,1],self.centroids[:,2])
-                
+                #transform centroids to MM
+                #self.transformations(cmd, frameId, zenithAngle, insRot)
+
                 # fibreID
-                self.fibreID(cmd, frameId)
+                self.fibreID(cmd, frameId, zenithAngle, insRot)
 
         cmd.inform(f'frameId={frameId}; filename={filename}')
 
@@ -674,6 +670,12 @@ class McsCmd(object):
         self.fibreMode = cmdKeys['fibreMode'].values[0]
         cmd.inform(f'text="fibreMode = {self.fibreMode}"')
         cmd.finish('switchFibreMode=done')
+             
+    def switchCMethod(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+        self.cMethod = cmdKeys['cMethod'].values[0]
+        cmd.inform(f'text="cMethod = {self.cmethod}"')
+        cmd.finish('switchCMethod=done')
 
     def resetGeometry():
         """
@@ -713,6 +715,89 @@ class McsCmd(object):
 
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
+=======
+        if(self.fibreMode == "asrd"):
+
+            """
+            asrd mode, all in pixels, no fiducial fibres
+            """
+
+            #not used
+            self.offset = [0, 0]
+            cmd.inform(f'text="offset={self.offset[0]},{self.offset[1]}"')
+
+            # boresight centre in pixels
+            self.rotCent = dbTools.loadBoresightFromDB(db, int(self.visitId))
+            cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
+
+            # read xmlFile
+            #where is inst_data
+
+            instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
+            if(self.geomFile == None):
+                self.geomFile = os.path.join('/data/MCS/20210910_002/output/2021-09-15-theta_newproj.xml')
+            if(self.dotFile == None):
+                self.dotFile = os.path.join(
+                    instPath, "data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
+
+            cmd.inform(f'text="{instPath} {self.geomFile} {self.dotFile}"')
+
+            # xmlFile="/Users/karr/Science/PFS/cobraData/Full2D/20210219_002/output/ALL_new.xml"
+            # dotFile="/Users/karr/software/mhs/products/DarwinX86/pfs_instdata/1.0.1/data/pfi/dot_measurements_20210428_el90_rot+00_ave.csv"
+            cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
+
+            self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.pfic = mcsTools.readCobraGeometry(
+                self.geomFile, self.dotFile)
+            cmd.inform('text="cobra geometry read"')
+
+        elif(self.fibreMode == "full"):
+
+            # check this value
+            self.offset = [0, 0]
+            cmd.inform(f'text="offset={self.offset[0]},{self.offset[1]}"')
+
+            # boresight centre in pixels
+            self.rotCent = dbTools.loadBoresightFromDB(db, int(self.visitId))
+            cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
+
+            # read xmlFile
+            instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
+            if(self.geomFile == None):
+                self.geomFile = os.path.join(instPath, 'data/pfi/modules/ALL/ALL_final_20210920_mm.xml')
+            if(self.dotFile == None):
+                self.dotFile = os.path.join(
+                    instPath, "data/pfi/dot/black_dots_mm.csv")
+
+            cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
+            self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.calibModel = mcsTools.readCobraGeometry(
+                self.geomFile, self.dotFile)
+            cmd.inform('text="cobra geometry read"')
+            self.geometrySet = True
+
+        elif(self.fibreMode == "comm"):
+
+            """
+            commissioning mode, full version with fake fiducial fibres, no cobra movemnet, fake arms
+            """
+
+            # offset of pinhole mask from center of instrument
+            self.offset = [0, -85]
+
+            cmd.inform(f'text="offset={self.offset[0]},{self.offset[1]}"')
+
+            # boresight centre, in pixels
+            self.rotCent = dbTools.loadBoresightFromDB(db, int(self.visitId))
+
+            cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
+
+            # get fake geometry
+            self.centrePos, self.armLength, self.dotPos, self.goodIdx = mcsTools.readCobraGeometryFake()
+            cmd.inform('text="cobra geometry read"')
+
+        cmd.inform('text="fiducial fibres read"')
+
+    def establishTranform(self, cmd, altitude, insrot, frameID):
+>>>>>>> 398a0f9 (tidied and checked edits)
         butler = Butler(configRoot=os.path.join(os.environ["PFS_INSTDATA_DIR"], "data"))
 
         # Read fiducial and spot geometry
@@ -754,7 +839,7 @@ class McsCmd(object):
 =======
     def transformations(self, cmd, frameId, zenithAngle, insRot):
         
-        # this routine should now be redundant, delete later!!
+        # two caes here, the full mm version, and the asrd pixel version, with no ff
         cmd.inform(f'text="fibreMode {self.fibreMode}"')
 
         if(self.fibreMode == 'comm'):
@@ -786,8 +871,11 @@ class McsCmd(object):
 
             self.centroidsMMTrans = self.centroids
 
+<<<<<<< HEAD
 
 >>>>>>> 1ae1940 (commits need to be done *after* saving changes.)
+=======
+>>>>>>> 398a0f9 (tidied and checked edits)
     def easyFiberID(self, cmd, frameId):
         reload(calculation)
         
@@ -847,19 +935,22 @@ class McsCmd(object):
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
 
 
-    def fibreID(self, cmd, frameId):
-
-        # if the iteration is the first, the previous position is the home position
-        if(frameId % 100 == 1):
-            self.prevPos = self.centrePos
+    def fibreID(self, cmd, frameId, zenithAngle, insRot):
 
         db = self.connectToDB(cmd)
 
-        # load targets from the database
-        tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
-        cmd.inform(f'text="loaded target postitions from DB"')
+        # if the iteration is the first, the previous position is the home position
+        if(frameId % 100 == 0):
+            self.prevPos = self.centrePos
 
-        #run the matching routine
+        #transform the coordinates to mm in place
+        self.centroids[:,1], self.centroids[:,2] = self.pfiTrans.mcsToPfi(self.centroids[:,1],self.centroids[:,2])
+        
+        # load target positions
+        tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
+
+        # do the identification
+        cmd.inform(f'text="loaded target postitions from DB"')
         cobraMatch = mcsTools.fibreID(self.pfic, self.centroids, tarPos, self.centrePos,
                                          self.armLength, self.prevPos, self.dotPos, self.adjacentCobras)
         cmd.inform(f'text="identified fibres"')
@@ -923,7 +1014,7 @@ class McsCmd(object):
 
         self._writeTelescopeInfo(cmd, telescopeInfo)
 
-    def calcThresh(self, cmd, frameId, centParms):
+    def calcThresh(self, cmd, frameId, zenithAngle, insRot, centParms):
         """  Calculate thresholds for finding/centroiding from image 
 
         3 methods: fieldID uses the known system geometry to figure out the right region
@@ -935,8 +1026,26 @@ class McsCmd(object):
         image = self.actor.image
         db = self.connectToDB(cmd)
 
-        self.findThresh, self.centThresh = mcsTools.getThresh(
-            image, self.rotCent, 'full', self.centParms['threshSigma'], self.centParms['findSigma'], self.centParms['centSigma'])
+        cmd.inform(f'text="loading telescope parameters for frame={frameId} '
+            f'with fibreMode={self.fibreMode} at z={zenithAngle} rot={insRot}"')
+
+        # zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
+        #cmd.diag(f'text="zenithAngle={zenithAngle}, insRot={insRot}"')
+
+        # different transforms for different setups: with and w/o field elements
+        if(self.fibreMode == 'full'):
+            #centrePosPix = mcsTools.transformToPix(
+            #    self.centrePos, self.rotCent, self.offset, zenithAngle, insRot, fieldElement=True, pixScale=0)
+            centrePosPix =self.centrePos
+        elif(self.fibreMode == 'comm'):
+            centrePosPix = mcsTools.transformToPix(
+                self.centrePos, self.rotCent, self.offset, zenithAngle, insRot, fieldElement=False, pixScale=0)
+        elif(self.fibreMode == 'asrd'):
+            centrePosPix = self.centrePos
+
+        np.save("cpos.npy", centrePosPix)
+        self.findThresh, self.centThresh, self.avBack = mcsTools.getThresh(
+            image, centrePosPix, 'full', self.centParms['threshSigma'], self.centParms['findSigma'], self.centParms['centSigma'])
 
         a1 = self.centParms['threshSigma']
         a2 = self.centParms['findSigma']
