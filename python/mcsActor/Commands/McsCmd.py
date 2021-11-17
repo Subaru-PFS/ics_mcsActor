@@ -482,7 +482,6 @@ class McsCmd(object):
             imgHdr = pyfits.Header()
         imgHdu = pyfits.CompImageHDU(image.astype('uint16'), name='IMAGE', compression_type='RICE_1')
 
-        #imgHdu = pyfits.PrimaryHDU(image.astype('uint16'))
         imgHdu.header.extend(imgHdr)
         hduList = pyfits.HDUList([phdu, imgHdu])
 
@@ -531,12 +530,11 @@ class McsCmd(object):
         doFibreID = 'doFibreID' in cmdKeys
         newField = 'newField' in cmdKeys
 
-        simDotArg = 'simDot' in cmdKeys
-        if simDotArg:
-            simDot = True
+        simDot = 'simDot' in cmdKeys
+        if simDot:
             dotmask = self._makeDotMask(cmd)
         else:
-            simDot = False
+            dotmask = None
 
         cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID}')
 
@@ -557,10 +555,7 @@ class McsCmd(object):
             self.actor.camera.setExposureTime(cmd, expTime)
 
         cmd.inform('text="Exposure time now is %d ms." ' % (expTime))
-        if simDot is True:
-            filename, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
-        else:
-            filename, image = self._doExpose(cmd, expTime, expType, frameId)
+        filename, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
 
         if frameId is None:
             filename = pathlib.Path(filename)
