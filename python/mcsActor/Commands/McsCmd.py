@@ -36,11 +36,10 @@ import psycopg2.extras
 from xml.etree.ElementTree import dump
 from procedures.moduleTest import calculation
 
-
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
-from pfs.utils.butler import Butler
+from pfs.utils import butler
 
 from opdb import opdb
 
@@ -76,8 +75,7 @@ class McsCmd(object):
                             datefmt="%Y-%m-%dT%H:%M:%S")
         self.logger = logging.getLogger('mcscmd')
         self.logger.setLevel(logging.INFO)
-
-
+        self.butler = butler.Butler()
 
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -262,14 +260,14 @@ class McsCmd(object):
         cmd.inform('text="returning simulation file %s"' % (imagePath))
         return imagePath, image, targets
 
-    def requestNextFilename(self, cmd, frameId):
-        """ Return a queue which will eventually contain a filename. """
+    def requestNextFileIds(self, cmd, frameId):
+        """ Return a queue which will eventually contain our fileIda. """
 
         q = queue.Queue()
         cmd.inform('text="frameIds = %s." '%{frameId})
 
         def worker(q=q, cmd=cmd):
-            filename = self.getNextFilename(cmd, frameId)
+            filename = self.getNextFileIds(cmd, frameId)
             q.put(filename)
             q.task_done()
 
@@ -279,10 +277,19 @@ class McsCmd(object):
 
         return q
 
-    def getNextFilename(self, cmd, frameId):
-        """ Fetch next image filename. 
+    def getNextFileIds(self, cmd, frameId):
+        """ Fetch next image filename components
 
-        In real life, we will instantiate a Subaru-compliant image pathname generating object.  
+        Args
+        ----
+        cmd : MHS Command
+          who to report to
+        frameId : `int`
+          The full, 8-digit frame number. Or None if we should fetch a new one.
+
+        Returns
+        -------
+        fileIds : dictionary of ids sufficient for butler.getPath('mcsFile')
 
         """
 
@@ -291,25 +298,26 @@ class McsCmd(object):
             if ret.didFail:
                 raise RuntimeError("getNextFilename failed getting a visit number in 15s!")
             visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
-            frameId = visit * 100
-
+            subframeId = 0
             cmd.inform(f'text="gen2.getVisit = {visit}"')
         else:
-            if False:           # Need to make this async for safety.
-                ret = self.actor.cmdr.call(actor='gen2', cmdStr='updateTelStatus caller=mcs', timeLim=15.0)
-                if ret.didFail:
-                    raise RuntimeError("getNextFilename failed getting a visit number in 15s!")
+            visit = frameId // 100
+            subframeId = frameId % 100
 
-        # CPL -- switch to some ics.utils function
-        path = os.path.join('/data/raw', time.strftime('%Y-%m-%d', time.gmtime()), 'mcs')
-        path = os.path.expandvars(os.path.expanduser(path))
-        if not os.path.isdir(path):
-            os.makedirs(path, 0o755, exist_ok=True)
+            t0 = time.time()
+            ret = self.actor.cmdr.call(actor='gen2', cmdStr='updateTelStatus caller=mcs', timeLim=5.0)
+            if ret.didFail:
+                raise RuntimeError("getNextFilename failed updating telesceop status in 15s!")
+            t1 = time.time()
+            if t1-t0 >= 2:
+                cmd.warn(f'text="it took {t1-t0:0.2f}s to update telescope status"')
 
-        newpath = os.path.join(path, 'PFSC%08d.fits' % (frameId))
-        cmd.inform(f'text="newpath={newpath}"')
+        idDict = dict(pfsDay=self.butler.getPfsDay(),
+                      visit=visit,
+                      frame=subframeId,
+                      frameId=frameId)
 
-        return newpath
+        return idDict
 
     def _getInstHeader(self, cmd):
         """ Gather FITS cards from all actors we are interested in. """
@@ -343,8 +351,6 @@ class McsCmd(object):
         # Subaru rules
         if expType == 'object':
             expType = 'acquisition'
-
-        frameId = os.path.splitext(os.path.basename(filename))[0]
 
         hdr = pyfits.Header()
 
@@ -430,7 +436,7 @@ class McsCmd(object):
     def _doExpose(self, cmd, expTime, expType, frameId, mask=None):
         """ Take an exposure and save it to disk. """
 
-        nameQ = self.requestNextFilename(cmd, frameId)
+        fileIdsQ = self.requestNextFileIds(cmd, frameId)
         cmd.diag(f'text="new exposure"')
         expStart = time.time()
         if self.simulationPath is None:
@@ -441,11 +447,16 @@ class McsCmd(object):
         cmd.inform(f'text="done: image shape = {image.shape}"')
 
         try:
-            filename = nameQ.get(timeout=5.0)
+            fileIds = fileIdsQ.get(timeout=15.0)
         except queue.Empty:
             cmd.warn('text="failed to get a new filename in time"')
 
-        frameId = int(pathlib.Path(filename).stem[4:], base=10)
+        frameId = fileIds['frameId']
+        filename = self.butler.getPath('mcsFile', **fileIds)
+        pathdir = filename.parent
+        if not os.path.isdir(pathdir):
+            os.makedirs(pathdir, 0o755, exist_ok=True)
+        cmd.inform(f'text="newpath={filename}"')
 
         # Now, after getting the filename, get predicted locations
         if self.simulationPath is not None:
@@ -488,9 +499,9 @@ class McsCmd(object):
         pHdr.set('EXTEND', comment='Presence of FITS Extension')
 
         hduList.writeto(filename, checksum=True, overwrite=True)
-        cmd.inform(f'filename={filename}')
         cmd.inform(f'text="write image to filename={filename}"')
 
+        cmd.inform(f'mcsFileIds={fileIds["pfsDay"]},{fileIds["visit"]},{fileIds["frame"]}')
         return filename, image
 
     def resetThreshold(self, cmd):
@@ -625,7 +636,6 @@ class McsCmd(object):
                 # fibreID
                 self.fibreID(cmd, frameId, zenithAngle, insRot)
 
-            
         cmd.inform(f'frameId={frameId}; filename={filename}')
 
         # if doFibreID:
@@ -758,10 +768,8 @@ class McsCmd(object):
         cmd.inform('text="fiducial fibres read"')
 
     def establishTranform(self, cmd, altitude, insrot, frameID):
-        butler = Butler(configRoot=os.path.join(os.environ["PFS_INSTDATA_DIR"], "data"))
-
         # Read fiducial and spot geometry
-        fids = butler.get('fiducials')
+        fids = self.butler.get('fiducials')
 
         db=opdb.OpDB(hostname='db-ics', port=5432,
                    dbname='opdb',
