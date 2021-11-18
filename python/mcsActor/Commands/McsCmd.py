@@ -400,13 +400,6 @@ class McsCmd(object):
 
         return hdr
 
-    def _writeCentroidsToDB(self, cmd, frameId):
-        """write centroids to database"""
-
-        db = self.connectToDB(cmd)
-        dbTools.writeCentroidsToDB(db, self.centroids, int(frameId))
-        cmd.inform(f'text="Centroids of exposure ID {frameId} populated"')
-
     def _makeImageHeader(self, cmd):
         """ Create a complete WCS header.
 
@@ -597,12 +590,12 @@ class McsCmd(object):
             # switch for different centorid methods. Call with switchCMethod
             if(self.cMethod == 'sep'):
                 self.runCentroidSEP(cmd)
-                self.dumpCentroidtoDB(cmd, frameId)
-
             else:
                 self.runCentroid(cmd, self.centParms)
-                self._writeCentroidsToDB(cmd, frameId)
 
+            # dumpCentroidtoDB
+            self.dumpCentroidtoDB(cmd, frameId)
+            
             cmd.inform('text="Sending centroid data to database" ')
 
         # do the fibre identification
@@ -711,88 +704,6 @@ class McsCmd(object):
             self.geomFile, self.dotFile)
         cmd.inform('text="cobra geometry read"')
         self.geometrySet = True
-
-    def establishTransform(self, cmd, altitude, insrot, frameID):
-
-        if(self.fibreMode == "asrd"):
-
-            """
-            asrd mode, all in pixels, no fiducial fibres
-            """
-
-            #not used
-            self.offset = [0, 0]
-            cmd.inform(f'text="offset={self.offset[0]},{self.offset[1]}"')
-
-            # boresight centre in pixels
-            self.rotCent = dbTools.loadBoresightFromDB(db, int(self.visitId))
-            cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
-
-            # read xmlFile
-            #where is inst_data
-
-            instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
-            if(self.geomFile == None):
-                self.geomFile = os.path.join('/data/MCS/20210910_002/output/2021-09-15-theta_newproj.xml')
-            if(self.dotFile == None):
-                self.dotFile = os.path.join(
-                    instPath, "data/pfi/dot/dot_measurements_20210428_el30_rot+00_ave.csv")
-
-            cmd.inform(f'text="{instPath} {self.geomFile} {self.dotFile}"')
-
-            # xmlFile="/Users/karr/Science/PFS/cobraData/Full2D/20210219_002/output/ALL_new.xml"
-            # dotFile="/Users/karr/software/mhs/products/DarwinX86/pfs_instdata/1.0.1/data/pfi/dot_measurements_20210428_el90_rot+00_ave.csv"
-            cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
-
-            self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.pfic = mcsTools.readCobraGeometry(
-                self.geomFile, self.dotFile)
-            cmd.inform('text="cobra geometry read"')
-
-        elif(self.fibreMode == "full"):
-
-            # check this value
-            self.offset = [0, 0]
-            cmd.inform(f'text="offset={self.offset[0]},{self.offset[1]}"')
-
-            # boresight centre in pixels
-            self.rotCent = dbTools.loadBoresightFromDB(db, int(self.visitId))
-            cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
-
-            # read xmlFile
-            instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
-            if(self.geomFile == None):
-                self.geomFile = os.path.join(instPath, 'data/pfi/modules/ALL/ALL_final_20210920_mm.xml')
-            if(self.dotFile == None):
-                self.dotFile = os.path.join(
-                    instPath, "data/pfi/dot/black_dots_mm.csv")
-
-            cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
-            self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.calibModel = mcsTools.readCobraGeometry(
-                self.geomFile, self.dotFile)
-            cmd.inform('text="cobra geometry read"')
-            self.geometrySet = True
-
-        elif(self.fibreMode == "comm"):
-
-            """
-            commissioning mode, full version with fake fiducial fibres, no cobra movemnet, fake arms
-            """
-
-            # offset of pinhole mask from center of instrument
-            self.offset = [0, -85]
-
-            cmd.inform(f'text="offset={self.offset[0]},{self.offset[1]}"')
-
-            # boresight centre, in pixels
-            self.rotCent = dbTools.loadBoresightFromDB(db, int(self.visitId))
-
-            cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
-
-            # get fake geometry
-            self.centrePos, self.armLength, self.dotPos, self.goodIdx = mcsTools.readCobraGeometryFake()
-            cmd.inform('text="cobra geometry read"')
-
-        cmd.inform('text="fiducial fibres read"')
 
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
