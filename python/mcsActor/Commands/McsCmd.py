@@ -711,7 +711,6 @@ class McsCmd(object):
             self.geomFile, self.dotFile)
         cmd.inform('text="cobra geometry read"')
         self.geometrySet = True
->>>>>>> 4b94f2f (updated fibre identification and thresholding to work with new transformation class.)
 
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
@@ -797,7 +796,6 @@ class McsCmd(object):
         cmd.inform('text="fiducial fibres read"')
 
     def establishTranform(self, cmd, altitude, insrot, frameID):
->>>>>>> 398a0f9 (tidied and checked edits)
         butler = Butler(configRoot=os.path.join(os.environ["PFS_INSTDATA_DIR"], "data"))
 
         # Read fiducial and spot geometry
@@ -835,8 +833,6 @@ class McsCmd(object):
         self.geomFile = cmd.cmd.keywords["geomFile"].values[0]
         cmd.inform(f'text="geometry file set to {self.geomFile}"')
 
-<<<<<<< HEAD
-=======
     def transformations(self, cmd, frameId, zenithAngle, insRot):
         
         # two caes here, the full mm version, and the asrd pixel version, with no ff
@@ -871,11 +867,6 @@ class McsCmd(object):
 
             self.centroidsMMTrans = self.centroids
 
-<<<<<<< HEAD
-
->>>>>>> 1ae1940 (commits need to be done *after* saving changes.)
-=======
->>>>>>> 398a0f9 (tidied and checked edits)
     def easyFiberID(self, cmd, frameId):
         reload(calculation)
         
