@@ -714,7 +714,6 @@ class McsCmd(object):
 
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
-=======
         if(self.fibreMode == "asrd"):
 
             """
