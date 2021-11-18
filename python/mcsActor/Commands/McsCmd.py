@@ -101,7 +101,7 @@ class McsCmd(object):
             ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
             ('switchFibreMode', '<fibreMode>', self.switchFibreMode),
-            ('switchCMethod', '<centMode>', self.switchCMethod),
+            ('switchCMethod', '<cMethod>', self.switchCMethod),
             ('resetGeometry', '', self.resetGeometry),
             ('resetGeometryFile', '<geomFile>', self.resetGeometryFile)
         ]
@@ -1150,14 +1150,14 @@ class McsCmd(object):
             mcs_camera_id = 0
         if self.actor.cameraName == 'rmod_71m':
             mcs_camera_id = 1
-        if self.cMethod = 'win':
+        if self.cMethod == 'win':
             measurement_algorithm = "'windowed'"
-        if self.cMethod = 'sep':
+        if self.cMethod == 'sep':
             measurement_algorithm = "'sep'"
         version_actor = '0'
         version_instdata = '0'
 
-        line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%d,%s,%s,%s,%s,%s' % (telescopeInfo['frameid'],
+        line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%s,%s,%d,%s,%s,%s' % (telescopeInfo['frameid'],
                                                                        telescopeInfo['visitid'],
                                                                        telescopeInfo['exptime']/1000.0,
                                                                        telescopeInfo['altitude'],
@@ -1167,30 +1167,13 @@ class McsCmd(object):
                                                                        dome_pressure, dome_humidity,
                                                                        outside_temperature, outside_pressure,
                                                                        outside_humidity,
-                                                                       mcs_cover_temperature,
-                                                                             mcs_m1_temperature, mcs_camera_id,
+                                                                       mcs_cover_temperature,mcs_m1_temperature,
+                                                                       taken_at, taken_in_hst_at,
+                                                                       mcs_camera_id,
                                                                              measurement_algorithm,
-                                                                             version_actor, version_instdata,
-                                                                       taken_at, taken_in_hst_at)
+                                                                             version_actor, version_instdata)
                                                                         
 
-        #line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%s,%s,%d,%s' % (telescopeInfo['frameid'],
-        #                                                               telescopeInfo['visitid'],
-        #                                                               telescopeInfo['exptime']/1000.0,
-        #                                                               telescopeInfo['altitude'],
-        #                                                               telescopeInfo['azimuth'],
-        #                                                               telescopeInfo['instrot'],
-        #                                                               adc_pa, dome_temperature,
-        #                                                               dome_pressure, dome_humidity,
-        #                                                               outside_temperature, outside_pressure,
-        #                                                               outside_humidity,
-        #                                                               mcs_cover_temperature,
-        #                                                                     mcs_m1_temperature, mcs_camera_id,
-        #                                                                     measurement_algorithm,
-        #                                                                     version_actor, version_instdata,
-        #                                                               taken_at, taken_in_hst_at,
-        #                                                                     mcs_camera_id)
-        #
         buf = io.StringIO()
         buf.write(line)
         buf.seek(0, 0)
