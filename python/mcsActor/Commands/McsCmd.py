@@ -623,7 +623,7 @@ class McsCmd(object):
 
             if enableEasyID:
                 if newField:
-                    self.establishTranform(cmd, 90-zenithAngle, insRot, frameId)
+                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
                 
                 self.easyFiberID(cmd, frameId)
 
@@ -794,8 +794,7 @@ class McsCmd(object):
 
         cmd.inform('text="fiducial fibres read"')
 
-    def establishTranform(self, cmd, altitude, insrot, frameID):
-        butler = Butler(configRoot=os.path.join(os.environ["PFS_INSTDATA_DIR"], "data"))
+    def establishTransform(self, cmd, altitude, insrot, frameID):
 
         # Read fiducial and spot geometry
         fids = self.butler.get('fiducials')
