@@ -94,7 +94,7 @@ class mcsCamera(Camera):
 
             expType = 'flat'
             p = sub.Popen(['canonexp', '-e', expType, '-f', slicename, '-t', str(expTime), '-c'],
-                          cmd=self.coaddDir, bufsize=1, stdout=sub.PIPE, stderr=sub.PIPE)
+                          cwd=self.coaddDir, bufsize=1, stdout=sub.PIPE, stderr=sub.PIPE)
             output, errors = p.communicate()
             cmd.inform('text="taking exposure"')
 
