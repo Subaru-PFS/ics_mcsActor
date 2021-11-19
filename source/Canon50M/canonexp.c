@@ -287,16 +287,16 @@ int main(int argc, char *argv[]){
 
 	/** Check the total number of the arguments */
 	struct option longopts[] = {
-	     {"file" ,0, NULL, 'f'},
-	     {"exptime" ,0, NULL, 't'},
-	     {"etype" ,0, NULL, 'e'},
+	     {"file" ,1, NULL, 'f'},
+	     {"exptime" ,1, NULL, 't'},
+	     {"etype" ,1, NULL, 'e'},
 	     {"coadd" ,0, NULL, 'c'},
 	     {"noheader" ,0, NULL, 'n'},
 		 {"verbose",0, NULL, 'v'},
 		 {"help", 0, NULL, 'h'},
 		 {0,0,0,0}};
 
-	while((opt = getopt_long(argc, argv, "e:f:l:t:vhc",
+	while((opt = getopt_long(argc, argv, "ne:f:l:t:vhc",
 	   longopts, NULL))  != -1){
 	      switch(opt) {
 	         case 'e':
@@ -506,7 +506,7 @@ int main(int argc, char *argv[]){
 
 		if (noheader){
 			if (verbose) printf("Skipping FITS headers.\n");
-			fwrite(coaddframe, sizeof(coaddframe), imagesize, stdout);
+			fwrite(coaddframe, sizeof(u_char), imagesize, stdout);
         	fflush(stdout);
 		} else {
 			//u_short *coaddshorts; /* alias. */
