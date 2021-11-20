@@ -716,9 +716,18 @@ class McsCmd(object):
         mcsData = db.bulkSelect('mcs_data',f'select spot_id, mcs_center_x_pix, mcs_center_y_pix '
                 f'from mcs_data where mcs_frame_id = {frameID}')
 
-        pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, altitude=altitude, insrot=insrot)
-        for i in range(3):
-            pfiTransform.updateTransform(mcsData, fids, matchRadius=3.2,nMatchMin=0.2)
+        pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, 
+            altitude=altitude, insrot=insrot)
+        
+        outerRing = np.empty(len(fids), dtype=bool)
+        for i in [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]:
+            outerRing[fids.fiducialId == i] = True
+        
+        pfiTransform.updateTransform(mcsData, fids[outerRing], matchRadius=8.0, nMatchMin=0.1)
+        #pfiTransform.updateTransform(mcsData, fids, matchRadius=4.0, nMatchMin=0.1)
+        
+        for i in range(2):
+            pfiTransform.updateTransform(mcsData, fids, matchRadius=4.2,nMatchMin=0.1)
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
 
         self.pfiTrans = pfiTransform

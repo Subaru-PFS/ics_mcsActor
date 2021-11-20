@@ -19,7 +19,7 @@ class mcsCamera(Camera):
         self.readNoise = 5.0
         self.name = 'Canon_50M'
         self.expTime = 0
-        self.coaddDir = '/tmp'
+        self.coaddDir = '/tmp/'
 
     def _readoutTime(self):
         return 0.5
@@ -109,11 +109,12 @@ class mcsCamera(Camera):
             # Command camera to do exposure sequence
             slicename = filename[0:33]+'_'
             cmd.inform('text="slice name: %s"' % (slicename))
-            p = sub.Popen(['canonexp', '-f', slicename, '-t', str(expTime), '-c'],
+            p = sub.Popen(['canonexp', '-e', expType,'-f', slicename, '-t', str(expTime), '-c'],
                           cwd=self.coaddDir, bufsize=1, stdout=sub.PIPE, stderr=sub.PIPE)
             output, errors = p.communicate()
             t2 = time.time()
 
+            cmd.inform(f'Path="{self.coaddDir}"')
         if (output == 'Exposure sequence is done'):
             cmd.inform('exposureState="done"')
 
