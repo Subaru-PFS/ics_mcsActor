@@ -134,7 +134,7 @@ int WriteFitsImage(char *filename, int height, int width, u_char * image_p, int 
     fits_create_file(&fptr, filename, &status); /* create new FITS file */
     if (status != 0) {
     	fprintf(stderr, "Error: (%s:%s:%d) can not get create image %s in disk "
-    			".\n", __FILE__, __func__, __LINE__,filenmae);
+    			".\n", __FILE__, __func__, __LINE__,filename);
     	exit(1);
     }
 
