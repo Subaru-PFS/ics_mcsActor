@@ -21,7 +21,7 @@ values:
   fwhmy: 0
   matchRad: 20
   maxIt: 20
-  nmax: 90
+  nmax: 250
   nmin: 10
   threshFact: 4
   threshMode: full
