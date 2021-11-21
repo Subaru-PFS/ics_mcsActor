@@ -630,17 +630,11 @@ class McsCmd(object):
                     adjacentCobras = mcsTools.makeAdjacentList(self.centrePos[:, 1:3], self.armLength)
                     cmd.inform(f'text="made adjacent lists"')
 
-                #transform centroids to MM
-                #self.transformations(cmd, frameId, zenithAngle, insRot)
-
                 # fibreID
                 self.fibreID(cmd, frameId, zenithAngle, insRot)
 
         cmd.inform(f'frameId={frameId}; filename={filename}')
 
-        # if doFibreID:
-        #self.runFibreID(cmd, doFinish=False)
-        #self.dumpCentroidtoDB(cmd, frameId)
 
         cmd.finish('exposureState=done')
 
@@ -792,14 +786,20 @@ class McsCmd(object):
     def easyFiberID(self, cmd, frameId):
         reload(calculation)
         
-        #sys.path.append('/software/devel/pfs/ics_fpsActor')
-        #os.environ['ICS_FPSACTOR_DIR'] = '/software/devel/pfs/ics_fpsActor/'
         db = self.connectToDB(cmd)
         cmd.inform(f'text="Running easy FibreID"')
 
-        from ics.fpsActor import najaVenator
-        nv = najaVenator.NajaVenator()
-        mcsData = nv.readCentroid(frameId)
+        # sorting the spot id, so that the ID returned by matching should 
+        # keep the same.
+        mcsData = db.bulkSelect('mcs_data','select * from mcs_data where '
+                f'mcs_frame_id = {frameId}').sort_values(by=['spot_id'])
+
+        renames = dict(mcs_frame_id='mcsId',
+                       spot_id='fiberId',
+                       mcs_center_x_pix='centroidx',
+                       mcs_center_y_pix='centroidy')
+
+        mcsData.rename(columns=renames, inplace=True)
         df=mcsData.loc[mcsData['fiberId'] > 0]
         
         
