@@ -574,7 +574,7 @@ class McsCmd(object):
 
         # if the centroid flag is set
         if doCentroid:
-
+            
             # connect to DB
             db = self.connectToDB(cmd)
 
@@ -588,14 +588,18 @@ class McsCmd(object):
             cmd.inform('text="Running centroid on current image" ')
 
             # switch for different centorid methods. Call with switchCMethod
+            t1 = time.time()
             if(self.cMethod == 'sep'):
                 self.runCentroidSEP(cmd)
             else:
                 self.runCentroid(cmd, self.centParms)
+            
+            t2 = time.time()
+            cmd.inform(f'text="Centroids done in {t2-t1} second" ')
 
             # dumpCentroidtoDB
             self.dumpCentroidtoDB(cmd, frameId)
-            
+           
             cmd.inform('text="Sending centroid data to database" ')
 
         # do the fibre identification
