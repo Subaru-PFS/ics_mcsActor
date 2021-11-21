@@ -109,9 +109,13 @@ class mcsCamera(Camera):
             # Command camera to do exposure sequence
             slicename = filename[0:33]+'_'
             cmd.inform('text="slice name: %s"' % (slicename))
-            p = sub.Popen(['canonexp', '-e', expType,'-f', slicename, '-t', str(expTime), '-c'],
-                          cwd=self.coaddDir, bufsize=1, stdout=sub.PIPE, stderr=sub.PIPE)
+            
+            p = sub.Popen(['canonexp', '-e', expType, '-f', '-', '-t', str(expTime), '-c','--noheader'],
+                cwd=self.coaddDir, bufsize=1, stdout=sub.PIPE, stderr=sub.PIPE)
+            
             output, errors = p.communicate()
+            data=np.frombuffer(output, dtype='u2').reshape((5778, 8960))
+            
             t2 = time.time()
 
             cmd.inform(f'Path="{self.coaddDir}"')
@@ -121,22 +125,7 @@ class mcsCamera(Camera):
         if cmd:
             cmd.inform('exposureState="reading"')
 
-        coaddpath = os.path.join(self.coaddDir, 'coadd.fits')
-        if doCopy:
-            try:
-                shutil.copy(coaddpath, filename)
-            except Exception as e:
-                cmd.warn(f'text="failed to copy coadd {coaddpath} to {filename}: {e}"')
-
-        f = pyfits.open(coaddpath)
-
-        # Remove the temporary file
-        try:
-            os.remove(coaddpath)
-        except OSError:
-            pass
-
-        image = f[0].data
+        image = data
         t3 = time.time()
         cmd.inform('text="Time for exposure = %f." ' % ((t2-t1)/1.))
         cmd.inform('text="Time for image loading= %f." ' % ((t3-t2)/1.))

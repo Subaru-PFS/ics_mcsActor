@@ -68,24 +68,35 @@ int setShutterStatus(int status)
 	return(0);
 }
 
+struct shutterArgs {
+    int time;
+    int verbose;
+};
 
 
-int OpenShutterTime(void* time)
+int OpenShutterTime(void* shutterArgs)
 {
 
 	int i, outputData;
 	int res;
+	int time, verbose;
+	int delay = 70;
 
-	int delay = 700;
+	time = ((struct shutterArgs*)shutterArgs)->time;
+	verbose = ((struct shutterArgs*)shutterArgs)->verbose;
 
 	i = open("/dev/ttyUSB0", O_RDWR);
 
 	/* Adding a delay so that the image readout will start before shutter is opened */
 	usleep(delay*1000);
-	printf("Opening shutter for %d msec.\n",*(int *)time);
+	
+	if (verbose){
+		printf("Opening shutter for %d msec.\n",time);
+	}
+	
 	outputData=S_OPEN;
 	res = ioctl(i, GP0_SET_VALUE,&outputData);
-	usleep(*(int *)time*1000);
+	usleep(time*1000);
 	outputData=S_CLOSE;
 
 	res = ioctl(i, GP0_SET_VALUE,&outputData);
@@ -109,12 +120,12 @@ int WriteFitsImage(char *filename, int height, int width, u_char * image_p, int 
     long naxes[2] = { width, height };   /* image is 640 pixels wide by 512 rows */
 
     /* allocate memory for the whole image */
-    array = (unsigned short *)malloc( naxes[0] * naxes[1]
-                                        * sizeof( unsigned short ) );
+    //array = (unsigned short *)malloc( naxes[0] * naxes[1]
+    //                                    * sizeof( unsigned short ) );
 
     /* initialize pointers to the start of each row of the image */
-    for( ii=1; ii<naxes[1]; ii++ )
-      array[ii] = array[ii-1] + naxes[0];
+    //for( ii=1; ii<naxes[1]; ii++ )
+    //  array[ii] = array[ii-1] + naxes[0];
 
     remove(filename);               /* Delete old file if it already exists */
 
@@ -123,7 +134,7 @@ int WriteFitsImage(char *filename, int height, int width, u_char * image_p, int 
     fits_create_file(&fptr, filename, &status); /* create new FITS file */
     if (status != 0) {
     	fprintf(stderr, "Error: (%s:%s:%d) can not get create image %s in disk "
-    			".\n", __FILE__, __func__, __LINE__,filenmae);
+    			".\n", __FILE__, __func__, __LINE__,filename);
     	exit(1);
     }
 
@@ -143,17 +154,17 @@ int WriteFitsImage(char *filename, int height, int width, u_char * image_p, int 
     }
     nelements = naxes[0] * naxes[1];          /* number of pixels to write */
 
-    memcpy(array, image_p, nelements*sizeof(unsigned short));
+    //memcpy(array, image_p, nelements*sizeof(unsigned short));
 
-    for (ii=0;ii<nelements;ii++){
-    		if (array[ii] > 65535) array[ii]=65535;
-    }
+    //for (ii=0;ii<nelements;ii++){
+    //		if (array[ii] > 65535) array[ii]=65535;
+    //}
 
 
     fpixel = 1;                               /* first pixel to write      */
     /* write the array of unsigned integers to the FITS file */
-    fits_write_img(fptr, TUSHORT, fpixel, nelements, (unsigned short *)array, &status);
-    //fits_write_img(fptr, TUSHORT, fpixel, nelements, (unsigned short *)image_p, &status);
+    //fits_write_img(fptr, TUSHORT, fpixel, nelements, (unsigned short *)array, &status);
+    fits_write_img(fptr, TUSHORT, fpixel, nelements, (unsigned short *)image_p, &status);
     if (status != 0) {
     	fprintf(stderr, "Error: (%s:%s:%d) can not get close image in disk "
     			".\n", __FILE__, __func__, __LINE__);
@@ -215,13 +226,14 @@ void strupp(char* lower)
 static void
 printUsageSyntax(char *prgname) {
    fprintf(stderr,
-	   "Star guider sequence.\n"
+	   "Canon 50M image acquisition sequence.\n"
 	   "Usage: %s <INPUT> <OUTPUT> [options...]\n"
 		"	-h, --help   display help message\n"
 		"	-f, --file   name of FITS file to be saved.\n"
 		"	-e, --etype  exposure type [flat|object|dark|object].\n"
 		"	-t, --exptime  shutter time.\n"
 		"	-c, --coadd  produce a co-added image.\n"
+		"	-n, --noheader  write to stdout without header.\n"
 		"	-v, --verbose  turn on verbose.\n"
 		, prgname);
 
@@ -236,10 +248,10 @@ int main(int argc, char *argv[]){
 	int    channel = 0 ;
 	int    s_height,s_width,s_depth;
 	int    imagesize;
-	int    verbose=0,loops;
+	int    verbose=0, loops;
 	int    i,ii;
 	int    exptime = 0;
-	int    ret;
+	int    ret, noheader = 0;
 	int    coadd = 0;
 	int    flag = 0;
 
@@ -251,10 +263,11 @@ int main(int argc, char *argv[]){
 	float  *stddev_img = NULL;
 	float  *stddev_sec = NULL;
 
-	u_char *coaddframe=NULL;
+	u_char *coaddframe = NULL;
 	float  nloops = 0;
 
-    char   *file=NULL;
+    char   *file = NULL;
+	char   *basename = NULL;
 	char   *unitstr = "0";
 	char   edt_devname[256];
     char   errstr[64];
@@ -263,21 +276,27 @@ int main(int argc, char *argv[]){
 
 	char etype_list[5][20]={"DARK","BIAS","FLAT","OBJECT","TEST"};
 
-	FILE *fp;
+	u_short *coaddshorts = NULL;
+	u_short pixel;
+
+	struct shutterArgs *args = (struct shutterArgs *)malloc(sizeof(struct shutterArgs));
 
     double shutter_ts,start_ts,save_ts;
     double dtime;
+
+
 	/** Check the total number of the arguments */
 	struct option longopts[] = {
-	     {"file" ,0, NULL, 'f'},
-	     {"exptime" ,0, NULL, 't'},
-	     {"etype" ,0, NULL, 'e'},
+	     {"file" ,1, NULL, 'f'},
+	     {"exptime" ,1, NULL, 't'},
+	     {"etype" ,1, NULL, 'e'},
 	     {"coadd" ,0, NULL, 'c'},
+	     {"noheader" ,0, NULL, 'n'},
 		 {"verbose",0, NULL, 'v'},
 		 {"help", 0, NULL, 'h'},
 		 {0,0,0,0}};
 
-	while((opt = getopt_long(argc, argv, "e:f:l:t:vhc",
+	while((opt = getopt_long(argc, argv, "ne:f:l:t:vhc",
 	   longopts, NULL))  != -1){
 	      switch(opt) {
 	         case 'e':
@@ -294,6 +313,9 @@ int main(int argc, char *argv[]){
 	               break;
 			 case 'c':
 	               coadd = 1;
+	               break;
+			 case 'n':
+	               noheader = 1;
 	               break;
 	         case 'h':
 	               printUsageSyntax(argv[0]);
@@ -322,7 +344,7 @@ int main(int argc, char *argv[]){
 		"\n", __FILE__, __func__, __LINE__);
 		file="exposure";
 	}
-
+	
 	/* Determin the total loops needed if exposure time is set */
 	nloops=ceil(((float)exptime/800.0))+1;
 	loops = (int)nloops;
@@ -415,21 +437,33 @@ int main(int argc, char *argv[]){
 	stddev_img = (float *)malloc(100 * sizeof(float));
 	stddev_sec = (float *)malloc(100 * sizeof(float));
 
-    for (i=0; i<loops; i++){
-		if ((bufs[i] = edt_alloc(imagesize)) == NULL){
-	    	printf("buffer allocation FAILED (probably too many images specified)\n");
-	    	exit(1);
-		}
-    }
-	
+    //for (i=0; i<loops; i++){
+	//	if ((bufs[i] = edt_alloc(imagesize)) == NULL){
+	//    	printf("buffer allocation FAILED (probably too many images specified)\n");
+	//    	exit(1);
+	//	}
+    //}
+
+	/* allocate the memory for coadding frames */
+	coaddframe = (u_char *)calloc(imagesize, sizeof(u_char));
+	coaddshorts= (u_short *)coaddframe;
+
+	args->time = exptime;
+	args->verbose = verbose;
+
     if (exptime > 0){
-    	ret=pthread_create(&id,NULL,(void *) OpenShutterTime, (void *)&exptime);
+    	ret=pthread_create(&id,NULL,(void *) OpenShutterTime, (void *)args);
     }
 
 	(void) edt_dtime();		/* init time for check */
 	pdv_start_images(pdv_p, loops);
 
     for (i=0; i<loops; i++){
+		if ((bufs[i] = edt_alloc(imagesize)) == NULL){
+	    	printf("buffer allocation FAILED (probably too many images specified)\n");
+	    	exit(1);
+		}
+			
 		image_p = pdv_wait_image(pdv_p);
 		
 		/*   Try to detecting the image shifting by calculating the stand deviation of 
@@ -447,60 +481,80 @@ int main(int argc, char *argv[]){
 		} 
 
 		memcpy(bufs[i], image_p, imagesize);
-    }
 
+		for (ii=0;ii<imagesize;ii+=2){
+			
+			pixel = bufs[i][ii] | (bufs[i][ii+1] << 8);
+			coaddshorts[ii/2] += pixel;
+		}
+	}
 
-    dtime = edt_dtime();
-    printf("Image reading finished with %f frames/sec\n",(double) (loops) / dtime);
+	dtime = edt_dtime();
+	if (verbose){
+		printf("Image reading finished with %f frames/sec\n",(double) (loops) / dtime);
+	}
+    
 	
 	/* Finishing the shutter thread */
     if (exptime > 0){
     		pthread_join(id,NULL);
     }
+
 	/* Stacking frames if the flag is set */
 	if (coadd){
 		if (verbose) printf("Coadding all frames.\n");
 
-		u_short *coaddshorts; /* alias. */
+		if (noheader){
+			if (verbose) printf("Skipping FITS headers.\n");
+			fwrite(coaddframe, sizeof(u_char), imagesize, stdout);
+        	fflush(stdout);
+		} else {
+			//u_short *coaddshorts; /* alias. */
 
+			//coaddframe = (u_char *)calloc(imagesize, sizeof(u_char));
+			//coaddshorts= (u_short *)coaddframe;
 
-		coaddframe = (u_char *)calloc(imagesize, sizeof(u_char));
-		coaddshorts= (u_short *)coaddframe;
+			//sprintf(string,"%s","coadd.fits");
+			sprintf(string,"%s",file);
 
-		sprintf(string,"%s","coadd.fits");
+			//for(i=0;i<nloops;i++) {
+			//	for (ii=0;ii<imagesize;ii+=2){
+			//	  u_short pixel;
 
-		for(i=0;i<nloops;i++) {
-			for (ii=0;ii<imagesize;ii+=2){
-			  u_short pixel;
+			//	  pixel = bufs[i][ii] | (bufs[i][ii+1] << 8);
+			//	  coaddshorts[ii/2] += pixel;
+			//	}
+			//}
 
-			  pixel = bufs[i][ii] | (bufs[i][ii+1] << 8);
-			  coaddshorts[ii/2] += pixel;
-			}
+			WriteFitsImage(string, s_height, s_width, coaddframe, exptime);
 		}
-
-		WriteFitsImage(string, s_height, s_width, coaddframe, exptime);
 	} else {
-
-		i=0;
-		while(loops) {
+		basename = strtok(file, ".");
+		//printf("%i\n",strcmp(file,"-"));
+		for (i=0; i<loops; i++){
 			start_ts = getClockTime();
 
-			sprintf(string,"%s%04i%s",file,i+1,".fits");
-
+			if (strcmp(file,"-") == 0){
+				sprintf(string,"%s",file);
+			} else{
+				sprintf(string,"%s-%04i%s",basename,i+1,".fits");
+			}
+			
 			/*process and/or display image previously acquired here*/
-			WriteFitsImage(string, s_height, s_width,bufs[i], 800);
+			WriteFitsImage(string, s_height, s_width, bufs[i], 800);
 
 			if (verbose){
 				save_ts=getClockTime();;
 				fprintf(stdout,"%02i Image saving runtime = %f\n",i+1, save_ts-start_ts);
 			}
 
-			loops--;
-			i++;
-
 		}
 	}
 
+	dtime = edt_dtime();
+	if (verbose){
+		printf("Time used to save image = %f second. \n", dtime);
+	}
 
 	/* Free imaeg blocks */
 	for (i=0; i<loops; i++){
@@ -514,7 +568,9 @@ int main(int argc, char *argv[]){
 	free(stddev_sec);
 	pdv_close(pdv_p);
 
-	printf("Exposure sequence is done\n");
+	if (verbose){
+		printf("Exposure sequence is done\n");
+	}
 	return EXIT_SUCCESS;
 
 }
