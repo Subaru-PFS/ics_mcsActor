@@ -461,8 +461,6 @@ class McsCmd(object):
         else:
             pass
 
-        self.logger.info(f'read filename: {filename}')
-
         if mask is not None:
             cmd.inform(f'text="mask image shape: {mask.shape} type:{mask.dtype}"')
             cmd.inform(f'text="image shape: {image.shape} type:{image.dtype}"')
