@@ -972,6 +972,7 @@ class McsCmd(object):
         """
 
         self.centParms = mcsTools.getCentroidParams(cmd)
+        self.logger.info(f'centParms: {self.centParms}')
 
     def runCentroidSEP(self, cmd):
         cmdKeys = cmd.cmd.keywords
