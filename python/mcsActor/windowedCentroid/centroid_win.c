@@ -109,6 +109,20 @@ void* subimage_Thread(void *arg)
 
   cand_list=getRegions(image,thresh1,thresh2,boxFind,boxCent,n_x,n_y,nmin,nmax,imagemask,&np,verbose);
 
+  /* exit with an intermediate values if there are too many points (threshold too low) */
+  if(np > 10000)
+    {
+      ((struct thread_data*)arg)->cand_list=cand_list;
+
+      //free memory
+      free(image);
+      free(imagemask);
+      //exit the thread properly
+      pthread_exit(0);
+    }
+
+
+  
   /* get the automatic paramters if desired */
   if((fwhmx==0) || (fwhmy==0))
     {
