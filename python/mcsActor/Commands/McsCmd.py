@@ -715,7 +715,7 @@ class McsCmd(object):
         pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, 
             altitude=altitude, insrot=insrot)
         
-        outerRing = np.empty(len(fids), dtype=bool)
+        outerRing = np.zeros(len(fids), dtype=bool)
         for i in [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]:
             outerRing[fids.fiducialId == i] = True
         
