@@ -579,7 +579,7 @@ class McsCmd(object):
             cmd.inform('text="Setting centroid parameters." ')
             self.setCentroidParams(cmd)
 
-            if self.findThresh is None:
+            if self.findThresh is None or frameId % 100 == 0:
                 cmd.inform('text="Calculating threshold." ')
                 self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
 
