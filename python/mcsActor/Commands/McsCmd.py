@@ -1023,6 +1023,10 @@ class McsCmd(object):
 
         image = self.actor.image
 
+        cmd.inform(f'centroidParms: findThresh {self.findThresh},centThresh {self.centThresh}')
+        cmd.inform(f'centroidParms: nmin {centParms["nmin"]}, maxIt {centParms["maxIt"]} boxFind {centParms["boxFine"]} boxCent {centParms["boxCent"]}')
+
+        
         cmd.inform(f'state="measuring cached image: {image.shape}"')
         a = centroid.centroid_only(image.astype('<i4'),
                                    centParms['fwhmx'], centParms['fwhmy'], self.findThresh, self.centThresh,
