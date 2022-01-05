@@ -834,7 +834,7 @@ class McsCmd(object):
                 mpos[n] = pos[k]
         indx = np.where(target < 0 )
 
-        dbTools.writeTargetToDB(db, int(frameId), target, mpos)
+        #dbTools.writeTargetToDB(db, int(frameId), target, mpos)
     
         cobraMatch = np.zeros((2394, 5))
         cobraMatch[:,0] = np.arange(2394)+1 
