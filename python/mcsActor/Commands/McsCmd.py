@@ -1157,8 +1157,8 @@ class McsCmd(object):
 
         # if too many centroids have been returned, only save the first 5000
         
-        nItems = len(centArray))
-        if(nTimes > 5000):
+        nItems = len(centArr)
+        if(nItems > 5000):
             nItems = 5000
             
         buf = io.StringIO()
