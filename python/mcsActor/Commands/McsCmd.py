@@ -834,7 +834,13 @@ class McsCmd(object):
                 mpos[n] = pos[k]
         indx = np.where(target < 0 )
 
-        #dbTools.writeTargetToDB(db, int(frameId), target, mpos)
+        visitId = frameId // 100
+        iteration = frameId % 100
+        cobraTarget = db.bulkSelect('cobra_target','select pfs_visit_id from cobra_target where '
+            f'(pfs_visit_id = {visitId}) AND iteration = {iteration}').reset_index()
+
+        if len(cobraTarget) == 0:
+            dbTools.writeTargetToDB(db, int(frameId), target, mpos)
     
         cobraMatch = np.zeros((2394, 5))
         cobraMatch[:,0] = np.arange(2394)+1 
