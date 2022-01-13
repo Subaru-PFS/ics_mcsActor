@@ -68,7 +68,7 @@ double maxValD(double val1,double val2)
     }
 }
     
-struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int boxsize1,int xsize,int ysize,int nmin,int nmax,int *mask,int *npoints, int verbose)
+struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int boxsize1,int xsize,int ysize,int nmin,int *mask,int *npoints, int verbose)
 {
 
   /* when passed an image, finds regions above the threshold. The
@@ -87,7 +87,7 @@ struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int
 	       the detection close to the centre of the PSF, rather than at the edge.
 
      boxsize: boxsize for searching for pixels. 
-     nmin, nmax; minimum and maximum size of regions
+     nmin, minimum and maximum size of regions
      mask: integer mask file showing location of regions; for debugging purposes. 
      verbose: flag for diagnostic output
 
@@ -108,7 +108,7 @@ struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int
 
   (*npoints)=0;
 
-  //printf("VV %d %d %d %d %d %d %d %d\n",thresh1,thresh2,xsize,ysize,boxsize,nmin,nmax,verbose);
+  //printf("VV %d %d %d %d %d %d %d %d\n",thresh1,thresh2,xsize,ysize,boxsize,nmin,verbose);
   
   if(verbose==1)
     {
@@ -184,7 +184,7 @@ struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int
 	      xval=((double)bx/(double)tt)+i;
 	      yval=((double)by/(double)tt)+j;
 	      //now that we have a region, check its size to filter out hot pixels etc.
-	      if((npt >= nmin) && (npt <= nmax) && ((xval-boxsize1) > 0) && ((yval-boxsize1) > 0) && ((xval + boxsize1) < xsize) &&  ((yval + boxsize1) < ysize))
+	      if((npt >= nmin) && ((xval-boxsize1) > 0) && ((yval-boxsize1) > 0) && ((xval + boxsize1) < xsize) &&  ((yval + boxsize1) < ysize))
 		{
 
 		  //assign to the structure

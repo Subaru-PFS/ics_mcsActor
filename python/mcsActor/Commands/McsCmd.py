@@ -95,7 +95,7 @@ class McsCmd(object):
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
             ('resetThreshold', '', self.resetThreshold),
-            ('setCentroidParams', '[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<nmax>] [<maxIt>]',
+            ('setCentroidParams', '[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<maxIt>]',
              self.setCentroidParams),
             ('calcThresh', '[<threshMethod>] [<threshSigma>] [<threshFact>]', self.calcThresh),
             ('simulate', '<path>', self.simulateOn),
@@ -121,7 +121,6 @@ class McsCmd(object):
                                                  help="box size for centroiding spots"),
                                         keys.Key("nmin", types.Int(),
                                                  help="minimum number of points for spot"),
-                                        keys.Key("nmax", types.Int(), help="max number of points for spot"),
                                         keys.Key("maxIt", types.Int(),
                                                  help="maximum number of iterations for centroiding"),
                                         keys.Key("findSigma", types.Float(),
@@ -1024,14 +1023,14 @@ class McsCmd(object):
         image = self.actor.image
 
         cmd.inform(f'centroidParms: findThresh {self.findThresh},centThresh {self.centThresh}')
-        cmd.inform(f'centroidParms: nmin {centParms["nmin"]}, maxIt {centParms["maxIt"]} boxFind {centParms["boxFine"]} boxCent {centParms["boxCent"]}')
+        cmd.inform(f'centroidParms: nmin {centParms["nmin"]}, maxIt {centParms["maxIt"]} boxFind {centParms["boxFind"]} boxCent {centParms["boxCent"]}')
 
         
         cmd.inform(f'state="measuring cached image: {image.shape}"')
         a = centroid.centroid_only(image.astype('<i4'),
                                    centParms['fwhmx'], centParms['fwhmy'], self.findThresh, self.centThresh,
                                    centParms['boxFind'], centParms['boxCent'],
-                                   centParms['nmin'], centParms['nmax'], centParms['maxIt'], 0)
+                                   centParms['nmin'], centParms['maxIt'], 0)
 
         centroids = np.frombuffer(a, dtype='<f8')
         centroids = np.reshape(centroids, (len(centroids)//7, 7))

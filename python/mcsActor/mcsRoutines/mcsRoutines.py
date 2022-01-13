@@ -44,28 +44,57 @@ def getCentroidParams(cmd):
     centParms = defaultParms['values']
 
     if('fwhmx' in cmdKeys):
+
+        # will be zero by default
         centParms['fwhmx'] = cmd.cmd.keywords["fwhmx"].values[0]
+
+        
     if('fwhmy' in cmdKeys):
+
+        # will be zero by default
+
         centParms['fwhmy'] = cmd.cmd.keywords["fwhmy"].values[0]
 
     if('boxFind' in cmdKeys):
+
+        # required parameter
         centParms['boxFind'] = cmd.cmd.keywords["boxFind"].values[0]
     if('boxCent' in cmdKeys):
+
+        # required parameter
+
         centParms['boxCent'] = cmd.cmd.keywords["boxCent"].values[0]
 
     if('findSigma' in cmdKeys):
+
+        # required parameter
+
         centParms['findSigma'] = cmd.cmd.keywords["findSigma"].values[0]
     if('centSigma' in cmdKeys):
+
+        # required parameter
+
         centParms['centSigma'] = cmd.cmd.keywords["centSigma"].values[0]
     if('threshSigma' in cmdKeys):
+
+        # required parameter
+
         centParms['threshSigma'] = cmd.cmd.keywords["threshSigma"].values[0]
 
     if('nmin' in cmdKeys):
+
+        # optional filter
         centParms['nmin'] = cmd.cmd.keywords["nmin"].values[0]
-    if('nmax' in cmdKeys):
-        centParms['nmax'] = cmd.cmd.keywords["nmax"].values[0]
-    if('nmax' in cmdKeys):
+        # check for "ignore" value
+        if(centParms['nmin'] == -1):
+            centParms['nmin'] = 0
+            
+    if('maxIt' in cmdKeys):
+        # optional filter
         centParms['maxIt'] = cmd.cmd.keywords["maxIt"].values[0]
+        # check for "ignroe" value
+        if(centParms['maxIt']) == -1):
+            centParms['maxIt') = 100000
 
     return centParms
 
