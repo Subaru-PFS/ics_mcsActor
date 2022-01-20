@@ -617,8 +617,8 @@ class McsCmd(object):
             enableEasyID=True
 
             if enableEasyID:
-                if newField:
-                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
+                #if newField:
+                self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
                 
                 self.easyFiberID(cmd, frameId)
 

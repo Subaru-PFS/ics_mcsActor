@@ -123,7 +123,7 @@ def loadTargetsFromDB(db, frameId):
 def writeTargetToDB(db, frameId, target, mpos):
     visitId = frameId // 100
     iteration = frameId % 100
-
+    
     # To-Do here we need a better implementation.
     data = {'pfs_visit_id': np.repeat(visitId,2394),     
             'iteration' : np.repeat(iteration,2394),   
