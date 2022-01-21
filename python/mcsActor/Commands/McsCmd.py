@@ -712,6 +712,12 @@ class McsCmd(object):
         mcsData = db.bulkSelect('mcs_data',f'select spot_id, mcs_center_x_pix, mcs_center_y_pix '
                 f'from mcs_data where mcs_frame_id = {frameID}')
 
+        if 'rmod' in self.actor.cameraName.lower():
+            altitude = 90.0
+
+        self.logger.info(f'Camera name: {self.actor.cameraName}')
+        cmd.inform(f'text="camera name: {self.actor.cameraName} altitude using {altitude}"')
+        
         pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, 
             altitude=altitude, insrot=insrot)
         
