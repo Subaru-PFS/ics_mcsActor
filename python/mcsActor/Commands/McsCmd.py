@@ -617,8 +617,8 @@ class McsCmd(object):
             enableEasyID=True
 
             if enableEasyID:
-                #if newField:
-                self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
+                if newField:
+                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
                 
                 self.easyFiberID(cmd, frameId)
 
@@ -663,7 +663,7 @@ class McsCmd(object):
     def switchCMethod(self, cmd):
         cmdKeys = cmd.cmd.keywords
         self.cMethod = cmdKeys['cMethod'].values[0]
-        cmd.inform(f'text="cMethod = {self.cmethod}"')
+        cmd.inform(f'text="cMethod = {self.cMethod}"')
         cmd.finish('switchCMethod=done')
 
     def resetGeometry():
