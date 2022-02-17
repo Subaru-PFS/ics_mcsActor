@@ -848,6 +848,7 @@ class McsCmd(object):
             f'(pfs_visit_id = {visitId}) AND iteration = {iteration}').reset_index()
 
         if len(cobraTarget) == 0:
+            cmd.inform(f'text="Fall back using cobra centers as target." ')
             dbTools.writeCobraCenterToDB(db, int(frameId), target, mpos)
     
         cobraMatch = np.zeros((2394, 5))
