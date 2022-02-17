@@ -134,6 +134,24 @@ def writeTargetToDB(db, frameId, target, mpos):
     df = pd.DataFrame(data=data)
     db.insert("cobra_target", df)
 
+def writeCobraCenterToDB(db, frameId, centers, mpos)
+    visitId = frameId // 100
+    iteration = frameId % 100
+
+    targetTable = {'pfs_visit_id':np.repeat(visitId,2394),
+                    'iteration':np.repeat(iteration,2394),
+                    'cobra_id':np.arange(2394)+1,
+                    'pfs_config_id':np.repeat(0),2394),
+                    'pfi_nominal_x_mm':centers.real,
+                    'pfi_nominal_y_mm':centers.imag,
+                    'pfi_target_x_mm' mpos.real,
+                    'pfi_target_y_mm':mpos.imag,
+                    'motor_target_theta':np.repeat(0,2394),
+                    'motor_target_phi':np.repeat(0,2394),
+            }
+
+    df = pd.DataFrame(data=data)
+    db.insert("cobra_target", df)
 
 def writeBoresightToDB(db, pfsVisitId, boresight):
     """ write boresight to database with current timestamp """

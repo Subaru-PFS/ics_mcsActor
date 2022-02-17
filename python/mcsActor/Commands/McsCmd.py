@@ -587,7 +587,9 @@ class McsCmd(object):
 
             # switch for different centorid methods. Call with switchCMethod
             t1 = time.time()
+            self.cMethod = 'sep'
             if(self.cMethod == 'sep'):
+                cmd.inform(f'text="Using SExtractor for centroid" ')
                 self.runCentroidSEP(cmd)
             else:
                 self.runCentroid(cmd, self.centParms)
@@ -846,7 +848,7 @@ class McsCmd(object):
             f'(pfs_visit_id = {visitId}) AND iteration = {iteration}').reset_index()
 
         if len(cobraTarget) == 0:
-            dbTools.writeTargetToDB(db, int(frameId), target, mpos)
+            dbTools.writeCobraCenterToDB(db, int(frameId), target, mpos)
     
         cobraMatch = np.zeros((2394, 5))
         cobraMatch[:,0] = np.arange(2394)+1 
