@@ -271,7 +271,6 @@ def makeAdjacentList(ff, armLength):
     # temproary fix for system issues, change back!!!
 
     cobraTree = cKDTree(np.ascontiguousarray(ff), copy_data = True)
-
     for i in range(len(ff[:, 0])):
         # list of adjacent centers
         dd = np.sqrt((ff[i, 1]-ff[:, 1])**2+(ff[i, 2]-ff[:, 2])**2)
@@ -288,7 +287,6 @@ def makeAdjacentList(ff, armLength):
 
 def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adjacentCobras):
 
-    # set some variables for easy reference - can clean some of these up later??
     
     centers = centrePos
     points = centroids
@@ -304,6 +302,7 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     nPoints = points.shape[0]
     nCobras = targets.shape[0]
 
+    print("here1")
     # set up variables
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch = prepWork(
         points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge=0.5)
@@ -311,7 +310,6 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     # first pass - assign cobra/spot pairs based on the spots poiint of view
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = firstPass(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange)
- 
 
     # second pass - assign cobra/spot pairs based on the cobra point of view
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = secondPass(
@@ -321,6 +319,8 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     # last pass - figure out the spots that can belong to more than one cobra, and things hidden by dots
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = lastPassDist(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, tarPos, 't', anyChange, goodIdx)
+
+    print("here6")
 
     # some final tidying up
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = secondPass(
@@ -676,17 +676,18 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
 
 
 
-    #decision making time. 
-
     change = 1
     while(change == 1):
         change = 0
+        nn = nn+1
+
         #get distances between unassigned points and unassigned cobras
         D = cdist(points[unaPoints, 1:3], targets[unaCobras, 1:3])
         #ind = np.unravel_index(D.argmin(), D.shape)
 
         #sort, to find the lowest value
         ind = np.unravel_index(np.argsort(D, axis = None), D.shape)
+
         #now find the smallest separation among the allowed values
         found = False
         i = 0
