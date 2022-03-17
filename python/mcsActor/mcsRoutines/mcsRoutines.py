@@ -67,7 +67,6 @@ def getCentroidParams(cmd):
 
     return centParms
 
-
 def readCobraGeometry(xmlFile, dotFile):
     """
     read cobra geometry from configuration file/inst_config
@@ -440,17 +439,11 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
     aPoints = []
     dotCobras = []
     fidPoints = []
-
-    bPoints = []  # non real points (fids, stuck fibres)
-
-    stuckPos = np.loadtxt("./stuck.txt")
     
     #first, quick positional matching to remove fiducial fibres from list of matchable points
     #note that the matching should return either 0 points (unilluminated fiducials) or
     #1 points (match) as the fiducial fibres don't have a patrol radius
 
-
-    
     D = cdist(fidPos[:,1:3],points[:,1:3])
     for i in range(len(fidPos)):
         ind = np.where(D[i, :] < 1)
@@ -462,7 +455,9 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
 
     #and the same for stuck but illuminated cobras. This is currently a bit of a cludge, based
     #on empirical averages of positions
-        
+    fileName = os.path.join(os.environ['ICS_MCSACTOR_DIR'],  'etc',  'stuck.txt')
+    stuckPos = np.loadtxt(fileName)
+
     D = cdist(stuckPos[:,1:3], points[:,1:3])
     for i in range(len(stuckPos)):
         ind = np.where(D[i, :] < 1)
