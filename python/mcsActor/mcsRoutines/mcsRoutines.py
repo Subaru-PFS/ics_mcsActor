@@ -367,11 +367,8 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
     dotCobras = []
     fidPoints = []
 
+
     bPoints = []  # non real points (fids, stuck fibres)
-    fileName = os.path.join(os.environ['ICS_MCSACTOR_DIR'],  'etc',  'stuck.txt')
-
-    stuckPos = np.loadtxt(fileName)
-
     
     #first, quick positional matching to remove fiducial fibres from list of matchable points
     #note that the matching should return either 0 points (unilluminated fiducials) or
@@ -383,6 +380,7 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
         #print("Fid Match", i, ind, len(ind[0]))
         if len(ind[0]) > 0:
             unaPoints.remove(ind[0][0])
+
             bPoints.append(ind[0][0])
 
 
