@@ -233,6 +233,7 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange)
     print("here3")
 
+
     # second pass - assign cobra/spot pairs based on the cobra point of view
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = secondPass(
         aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras, anyChange)
@@ -364,7 +365,6 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
     dotCobras = []
     fidPoints = []
 
-
     bPoints = []  # non real points (fids, stuck fibres)
     
     #first, quick positional matching to remove fiducial fibres from list of matchable points
@@ -377,7 +377,6 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
         #print("Fid Match", i, ind, len(ind[0]))
         if len(ind[0]) > 0:
             unaPoints.remove(ind[0][0])
-
             bPoints.append(ind[0][0])
 
 
@@ -392,8 +391,6 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
         if len(ind[0]) > 0:
             unaPoints.remove(ind[0][0])
             bPoints.append(ind[0][0])
-
-
     # get the distnace between cobras and points. cdist is pretty fast, check total time
     D = cdist(points[:, 1:3], centers[:, 1:3])
 
