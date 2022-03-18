@@ -42,31 +42,6 @@ def connectToDB(hostname='', port='', dbname='opdb', username='pfs'):
     return db
 
 
-def writeFidToDB(db, spot_id, fiducial_fiber_id, mcs_frame_id):
-
-    """
-    write the fiducial fibre matches to db
-    """
-
-    pfs_visit_id = mcs_frame_id // 100
-    iteration = mcs_frame_d % 100
-
-    sz = len(fiducial_fiber_id)
-    frame = np.zeros((sz, 6))
-
-    frame[:,0] = np.repeat(pfs_visit_id,sz)
-    frame[:,1] = np.repeat(iteration,sz)
-    frame[:,2] = np.repeat(mcs_frame_id,sz)
-    frame[:,3] = fiducial_fiber_id
-    frame[:,4] = spot_id
-    frame[:,5] = np.repeat(0,sz)
-
-    columns = ['pfs_visit_id','iteration','mcs_frame_id', 'fiducial_fiber_id', 'spot_id', 'flags']
-
-    df = pd.DataFrame(frame, columns=columns)
-    db.insert("fiducial_fiber_match", df)
-
-    
 def loadCobraMatchFromDB(db, frameId):
     """
     read the cobra_match table information, convert to x+ij format, return positions and flags
