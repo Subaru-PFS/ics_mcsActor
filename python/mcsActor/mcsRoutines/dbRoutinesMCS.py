@@ -259,3 +259,35 @@ def writeAffineToDB(db, afCoeff, frameId):
     df = pd.DataFrame({'mcs_frame_id': [frameId], 'x_trans': [xd], 'y_trans': [
                       yd], 'x_scale': [sx], 'y_scale': [sy], 'angle': [rotation]})
     db.insert('mcs_pfi_transformation', df)
+
+def writeFidToDB(db, ffid,  mcs_frame_id):
+
+    """
+    write the fiducial fibre matches to db.
+
+    only writes fibres with matches
+    """
+
+    # get indices of matched FF
+    ind=np.where(ffids1 != -1)
+    ffids=ffid[ind]
+
+    # generate the dataframe
+    
+    pfs_visit_id = mcs_frame_id // 100
+    iteration = mcs_frame_id % 100
+    sz = len(ffids)
+    frame = np.zeros((sz, 6))
+    frame[:,0] = np.repeat(pfs_visit_id,sz)
+    frame[:,1] = np.repeat(iteration,sz)
+    frame[:,2] = np.repeat(mcs_frame_id,sz)
+    frame[:,3] = ffids
+    frame[:,4] = ind[0]
+    frame[:,5] = np.repeat(0,sz)
+    columns = ['pfs_visit_id','iteration','mcs_frame_id', 'fiducial_fiber_id', 'spot_id', 'flags']
+
+    df = pd.DataFrame(frame, columns=columns)
+
+    #insert
+    db.insert("fiducial_fiber_match", df)
+ 
