@@ -729,11 +729,12 @@ class McsCmd(object):
         
         pfiTransform.updateTransform(mcsData, fids[outerRing], matchRadius=8.0, nMatchMin=0.1)
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=4.0, nMatchMin=0.1)
-        
-        for i in range(2):
-            pfiTransform.updateTransform(mcsData, fids, matchRadius=4.2,nMatchMin=0.1)
-        #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
 
+        #return the values for writing to DB
+        for i in range(2):
+            ffid, dist = pfiTransform.updateTransform(mcsData, fids, matchRadius=4.2,nMatchMin=0.1)
+        #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
+        dbTools.writeFidToDB(db, ffid, mcs_frame_id)
         self.pfiTrans = pfiTransform
 
 
