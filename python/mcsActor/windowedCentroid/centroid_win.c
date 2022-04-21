@@ -81,7 +81,6 @@ void* subimage_Thread(void *arg)
   int thresh2=((struct thread_data*)arg)->thresh2;          //data threshold
   double fwhmy=((struct thread_data*)arg)->fwhmy;          //fwhm
   int boxCent=((struct thread_data*)arg)->boxCent;      //box size for mpfit
-  int nmax=((struct thread_data*)arg)->nmax;          //data threshold
   int maxIt=((struct thread_data*)arg)->maxIt;          //data threshold
 
   struct cand_point *cand_head=((struct thread_data*)arg)->cand_list;  //output list of found points
@@ -105,9 +104,9 @@ void* subimage_Thread(void *arg)
 
   
   int np;
-  //printf("%d %d %d %d %d %d %d\n",thresh1,thresh2,n_x,n_y,boxFind,nmin,nmax);
+  //printf("%d %d %d %d %d %d %d\n",thresh1,thresh2,n_x,n_y,boxFind,nmin);
 
-  cand_list=getRegions(image,thresh1,thresh2,boxFind,boxCent,n_x,n_y,nmin,nmax,imagemask,&np,verbose);
+  cand_list=getRegions(image,thresh1,thresh2,boxFind,boxCent,n_x,n_y,nmin,imagemask,&np,verbose);
 
   /* exit with an intermediate values if there are too many points (threshold too low) */
   if(np > 10000)
@@ -126,7 +125,7 @@ void* subimage_Thread(void *arg)
   /* get the automatic paramters if desired */
   if((fwhmx==0) || (fwhmy==0))
     {
-      //printf("G %d %d %d %d %d %d %d\n",thresh1,thresh2,n_x,n_y,boxFind,nmin,nmax);
+      //printf("G %d %d %d %d %d %d %d\n",thresh1,thresh2,n_x,n_y,boxFind,nmin);
 
       getParams(cand_list,&fwhmx,&fwhmy);
       //printf("KK %lf %lf\n",fwhmx,fwhmy);
@@ -192,7 +191,7 @@ void* subimage_Thread(void *arg)
 
   /*-------------------------------------------------------------------------------------*/
 
-struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh2, double fwhmx, double fwhmy,int boxFind, int boxCent,int *np, int nmin, int nmax,int maxIt, int verbose)
+struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh2, double fwhmx, double fwhmy,int boxFind, int boxCent,int *np, int nmin, int maxIt, int verbose)
 {
 
   /*main routine. parses input values, calls setup routine, divides up the threads, 
@@ -351,7 +350,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	  thread_data_array[ind].boxFind=boxFind;
 	  thread_data_array[ind].boxCent=boxCent;
 	  thread_data_array[ind].nmin=nmin;
-	  thread_data_array[ind].nmax=nmax;
 	  thread_data_array[ind].maxIt=maxIt;
 	  thread_data_array[ind].cand_list=cand_list[ind];
 	  thread_data_array[ind].verbose=verbose;

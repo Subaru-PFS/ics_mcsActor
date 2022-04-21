@@ -38,9 +38,9 @@ cdef extern from "centroid_types.h" nogil:
     
 
 cdef extern from "centroid.h" nogil:
-     centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh2, double fwhmx, double fwhmy,int boxFind, int boxCent,int *np, int nmin, int nmax,int maxIt, int verbose)
+     centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh2, double fwhmx, double fwhmy,int boxFind, int boxCent,int *np, int nmin, int maxIt, int verbose)
 
-def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhmx, double fwhmy, int thresh1, int thresh2, int boxFind, int boxCent,int nmin, int nmax, int maxIt,int verbose):
+def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhmx, double fwhmy, int thresh1, int thresh2, int boxFind, int boxCent, int nmin, int maxIt,int verbose):
 
     """
 
@@ -54,7 +54,7 @@ def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhmx, double 
 
     #The function call
     with nogil:
-         vals=centroid(<int *>image.data,image.shape[1],image.shape[0],thresh1,thresh2,fwhmx,fwhmy, boxFind,boxCent, npoint, nmin,nmax,maxIt, verbose)
+         vals=centroid(<int *>image.data,image.shape[1],image.shape[0],thresh1,thresh2,fwhmx,fwhmy, boxFind,boxCent, npoint, nmin, maxIt, verbose)
 
     #convert the output into a buffer string
     cp = <char *> vals

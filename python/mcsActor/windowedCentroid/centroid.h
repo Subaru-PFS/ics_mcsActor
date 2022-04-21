@@ -7,7 +7,7 @@ int maxValI(int val1,int val2);
 double maxValD(double val1,double val2);
 
 
-struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int boxsize1,int xsize,int ysize,int nmin,int nmax,int *mask,int *npoints,int verbose);
+struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int boxsize1,int xsize,int ysize,int nmin,int *mask,int *npoints,int verbose);
 
 int getInd2D(int i,int j,int size);
 
@@ -39,7 +39,7 @@ double calculate_round(int *image,int *mask, int nhalf, int ix, int iy, int n_x,
 
 int *get_data(char *filename,long *n_x,long *n_y);
 
-struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh2, double fwhmx, double fwhmy,int boxFind, int boxCent,int *np, int nmin, int nmax,int maxIt, int verbose);
+struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh2, double fwhmx, double fwhmy,int boxFind, int boxCent,int *np, int nmin, int maxIt, int verbose);
 
 int *getParams(struct cand_point *cand_list,double *fwhmx,double *fwhmy);
 
