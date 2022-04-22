@@ -64,6 +64,7 @@ class McsCmd(object):
         self.findThresh = None
         self.centThresh = None
         self.cMethod = 'win'
+        self.fMethod = 'target'
 
         # self.setCentroidParams(None)
         self.adjacentCobras = None
@@ -95,13 +96,14 @@ class McsCmd(object):
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
             ('resetThreshold', '', self.resetThreshold),
-            ('setCentroidParams', '[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<nmax>] [<maxIt>]',
+            ('setCentroidParams', '[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<maxIt>]',
              self.setCentroidParams),
             ('calcThresh', '[<threshMethod>] [<threshSigma>] [<threshFact>]', self.calcThresh),
             ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
             ('switchFibreMode', '<fibreMode>', self.switchFibreMode),
             ('switchCMethod', '<cMethod>', self.switchCMethod),
+            ('switchFMethod', '<fMethod>', self.switchFMethod),
             ('resetGeometry', '', self.resetGeometry),
             ('resetGeometryFile', '<geomFile>', self.resetGeometryFile)
         ]
@@ -121,7 +123,6 @@ class McsCmd(object):
                                                  help="box size for centroiding spots"),
                                         keys.Key("nmin", types.Int(),
                                                  help="minimum number of points for spot"),
-                                        keys.Key("nmax", types.Int(), help="max number of points for spot"),
                                         keys.Key("maxIt", types.Int(),
                                                  help="maximum number of iterations for centroiding"),
                                         keys.Key("findSigma", types.Float(),
@@ -143,6 +144,8 @@ class McsCmd(object):
                                                  help="fieldID for getting instrument parameters"),
                                         keys.Key("cMethod", types.String(),
                                                  help="method for centroiding (of 'win', 'cent', default 'win')"),
+                                        keys.Key("fMethod", types.String(),
+                                                 help="method for fibreId (of 'target', 'previous', default 'target')"),
                                         keys.Key("fibreMode", types.String(),
                                                  help="flag for testing different inputs")
                                         )
@@ -585,7 +588,7 @@ class McsCmd(object):
 
             cmd.inform('text="Running centroid on current image" ')
 
-            # switch for different centorid methods. Call with switchCMethod
+            # switch for different centroid methods. Call with switchCMethod
             t1 = time.time()
             self.cMethod = 'sep'
             if(self.cMethod == 'sep'):
@@ -625,9 +628,10 @@ class McsCmd(object):
                 self.easyFiberID(cmd, frameId)
 
             else:
-            # read FF from the database, get list of adjacent fibres if they haven't been calculated yet.
+
+                self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
                 if(self.adjacentCobras == None):
-                    adjacentCobras = mcsTools.makeAdjacentList(self.centrePos[:, 1:3], self.armLength)
+                    adjacentCobras = mcsTools.makeAdjacentList(self.centrePos, self.armLength)
                     cmd.inform(f'text="made adjacent lists"')
 
                 # fibreID
@@ -661,7 +665,13 @@ class McsCmd(object):
         self.fibreMode = cmdKeys['fibreMode'].values[0]
         cmd.inform(f'text="fibreMode = {self.fibreMode}"')
         cmd.finish('switchFibreMode=done')
-             
+
+    def switchFMethod(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+        self.fMethod = cmdKeys['fMethod'].values[0]
+        cmd.inform(f'text="fMethod = {self.fMethod}"')
+        cmd.finish('switchFMethod=done')
+
     def switchCMethod(self, cmd):
         cmdKeys = cmd.cmd.keywords
         self.cMethod = cmdKeys['cMethod'].values[0]
@@ -707,6 +717,9 @@ class McsCmd(object):
 
         # Read fiducial and spot geometry
         fids = self.butler.get('fiducials')
+
+        # need for fibreID later
+        self.fids = fids
 
         db=opdb.OpDB(hostname='db-ics', port=5432,
                    dbname='opdb',
@@ -870,16 +883,21 @@ class McsCmd(object):
         if(frameId % 100 == 0):
             self.prevPos = self.centrePos
 
+        mmCentroids = np.copy(self.centroids)
         #transform the coordinates to mm in place
-        self.centroids[:,1], self.centroids[:,2] = self.pfiTrans.mcsToPfi(self.centroids[:,1],self.centroids[:,2])
-        
-        # load target positions
-        tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
+        self.mmCentroids[:,1], self.mmCentroids[:,2] = self.pfiTrans.mcsToPfi(self.centroids[:,1],self.centroids[:,2])
+
+        # if the method is target, load from database, otherwise the target = previous position
+       if(fMethod == 'target'):
+            # load target positions
+            tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
+            cmd.inform(f'text="loaded target postitions from DB"')
+        else:
+            tarPos = self.prevPos
 
         # do the identification
-        cmd.inform(f'text="loaded target postitions from DB"')
-        cobraMatch = mcsTools.fibreID(self.pfic, self.centroids, tarPos, self.centrePos,
-                                         self.armLength, self.prevPos, self.dotPos, self.adjacentCobras)
+        cobraMatch, unaPoints = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
+                                      self.fids, self.dotPos, self.goodIdx, self.adjacentCobras)
         cmd.inform(f'text="identified fibres"')
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
 
@@ -970,7 +988,6 @@ class McsCmd(object):
         elif(self.fibreMode == 'asrd'):
             centrePosPix = self.centrePos
 
-        np.save("cpos.npy", centrePosPix)
         self.findThresh, self.centThresh, self.avBack = mcsTools.getThresh(
             image, centrePosPix, 'full', self.centParms['threshSigma'], self.centParms['findSigma'], self.centParms['centSigma'])
 
@@ -1047,7 +1064,7 @@ class McsCmd(object):
         a = centroid.centroid_only(image.astype('<i4'),
                                    centParms['fwhmx'], centParms['fwhmy'], self.findThresh, self.centThresh,
                                    centParms['boxFind'], centParms['boxCent'],
-                                   centParms['nmin'], centParms['nmax'], centParms['maxIt'], 0)
+                                   centParms['nmin'], centParms['maxIt'], 0)
 
         centroids = np.frombuffer(a, dtype='<f8')
         centroids = np.reshape(centroids, (len(centroids)//7, 7))

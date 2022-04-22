@@ -19,7 +19,6 @@ typedef struct thread_data
   int boxFind;     //FWHM
   int boxCent;     //FWHM
   int nmin;
-  int nmax;
   int maxIt;
   int verbose;
 
