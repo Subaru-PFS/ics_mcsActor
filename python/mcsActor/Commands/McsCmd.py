@@ -101,7 +101,6 @@ class McsCmd(object):
             ('calcThresh', '[<threshMethod>] [<threshSigma>] [<threshFact>]', self.calcThresh),
             ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
-            ('switchFibreMode', '<fibreMode>', self.switchFibreMode),
             ('switchCMethod', '<cMethod>', self.switchCMethod),
             ('switchFMethod', '<fMethod>', self.switchFMethod),
             ('resetGeometry', '', self.resetGeometry),
@@ -145,9 +144,7 @@ class McsCmd(object):
                                         keys.Key("cMethod", types.String(),
                                                  help="method for centroiding (of 'win', 'cent', default 'win')"),
                                         keys.Key("fMethod", types.String(),
-                                                 help="method for fibreId (of 'target', 'previous', default 'target')"),
-                                        keys.Key("fibreMode", types.String(),
-                                                 help="flag for testing different inputs")
+                                                 help="method for fibreId (of 'target', 'previous', default 'target')")
                                         )
 
     def connectToDB(self, cmd=None):
@@ -660,12 +657,6 @@ class McsCmd(object):
 
         cmd.inform('text="Centroids of exposure ID %08d dumped."' % (frameId))
 
-    def switchFibreMode(self, cmd):
-        cmdKeys = cmd.cmd.keywords
-        self.fibreMode = cmdKeys['fibreMode'].values[0]
-        cmd.inform(f'text="fibreMode = {self.fibreMode}"')
-        cmd.finish('switchFibreMode=done')
-
     def switchFMethod(self, cmd):
         cmdKeys = cmd.cmd.keywords
         self.fMethod = cmdKeys['fMethod'].values[0]
@@ -768,40 +759,6 @@ class McsCmd(object):
 
         self.geomFile = cmd.cmd.keywords["geomFile"].values[0]
         cmd.inform(f'text="geometry file set to {self.geomFile}"')
-
-    def transformations(self, cmd, frameId, zenithAngle, insRot):
-        
-        # two caes here, the full mm version, and the asrd pixel version, with no ff
-        cmd.inform(f'text="fibreMode {self.fibreMode}"')
-
-        if(self.fibreMode == 'comm'):
-            fieldElement = False
-        if(self.fibreMode == 'full'):
-            fieldElement = True
-
-        if(self.fibreMode in ('comm', 'full')):
-            db = self.connectToDB(cmd)
-            cmd.inform(f'text="tests centroid shape {self.centroids[:,1:3].shape}"')
-            centroidsMM = mcsTools.transformToMM(
-                self.centroids, self.rotCent, self.offset, zenithAngle, fieldElement, insRot, pixScale=0)
-            np.save("centroidsMM.npy", centroidsMM)
-
-            # match FF to the transformed centroids
-            nFid = len(self.fidPos[:, 0])
-            matchPoint = mcsTools.nearestNeighbourMatching(centroidsMM, self.fidPos, nFid)
-            cmd.inform(f'text="fiducial fibres matched"')
-
-            afCoeff, xd, yd, sx, sy, rotation = mcsTools.calcAffineTransform(matchPoint, self.fidPos)
-            dbTools.writeAffineToDB(db, afCoeff, int(frameId))
-
-            cmd.inform(f'text="transform calculated {xd} {yd} {sx} {sy} {rotation}"')
-
-            self.centroidsMMTrans = mcsTools.applyAffineTransform(centroidsMM, afCoeff)
-            cmd.inform(f'text="affine applied to centroids"')
-
-        elif(self.fibreMode == 'asrd'):
-
-            self.centroidsMMTrans = self.centroids
 
     def easyFiberID(self, cmd, frameId):
         reload(calculation)
@@ -972,7 +929,7 @@ class McsCmd(object):
         db = self.connectToDB(cmd)
 
         cmd.inform(f'text="loading telescope parameters for frame={frameId} '
-            f'with fibreMode={self.fibreMode} at z={zenithAngle} rot={insRot}"')
+            f'at z={zenithAngle} rot={insRot}"')
 
         # zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
         #cmd.diag(f'text="zenithAngle={zenithAngle}, insRot={insRot}"')
