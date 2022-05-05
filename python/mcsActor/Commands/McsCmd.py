@@ -71,7 +71,6 @@ class McsCmd(object):
         self.geometrySet = False
         self.geomFile = None
         self.dotFile = None
-        self.fibreMode = 'full'
 
         logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
                             datefmt="%Y-%m-%dT%H:%M:%S")
@@ -98,7 +97,7 @@ class McsCmd(object):
             ('resetThreshold', '', self.resetThreshold),
             ('setCentroidParams', '[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<maxIt>]',
              self.setCentroidParams),
-            ('calcThresh', '[<threshMethod>] [<threshSigma>] [<threshFact>]', self.calcThresh),
+            ('calcThresh', '[<threshSigma>] [<threshFact>]', self.calcThresh),
             ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
             ('switchCMethod', '<cMethod>', self.switchCMethod),
@@ -134,9 +133,6 @@ class McsCmd(object):
                                                  help="factor for engineering threshold measurements"),
                                         keys.Key("matchRad", types.Int(),
                                                  help="radius in pixels for matching positions"),
-                                        keys.Key("threshMethod", types.String(),
-                                                 help="method for thresholding"),
-                                        keys.Key("threshMode", types.Float(), help="mode for threshold"),
                                         keys.Key("geomFile", types.String(), help="file for geometry"),
                                         keys.Key("dotFile", types.String(), help="file for dot information"),
                                         keys.Key("fieldID", types.String(),
@@ -918,35 +914,11 @@ class McsCmd(object):
 
     def calcThresh(self, cmd, frameId, zenithAngle, insRot, centParms):
         """  Calculate thresholds for finding/centroiding from image 
-
-        3 methods: fieldID uses the known system geometry to figure out the right region
-                   calib is for calibration when the system is not known, calculates from the image characteristics
-                   direct sets teh values manually (backup method)
-
-
-        """
+        """        
         image = self.actor.image
-        db = self.connectToDB(cmd)
-
-        cmd.inform(f'text="loading telescope parameters for frame={frameId} '
-            f'at z={zenithAngle} rot={insRot}"')
-
-        # zenithAngle,insRot=dbTools.loadTelescopeParametersFromDB(db,int(frameId))
-        #cmd.diag(f'text="zenithAngle={zenithAngle}, insRot={insRot}"')
-
-        # different transforms for different setups: with and w/o field elements
-        if(self.fibreMode == 'full'):
-            #centrePosPix = mcsTools.transformToPix(
-            #    self.centrePos, self.rotCent, self.offset, zenithAngle, insRot, fieldElement=True, pixScale=0)
-            centrePosPix =self.centrePos
-        elif(self.fibreMode == 'comm'):
-            centrePosPix = mcsTools.transformToPix(
-                self.centrePos, self.rotCent, self.offset, zenithAngle, insRot, fieldElement=False, pixScale=0)
-        elif(self.fibreMode == 'asrd'):
-            centrePosPix = self.centrePos
 
         self.findThresh, self.centThresh, self.avBack = mcsTools.getThresh(
-            image, centrePosPix, 'full', self.centParms['threshSigma'], self.centParms['findSigma'], self.centParms['centSigma'])
+            image, self.rotCent, self.centParms['threshSigma'], self.centParms['findSigma'], self.centParms['centSigma'])
 
         a1 = self.centParms['threshSigma']
         a2 = self.centParms['findSigma']
