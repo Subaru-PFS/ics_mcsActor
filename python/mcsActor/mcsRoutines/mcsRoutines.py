@@ -690,20 +690,9 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     return aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange
 
 
-def getThresh(image, cobraPos, threshMethod, sigmaThresh, findSigma, centSigma):
+def getThresh(image, boreSight, sigmaThresh, findSigma, centSigma):
     """
     wrapper for getting threshold
-
-    there are two modes. 
-
-      calib is specifically for the case when the expected location of the spots on the camera
-      is unknown, and therefor the illuminated region. The image statistics in the illuminated/
-      unilluminated parts are different enough to skew the results. 
-
-      It was designed for the pinhole mask, but appears to work for the PFI case.
-
-      otherwise, the expected position of the cobras is used to figure out the illuminated region. 
-
 
     input: 
       image: image array
@@ -719,181 +708,24 @@ def getThresh(image, cobraPos, threshMethod, sigmaThresh, findSigma, centSigma):
 
     """
 
-    # engineering mode
-    if(threshMethod == 'calib'):
-        xrange, yrange = getRegion(image, threshSigma)
-        a = getManualThresh(image, xrange, yrange, threshSigma)
-    else:
+    # get the centre
+    mpx = boreSight[0]
+    mpy = boreSight[1]
+    # grid of pixels value, and distance from the center
+    xx, yy = np.meshgrid(np.arange(image.shape[0]), np.arange(image.shape[1]))
+    dfromc = np.sqrt((xx-mpx)**2+(yy-mpy)**2)
+    
+    # crop to a radius of 1500 for hte whole PFI, to select the illuminated region
+    
+    ind = np.where(dfromc < 1500)
+    # sigma clip values
+    a, b, c = sigmaclip(image[ind], sigmaThresh, sigmaThresh)
 
-        # get the centre
-        mpx = cobraPos[:, 1].mean()
-        mpy = cobraPos[:, 2].mean()
-        # grid of pixels value, and distance from the center
-        xx, yy = np.meshgrid(np.arange(image.shape[0]), np.arange(image.shape[1]))
-        dfromc = np.sqrt((xx-mpx)**2+(yy-mpy)**2)
+    # return the mean + sigma value
+    threshFind = a.mean()+a.std()*findSigma
+    threshCent = a.mean()+a.std()*centSigma
 
-        # crop to a radius of 1500 for hte whole PFI, to select the illuminated region
-
-        ind = np.where(dfromc < 1500)
-        # sigma clip values
-        a, b, c = sigmaclip(image[ind], sigmaThresh, sigmaThresh)
-
-        # return the mean + sigma value
-        threshFind = a.mean()+a.std()*findSigma
-        threshCent = a.mean()+a.std()*centSigma
-
-        return threshFind, threshCent, a.mean()
-
-
-def getManualThresh(image, xrange, yrange, sigmaThresh):
-    """
-
-    returns a sigma clipped array. 
-
-    Input: 
-       image: image
-       xrange, yrange: bounds of region 
-       sigmaThresh: threshold for sigma clipping
-
-    Returns:
-       clipped array
-
-    """
-
-    # sigma clip the image to get rid of the spots
-    subIm = image[xrange[0]:xrange[1], yrange[0]:yrange[1]]
-    a, b, c = sigmaclip(subIm.ravel(), sigmaThresh, sigmaThresh)
-
-    return a
-
-
-def getRegion(image, high):
-    """
-
-    A function to manually find the region of the pinhole mask when it's not known in advance. 
-
-    Input: 
-        Image: image
-        high: factor for sigma clipping
-        factor: fudge factor to take into account that 
-
-    """
-
-    # first a sigmaclip
-    im, a, b = sigmaclip(image, high = high)
-
-    # find the boundaries of the region
-    xlow, xhigh, ylow, yhigh = getBoundary(image, a, b, 0)
-
-    # and a second iteration
-    im, a, b = sigmaclip(image[xlow:xhigh, ylow:yhigh], high = high)
-    rrms = im.std()/4
-    xlow, xhigh, ylow, yhigh = getBoundary(image, a, b, rrms)
-
-    return [xlow, xhigh], [ylow, yhigh]
-
-
-def getBoundary(image, a, b, rms):
-    """
-
-    find the region that is occupied by the pinhole mask. 
-
-    input:
-
-        image
-        a, b - upper and lower limits for sigma clipping
-        rms - adjustment factor for short axis of image (default zero)
-
-    output:
-
-        x1, y1, x2, y2: limits of box for the pinhole mask structure. 
-
-    """
-
-    # set up the variables
-    sz = image.shape
-
-    prof1 = np.zeros((sz[0]))
-    prof0 = np.zeros((sz[1]))
-
-    # do a sigma clipped summing collapsing along each axis.
-    # there's probabably a fancy python way to make this more
-    # efficient
-
-    for i in range(sz[0]):
-        ind = np.where(image[i, :] < b)
-        prof1[i] = np.mean(image[i, ind])
-    for i in range(sz[1]):
-        ind = np.where(image[:, i] < b)
-        prof0[i] = np.mean(image[ind, i])
-
-    # get the mean of each profile, with an adjustment for the short axis
-    # of the image
-
-    pm0 = prof0.mean()
-    pm1 = prof1.mean()-rms
-
-    # next step - move along the summed profile and find the step function
-    # portion by looking for the place in which the step crossed the (adjusted)
-    # mean value.
-
-    # start from the left and move right, then start from the right and move left.
-    # if we reach the middle of the image without finding it, then we assume
-    # the region is right up against the edge of the image.
-
-    ###########################################
-
-    found = 0
-    i = 0
-    while((found == 0) & (i < sz[0]/2)):
-        if((prof1[i]-pm1)*(prof1[i+1]-pm1) < 0):
-            found = 1
-        i = i+1
-
-    x1 = i
-
-    # 3
-    i = int(sz[0]-1)
-    found = 0
-    while((found == 0) & (i > sz[0]/2)):
-        if((prof1[i]-pm1)*(prof1[i-1]-pm1) < 0):
-            found = 1
-        i = i-1
-
-    if(found == 1):
-        x2 = i
-    else:
-        x2 = sz[0]-1
-
-    # 3
-
-    # start at 1000 rather than zero in the long axis
-    # to avoid variation in background flux at the edge of the image
-
-    found = 0
-    i = 1000
-
-    while((found == 0) & (i < sz[1]/2)):
-        if((prof0[i]-pm0)*(prof0[i+1]-pm0) < 0):
-            found = 1
-        i = i+1
-
-    y1 = i
-
-    # 3
-    i = sz[1]-1
-    found = 0
-    while((found == 0) & (i > 1)):
-        if((prof0[i]-pm1)*(prof0[i-1]-pm0) < 0):
-            found = 1
-        i = i-1
-
-    y2 = i
-
-    # 3
-
-    return x1, x2, y1, y2
-
+    return threshFind, threshCent, a.mean()
 
 def checkAdjacentCobras(iCobra, adjacentCobras, unaCobras):
     """
