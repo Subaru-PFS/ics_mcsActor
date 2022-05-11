@@ -716,10 +716,13 @@ class McsCmd(object):
 
         if 'rmod' in self.actor.cameraName.lower():
             altitude = 90.0
+            insrot = 0
 
         self.logger.info(f'Camera name: {self.actor.cameraName}')
         cmd.inform(f'text="camera name: {self.actor.cameraName} altitude using {altitude}"')
-        
+        cmd.inform(f'text="camera name: {self.actor.cameraName} altitude using {insrot}"')
+
+
         pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, 
             altitude=altitude, insrot=insrot)
         
@@ -733,8 +736,11 @@ class McsCmd(object):
         #return the values for writing to DB
         for i in range(2):
             ffid, dist = pfiTransform.updateTransform(mcsData, fids, matchRadius=4.2,nMatchMin=0.1)
+            ffid, dist = pfiTransform.updateTransform(mcsData, fids, matchRadius=4.2,nMatchMin=0.1)
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
-        dbTools.writeFidToDB(db, ffid, mcs_frame_id)
+        
+        #dbTools.writeFidToDB(db, ffid, frameID)
+        
         self.pfiTrans = pfiTransform
 
 
@@ -841,7 +847,7 @@ class McsCmd(object):
         self.mmCentroids[:,1], self.mmCentroids[:,2] = self.pfiTrans.mcsToPfi(self.centroids[:,1],self.centroids[:,2])
 
         # if the method is target, load from database, otherwise the target = previous position
-       if(fMethod == 'target'):
+        if(fMethod == 'target'):
             # load target positions
             tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
             cmd.inform(f'text="loaded target postitions from DB"')

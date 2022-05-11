@@ -269,7 +269,7 @@ def writeFidToDB(db, ffid,  mcs_frame_id):
     """
 
     # get indices of matched FF
-    ind=np.where(ffids1 != -1)
+    ind=np.where(ffid != -1)
     ffids=ffid[ind]
 
     # generate the dataframe
