@@ -208,7 +208,6 @@ def makeAdjacentList(ff, armLength):
 
 def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adjacentCobras):
 
-
     
     centers = centrePos
     points = centroids
@@ -229,11 +228,11 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch = prepWork(
         points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge=0.5)
 
-
     # first pass - assign cobra/spot pairs based on the spots poiint of view
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = firstPass(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange)
     print("here3")
+
 
     # second pass - assign cobra/spot pairs based on the cobra point of view
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = secondPass(
@@ -244,9 +243,8 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = lastPassDist(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, tarPos, 't', anyChange, goodIdx)
 
-    print("here6")
 
-    print("here6")
+
 
     # some final tidying up
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = secondPass(
@@ -367,8 +365,12 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
     dotCobras = []
     fidPoints = []
 
-
     bPoints = []  # non real points (fids, stuck fibres)
+
+    fileName = os.path.join(os.environ['ICS_MCSACTOR_DIR'],  'etc',  'stuck.txt')
+
+    stuckPos = np.loadtxt(fileName)
+
     
     #first, quick positional matching to remove fiducial fibres from list of matchable points
     #note that the matching should return either 0 points (unilluminated fiducials) or
@@ -380,7 +382,6 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
         #print("Fid Match", i, ind, len(ind[0]))
         if len(ind[0]) > 0:
             unaPoints.remove(ind[0][0])
-
             bPoints.append(ind[0][0])
 
 
@@ -395,8 +396,6 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
         if len(ind[0]) > 0:
             unaPoints.remove(ind[0][0])
             bPoints.append(ind[0][0])
-
-
     # get the distnace between cobras and points. cdist is pretty fast, check total time
     D = cdist(points[:, 1:3], centers[:, 1:3])
 
@@ -601,7 +600,7 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
                 change = 1
 
 
-
+    # this loop is for debugging purposes while trying to break the code.
 
     change = 1
     while(change == 1):
@@ -614,7 +613,6 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
 
         #sort, to find the lowest value
         ind = np.unravel_index(np.argsort(D, axis = None), D.shape)
-        print(D.shape)
         #now find the smallest separation among the allowed values
         found = False
         i = 0
