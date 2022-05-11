@@ -224,7 +224,6 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     nPoints = points.shape[0]
     nCobras = targets.shape[0]
 
-    print("here1")
     # set up variables
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch = prepWork(
         points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge=0.5)
@@ -233,7 +232,6 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     # first pass - assign cobra/spot pairs based on the spots poiint of view
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = firstPass(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange)
-    print("here3")
 
     # second pass - assign cobra/spot pairs based on the cobra point of view
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = secondPass(
@@ -244,9 +242,7 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = lastPassDist(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, tarPos, 't', anyChange, goodIdx)
 
-    print("here6")
 
-    print("here6")
 
     # some final tidying up
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = secondPass(
@@ -614,7 +610,6 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
 
         #sort, to find the lowest value
         ind = np.unravel_index(np.argsort(D, axis = None), D.shape)
-        print(D.shape)
         #now find the smallest separation among the allowed values
         found = False
         i = 0
