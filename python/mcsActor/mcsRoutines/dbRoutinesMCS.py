@@ -133,6 +133,24 @@ def writeTargetToDB(db, frameId, target, mpos):
 
     df = pd.DataFrame(data=data)
     db.insert("cobra_target", df)
+def writeFakeTargetToDB(db, frameId, goodIdx):
+
+    """
+    make sure there is a target value if the target d
+    """
+    visitId = frameId // 100
+    iteration = frameId % 100
+
+    nCob = len(goodIdx)
+    # To-Do here we need a better implementation.
+    data = {'pfs_visit_id': np.repeat(visitId,nCob),
+            'iteration' : np.repeat(iteration,nCob),
+            'cobra_id':goodIdx+1,
+
+    }
+
+    df = pd.DataFrame(data=data)
+    db.insert("cobra_target", df)
 
 def writeCobraCenterToDB(db, frameId, centers, mpos):
     visitId = frameId // 100

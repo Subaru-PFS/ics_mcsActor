@@ -223,10 +223,10 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     nPoints = points.shape[0]
     nCobras = targets.shape[0]
 
-    print("here1")
     # set up variables
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch = prepWork(
         points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge=0.5)
+    
 
     # first pass - assign cobra/spot pairs based on the spots poiint of view
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = firstPass(
@@ -605,7 +605,7 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     change = 1
     while(change == 1):
         change = 0
-        nn = nn+1
+        
 
         #get distances between unassigned points and unassigned cobras
         D = cdist(points[unaPoints, 1:3], targets[unaCobras, 1:3])

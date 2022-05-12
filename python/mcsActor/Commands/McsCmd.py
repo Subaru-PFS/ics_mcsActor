@@ -624,7 +624,7 @@ class McsCmd(object):
 
                 self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
                 if(self.adjacentCobras == None):
-                    adjacentCobras = mcsTools.makeAdjacentList(self.centrePos, self.armLength)
+                    self.adjacentCobras = mcsTools.makeAdjacentList(self.centrePos, self.armLength)
                     cmd.inform(f'text="made adjacent lists"')
 
                 # fibreID
@@ -735,7 +735,7 @@ class McsCmd(object):
 
         #return the values for writing to DB
         for i in range(2):
-            ffid, dist = pfiTransform.updateTransform(mcsData, fids, matchRadius=4.2,nMatchMin=0.1)
+            #ffid, dist = pfiTransform.updateTransform(mcsData, fids, matchRadius=4.2,nMatchMin=0.1)
             ffid, dist = pfiTransform.updateTransform(mcsData, fids, matchRadius=4.2,nMatchMin=0.1)
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
         
@@ -850,14 +850,24 @@ class McsCmd(object):
         if(self.fMethod == 'target'):
             # load target positions
             tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
-            cmd.inform(f'text="loaded target postitions from DB"')
+            cmd.inform(f'text="loaded {len(tarPos)} targets from DB"')
+            if(len(tarPos)==0):
+                dbTools.writeFakeTargetToDB(db, int(frameId), self.goodIdx)
+                visitId = frameId // 100
+                iteration = frameId % 100
+                cmd.inform(f'text="Fall back using cobra centers as target." ')
+                cmd.inform(f'text="Writing minimal information to target database."')
+
+                tarPos = self.prevPos
         else:
             tarPos = self.prevPos
 
         # do the identification
+
         cobraMatch, unaPoints = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
                                       self.fids, self.dotPos, self.goodIdx, self.adjacentCobras)
         cmd.inform(f'text="identified fibres"')
+
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
 
         cmd.inform(f'text="wrote matched cobras to database"')
