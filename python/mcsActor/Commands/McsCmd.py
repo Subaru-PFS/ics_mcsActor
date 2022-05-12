@@ -612,7 +612,7 @@ class McsCmd(object):
             else:
                 newField = False
 
-            enableEasyID=True
+            enableEasyID=False
 
             if enableEasyID:
                 #if newField:
@@ -842,12 +842,12 @@ class McsCmd(object):
         if(frameId % 100 == 0):
             self.prevPos = self.centrePos
 
-        mmCentroids = np.copy(self.centroids)
+        self.mmCentroids = np.copy(self.centroids)
         #transform the coordinates to mm in place
         self.mmCentroids[:,1], self.mmCentroids[:,2] = self.pfiTrans.mcsToPfi(self.centroids[:,1],self.centroids[:,2])
 
         # if the method is target, load from database, otherwise the target = previous position
-        if(fMethod == 'target'):
+        if(self.fMethod == 'target'):
             # load target positions
             tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
             cmd.inform(f'text="loaded target postitions from DB"')
