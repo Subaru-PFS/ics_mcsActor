@@ -23,8 +23,12 @@ import fitsio
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 
-from actorcore.utility import fits as fitsUtils
-from actorcore.utility import timecards
+#from actorcore.utility import fits as fitsUtils
+#from actorcore.utility import timecards
+
+from ics.utils.fits import mhs as fitsUtils
+from ics.utils.fits import timecards
+
 from opscore.utility.qstr import qstr
 
 import pfs.utils.coordinates.transform as transformUtils
