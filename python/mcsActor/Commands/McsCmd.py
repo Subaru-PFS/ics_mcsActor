@@ -114,6 +114,7 @@ class McsCmd(object):
         self.keys = keys.KeysDictionary("mcs_mcs", (1, 1),
                                         keys.Key("expTime", types.Float(), help="The exposure time, seconds"),
                                         keys.Key("expType", types.String(), help="The exposure type"),
+                                        keys.Key("cameraName", types.String(), help="The camera used for MCS"),
                                         keys.Key("frameId", types.Int(), help="exposure frameID"),
                                         keys.Key("filename", types.String(), help="exposure filename"),
                                         keys.Key("path", types.String(), help="Simulated image directory"),
@@ -191,6 +192,9 @@ class McsCmd(object):
     def reconnect(self, cmd):
         self.actor.connectCamera(cmd)
         self.actor.camera.setExposureTime(cmd, self.expTime)
+
+        cmdKeys = cmd.cmd.keywords
+        cmdKeys['cameraName'] = self.actor.cameraName
 
         cmd.finish('text="Camera connected!"')
 
@@ -730,22 +734,21 @@ class McsCmd(object):
 
 
         pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, 
-            altitude=altitude, insrot=insrot)
+            altitude=altitude, insrot=insrot,nsigma=0, alphaRot=1)
         
-        outerRing = np.zeros(len(fids), dtype=bool)
-        for i in [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]:
-            outerRing[fids.fiducialId == i] = True
-        
-        pfiTransform.updateTransform(mcsData, fids[outerRing], matchRadius=8.0, nMatchMin=0.1)
-        #pfiTransform.updateTransform(mcsData, fids, matchRadius=4.0, nMatchMin=0.1)
+        outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
+        fidsOuterRing = fids[fids.fiducialId.isin(outerRingIds)]
 
-        #return the values for writing to DB
+        pt.updateTransform(mcsData, fidsOuterRing, matchRadius=8.0, nMatchMin=0.1, fig=fig)
+
+        pt.nsigma = nsigma
+        pt.alphaRot = 0
+
         for i in range(2):
-            #ffid, dist = pfiTransform.updateTransform(mcsData, fids, matchRadius=4.2,nMatchMin=0.1)
             ffid, dist = pfiTransform.updateTransform(mcsData, fids, matchRadius=4.2,nMatchMin=0.1)
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
         
-        #dbTools.writeFidToDB(db, ffid, frameID)
+        dbTools.writeFidToDB(db, ffid, frameID)
         
         self.pfiTrans = pfiTransform
 
