@@ -587,7 +587,8 @@ class McsCmd(object):
 
             # switch for different centroid methods. Call with switchCMethod
             t1 = time.time()
-            self.cMethod = 'sep'
+            #self.cMethod = 'sep'
+            
             if(self.cMethod == 'sep'):
                 cmd.inform(f'text="Using SExtractor for centroid" ')
                 self.runCentroidSEP(cmd)
@@ -698,7 +699,8 @@ class McsCmd(object):
             self.dotFile = os.path.join(
                 instPath, "data/pfi/dot/black_dots_mm.csv")
             
-        cmd.inform(f'text="reading geometry from {self.geomFile} {self.dotFile}"')
+        cmd.inform(f'text="reading XML from {self.geomFile}"')
+        cmd.inform(f'text="reading DOT location from {self.dotFile}"')
         self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.calibModel = mcsTools.readCobraGeometry(
             self.geomFile, self.dotFile)
         cmd.inform('text="cobra geometry read"')
@@ -944,7 +946,7 @@ class McsCmd(object):
         a2 = self.centParms['findSigma']
         a3 = self.centParms['centSigma']
         cmd.inform(f'text="findThresh ={self.findThresh:.2}, centThresh = {self.centThresh:.2}"')
-        cmd.inform(f'text="{a1} {a2} {a3}"')
+        cmd.inform(f'text="threshSigma={a1} findSigma={a2} centSigma={a3}"')
 
     def setCentroidParams(self, cmd):
         """
