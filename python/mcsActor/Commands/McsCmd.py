@@ -739,16 +739,17 @@ class McsCmd(object):
         outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
         fidsOuterRing = fids[fids.fiducialId.isin(outerRingIds)]
 
-        pt.updateTransform(mcsData, fidsOuterRing, matchRadius=8.0, nMatchMin=0.1, fig=fig)
+        pfiTransform.updateTransform(mcsData, fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
 
-        pt.nsigma = nsigma
-        pt.alphaRot = 0
+        nsigma = 0
+        pfiTransform.nsigma = nsigma
+        pfiTransform.alphaRot = 0
 
         for i in range(2):
             ffid, dist = pfiTransform.updateTransform(mcsData, fids, matchRadius=4.2,nMatchMin=0.1)
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
         
-        dbTools.writeFidToDB(db, ffid, frameID)
+        #dbTools.writeFidToDB(db, ffid, frameID)
         
         self.pfiTrans = pfiTransform
 
