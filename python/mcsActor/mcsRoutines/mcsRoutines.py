@@ -206,9 +206,8 @@ def makeAdjacentList(ff, armLength):
         
     return(adjacent)
 
-def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adjacentCobras):
+def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adjacentCobras, calibModel):
 
-    
     centers = centrePos
     points = centroids
     nPoints = len(centroids)
@@ -252,30 +251,38 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
 
 
     # turn the results into an array to be written to teh database
-    cobraMatch = np.empty((nCobras, 5))
+    cobraMatch = np.empty((2394, 5))
 
     ii = 0
-    for i in range(int(goodIdx[-1]+2)):
+    for i in range(2394):
         if(i in goodIdx):
 
             # cobras assigned to spots
             if(len(potPointMatch[ii]) == 1):
-                cobraMatch[ii, 0] = i+1
-                cobraMatch[ii, 1] = potPointMatch[ii][0]
-                cobraMatch[ii, 2] = points[potPointMatch[ii][0], 1]
-                cobraMatch[ii, 3] = points[potPointMatch[ii][0], 2]
-                cobraMatch[ii, 4] = 0
+                cobraMatch[i, 0] = i+1
+                cobraMatch[i, 1] = potPointMatch[ii][0]
+                cobraMatch[i, 2] = points[potPointMatch[ii][0], 1]
+                cobraMatch[i, 3] = points[potPointMatch[ii][0], 2]
+                cobraMatch[i, 4] = 0
 
             # cobras assigned to dots - set spot_id to -1 and set flag
             elif(len(potPointMatch[ii]) == 0):
-                cobraMatch[ii, 0] = i+1
-                cobraMatch[ii, 1] = -1
-                cobraMatch[ii, 2] = dotPos[ii, 1]
-                cobraMatch[ii, 3] = dotPos[ii, 2]
-                cobraMatch[ii, 4] = 2
+                cobraMatch[i, 0] = i+1
+                cobraMatch[i, 1] = -1
+                cobraMatch[i, 2] = dotPos[ii, 1]
+                cobraMatch[i, 3] = dotPos[ii, 2]
+                cobraMatch[i, 4] = 2
             else:
                 print(ii,i,potPointMatch[ii])
             ii = ii+1
+        else:
+            dd = np.sqrt((calibModel.centers.real[i]-points[:,1])**2+(calibModel.centers.imag[i]-points[:,2])**2)
+            ind = np.argmin(dd)
+            cobraMatch[i,0] = i+1
+            cobraMatch[i, 1] = -1
+            cobraMatch[i, 2] = points[ind,1]
+            cobraMatch[i, 3] = points[ind,2]
+            cobraMatch[i, 4] = 0
             
     return cobraMatch, unaPoints
 
@@ -364,7 +371,7 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
     aPoints = []
     dotCobras = []
     fidPoints = []
-
+    
     bPoints = []  # non real points (fids, stuck fibres)
 
     fileName = os.path.join(os.environ['ICS_MCSACTOR_DIR'],  'etc',  'stuck.txt')

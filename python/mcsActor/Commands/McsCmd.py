@@ -875,7 +875,7 @@ class McsCmd(object):
         # do the identification
 
         cobraMatch, unaPoints = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
-                                      self.fids, self.dotPos, self.goodIdx, self.adjacentCobras)
+                                                 self.fids, self.dotPos, self.goodIdx, self.adjacentCobras, self.calibModel)
         cmd.inform(f'text="identified fibres"')
 
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
