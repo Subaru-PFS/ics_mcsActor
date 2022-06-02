@@ -99,9 +99,19 @@ def readCobraGeometry(xmlFile, dotFile):
 
     
     # then extract the parameters for good fibres only
-    centrePos = np.array([goodIdx+1, centersAll[goodIdx].real, centersAll[goodIdx].imag]).T
-    armLength = (des.L1[goodIdx]+des.L2[goodIdx])
+    #centrePos = np.array([goodIdx+1, centersAll[goodIdx].real, centersAll[goodIdx].imag]).T
+    #armLength = (des.L1[goodIdx]+des.L2[goodIdx])
 
+    # get the centres and armlengths
+    centrePos = np.array([np.arange(0,2394), centersAll.real,centersAll.imag]).T
+    armLength = (des.L1 + des.L2)
+
+    # find bad arm lengths and put fake values in it
+    ind=np.where(np.any([armLength < 3.5,armLength > 6.5],axis=0))
+    armLength[ind]=4.5
+
+    goodIdx = np.arange(2394)
+    
     # number of cobras
     nCobras = len(armLength)
     # PFS_INSTDATA_DIR
@@ -206,6 +216,7 @@ def makeAdjacentList(ff, armLength):
         
     return(adjacent)
 
+
 def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adjacentCobras):
 
     
@@ -231,7 +242,6 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     # first pass - assign cobra/spot pairs based on the spots poiint of view
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = firstPass(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange)
-    print("here3")
 
 
     # second pass - assign cobra/spot pairs based on the cobra point of view
@@ -242,8 +252,6 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     # last pass - figure out the spots that can belong to more than one cobra, and things hidden by dots
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = lastPassDist(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, tarPos, 't', anyChange, goodIdx)
-
-
 
 
     # some final tidying up
@@ -390,12 +398,12 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
     fileName = os.path.join(os.environ['ICS_MCSACTOR_DIR'],  'etc',  'stuck.txt')
     stuckPos = np.loadtxt(fileName)
 
-    D = cdist(stuckPos[:,1:3], points[:,1:3])
-    for i in range(len(stuckPos)):
-        ind = np.where(D[i, :] < 1)
-        if len(ind[0]) > 0:
-            unaPoints.remove(ind[0][0])
-            bPoints.append(ind[0][0])
+    #D = cdist(stuckPos[:,1:3], points[:,1:3])
+    #for i in range(len(stuckPos)):
+    #    ind = np.where(D[i, :] < 1)
+    #    if len(ind[0]) > 0:
+    #        unaPoints.remove(ind[0][0])
+    #        bPoints.append(ind[0][0])
     # get the distnace between cobras and points. cdist is pretty fast, check total time
     D = cdist(points[:, 1:3], centers[:, 1:3])
 
