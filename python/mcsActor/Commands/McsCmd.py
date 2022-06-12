@@ -591,7 +591,11 @@ class McsCmd(object):
 
             # switch for different centroid methods. Call with switchCMethod
             t1 = time.time()
-            #self.cMethod = 'sep'
+            
+            if self.actor.cameraName == 'rmod_71m':
+                self.cMethod = 'sep'
+                cmd.inform(f'text="Bench camera RMOD-71M is used. Using SEP" ')
+
             
             if(self.cMethod == 'sep'):
                 cmd.inform(f'text="Using SExtractor for centroid" ')
@@ -696,17 +700,20 @@ class McsCmd(object):
         cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
 
         # read xmlFile
-        instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
-        if(self.geomFile == None):
-            self.geomFile = os.path.join(instPath, 'data/pfi/modules/ALL/ALL_final_20210920_mm.xml')
-        if(self.dotFile == None):
-            self.dotFile = os.path.join(
-                instPath, "data/pfi/dot/black_dots_mm.csv")
-            
-        cmd.inform(f'text="reading XML from {self.geomFile}"')
-        cmd.inform(f'text="reading DOT location from {self.dotFile}"')
+        #instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
+        #if(self.geomFile == None):
+        #    self.geomFile = os.path.join(instPath, 'data/pfi/modules/ALL/ALL_final_20210920_mm.xml')
+        #if(self.dotFile == None):
+        #    self.dotFile = os.path.join(
+        #        instPath, "data/pfi/dot/black_dots_mm.csv")
+
+        pfi = self.butler.get("moduleXml", moduleName="ALL", version="")
+        dots = self.butler.get("black_dots", moduleName="ALL", version="")
+
+        cmd.inform(f'text="loading XML from butler"')
+        cmd.inform(f'text="loading DOT location from butler"')
         self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.calibModel = mcsTools.readCobraGeometry(
-            self.geomFile, self.dotFile)
+            pfi, dots)
         cmd.inform('text="cobra geometry read"')
         self.geometrySet = True
 
@@ -738,7 +745,10 @@ class McsCmd(object):
         
         outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
         fidsOuterRing = fids[fids.fiducialId.isin(outerRingIds)]
-
+        badFids = [1,32,34,61,68,75,88,89,2,4,33,36,37,65,66,67,68,69]
+        goodFids = list(set(fids['fiducialId'].values)-set(badFids))
+        fidsGood = fids[fids.fiducialId.isin(goodFids)]
+        
         pfiTransform.updateTransform(mcsData, fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
 
         nsigma = 0
@@ -746,7 +756,7 @@ class McsCmd(object):
         pfiTransform.alphaRot = 0
 
         for i in range(2):
-            ffid, dist = pfiTransform.updateTransform(mcsData, fids, matchRadius=4.2,nMatchMin=0.1)
+            ffid, dist = pfiTransform.updateTransform(mcsData, fidsGood, matchRadius=4.2,nMatchMin=0.1)
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
         
         #dbTools.writeFidToDB(db, ffid, frameID)
@@ -862,6 +872,9 @@ class McsCmd(object):
             tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
             cmd.inform(f'text="loaded {len(tarPos)} targets from DB"')
             if(len(tarPos)==0):
+                db=opdb.OpDB(hostname='db-ics', port=5432,
+                   dbname='opdb',
+                   username='pfs')
                 dbTools.writeFakeTargetToDB(db, int(frameId), self.goodIdx)
                 visitId = frameId // 100
                 iteration = frameId % 100
@@ -877,7 +890,9 @@ class McsCmd(object):
         cobraMatch, unaPoints = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
                                       self.fids, self.dotPos, self.goodIdx, self.adjacentCobras)
         cmd.inform(f'text="identified fibres"')
-
+        db=opdb.OpDB(hostname='db-ics', port=5432,
+                   dbname='opdb',
+                   username='pfs')
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
 
         cmd.inform(f'text="wrote matched cobras to database"')

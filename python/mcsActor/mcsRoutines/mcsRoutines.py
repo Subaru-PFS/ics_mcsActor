@@ -67,7 +67,7 @@ def getCentroidParams(cmd):
 
     return centParms
 
-def readCobraGeometry(xmlFile, dotFile):
+def readCobraGeometry(des,dotData):
     """
     read cobra geometry from configuration file/inst_config
 
@@ -76,12 +76,6 @@ def readCobraGeometry(xmlFile, dotFile):
     The results will be return in whatever unit the input XML file is in
     """
 
-    # geometry XML file
-
-    #pfic = pfi.PFI(fpgaHost = 'localhost', doConnect = False, logDir = None)
-    #aa = pfic.loadModel([pathlib.Path(xmlFile)])
-
-    des  = pfiDesign.PFIDesign(pathlib.Path(xmlFile))
     # first figure out the good cobras (bad positions are set to 0)
     centersAll = des.centers
 
@@ -114,9 +108,6 @@ def readCobraGeometry(xmlFile, dotFile):
     
     # number of cobras
     nCobras = len(armLength)
-    # PFS_INSTDATA_DIR
-    # at the moment read dots from CSV file
-    dotData = pd.read_csv(dotFile, delimiter = ",", header=0)
     dotPos = np.zeros((len(goodIdx), 4))
 
     dotPos[:, 0] = dotData['spotId'].values[goodIdx]
