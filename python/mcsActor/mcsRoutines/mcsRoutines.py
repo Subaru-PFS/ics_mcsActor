@@ -67,7 +67,7 @@ def getCentroidParams(cmd):
 
     return centParms
 
-def readCobraGeometry(xmlFile, dotFile):
+def readCobraGeometry(des,dotData):
     """
     read cobra geometry from configuration file/inst_config
 
@@ -76,12 +76,6 @@ def readCobraGeometry(xmlFile, dotFile):
     The results will be return in whatever unit the input XML file is in
     """
 
-    # geometry XML file
-
-    #pfic = pfi.PFI(fpgaHost = 'localhost', doConnect = False, logDir = None)
-    #aa = pfic.loadModel([pathlib.Path(xmlFile)])
-
-    des  = pfiDesign.PFIDesign(pathlib.Path(xmlFile))
     # first figure out the good cobras (bad positions are set to 0)
     centersAll = des.centers
 
@@ -99,14 +93,21 @@ def readCobraGeometry(xmlFile, dotFile):
 
     
     # then extract the parameters for good fibres only
-    centrePos = np.array([goodIdx+1, centersAll[goodIdx].real, centersAll[goodIdx].imag]).T
-    armLength = (des.L1[goodIdx]+des.L2[goodIdx])
+    #centrePos = np.array([goodIdx+1, centersAll[goodIdx].real, centersAll[goodIdx].imag]).T
+    #armLength = (des.L1[goodIdx]+des.L2[goodIdx])
 
+    # get the centres and armlengths
+    centrePos = np.array([np.arange(0,2394), centersAll.real,centersAll.imag]).T
+    armLength = (des.L1 + des.L2)
+
+    # find bad arm lengths and put fake values in it
+    ind=np.where(np.any([armLength < 3.5,armLength > 6.5],axis=0))
+    armLength[ind]=4.5
+
+    goodIdx = np.arange(2394)
+    
     # number of cobras
     nCobras = len(armLength)
-    # PFS_INSTDATA_DIR
-    # at the moment read dots from CSV file
-    dotData = pd.read_csv(dotFile, delimiter = ",", header=0)
     dotPos = np.zeros((len(goodIdx), 4))
 
     dotPos[:, 0] = dotData['spotId'].values[goodIdx]
@@ -206,6 +207,7 @@ def makeAdjacentList(ff, armLength):
         
     return(adjacent)
 
+
 def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adjacentCobras):
 
     
@@ -231,7 +233,6 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     # first pass - assign cobra/spot pairs based on the spots poiint of view
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = firstPass(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange)
-    print("here3")
 
 
     # second pass - assign cobra/spot pairs based on the cobra point of view
@@ -242,8 +243,6 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     # last pass - figure out the spots that can belong to more than one cobra, and things hidden by dots
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, anyChange = lastPassDist(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, tarPos, 't', anyChange, goodIdx)
-
-
 
 
     # some final tidying up
@@ -390,12 +389,12 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
     fileName = os.path.join(os.environ['ICS_MCSACTOR_DIR'],  'etc',  'stuck.txt')
     stuckPos = np.loadtxt(fileName)
 
-    D = cdist(stuckPos[:,1:3], points[:,1:3])
-    for i in range(len(stuckPos)):
-        ind = np.where(D[i, :] < 1)
-        if len(ind[0]) > 0:
-            unaPoints.remove(ind[0][0])
-            bPoints.append(ind[0][0])
+    #D = cdist(stuckPos[:,1:3], points[:,1:3])
+    #for i in range(len(stuckPos)):
+    #    ind = np.where(D[i, :] < 1)
+    #    if len(ind[0]) > 0:
+    #        unaPoints.remove(ind[0][0])
+    #        bPoints.append(ind[0][0])
     # get the distnace between cobras and points. cdist is pretty fast, check total time
     D = cdist(points[:, 1:3], centers[:, 1:3])
 

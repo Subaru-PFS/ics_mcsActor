@@ -141,11 +141,12 @@ def writeFakeTargetToDB(db, frameId, goodIdx):
     visitId = frameId // 100
     iteration = frameId % 100
 
-    nCob = len(goodIdx)
+    nCob = 2394
+    
     # To-Do here we need a better implementation.
     data = {'pfs_visit_id': np.repeat(visitId,nCob),
             'iteration' : np.repeat(iteration,nCob),
-            'cobra_id':goodIdx+1,
+            'cobra_id':np.arange(2394)+1,
 
     }
 
