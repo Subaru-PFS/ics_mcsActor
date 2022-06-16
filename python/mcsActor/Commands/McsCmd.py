@@ -1038,6 +1038,8 @@ class McsCmd(object):
 
         centroids = np.frombuffer(a, dtype='<f8')
         centroids = np.reshape(centroids, (len(centroids)//7, 7))
+
+
         nSpots = centroids.shape[0]
         points = np.empty((nSpots, 8))
         points[:, 0] = np.arange(nSpots)
@@ -1046,7 +1048,8 @@ class McsCmd(object):
         points[:,-1]=np.repeat(self.avBack,len(points))
 
         # Swap last two fields
-        points[:,[-1,-2]] = points[:,[-2,-1]]
+        points[:,[-1,-3]] = points[:,[-3,-1]]
+        #points[:,[-1,-2]] = points[:,[-2,-1]]
 
         self.centroids = points
 
@@ -1168,7 +1171,7 @@ class McsCmd(object):
         for l_i in range(nItems):
             line = '%d,%d,%f,%f,%f,%f,%f,%f,%f\n' % (frameId, l_i+1, centArr[l_i,1], 
                                         centArr[l_i,2], centArr[l_i,3], centArr[l_i,4], 
-                                        centArr[l_i,5], centArr[l_i,6], centArr[l_i,7])
+                                        centArr[l_i,7], centArr[l_i,6], centArr[l_i,5])
             buf.write(line)
         
         line = line = '%d,%d,%f,%f,%f,%f,%f,%f,%f\n' % (frameId, -1, np.nan, 
