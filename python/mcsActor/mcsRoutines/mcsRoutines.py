@@ -260,7 +260,7 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
             # cobras assigned to spots
             if(len(potPointMatch[ii]) == 1):
                 cobraMatch[ii, 0] = i+1
-                cobraMatch[ii, 1] = potPointMatch[ii][0]
+                cobraMatch[ii, 1] = points[potPointMatch[ii][0],0]
                 cobraMatch[ii, 2] = points[potPointMatch[ii][0], 1]
                 cobraMatch[ii, 3] = points[potPointMatch[ii][0], 2]
                 cobraMatch[ii, 4] = 0

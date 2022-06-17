@@ -625,7 +625,7 @@ class McsCmd(object):
             else:
                 newField = False
 
-            enableEasyID=False
+            enableEasyID=True
 
             if enableEasyID:
                 #if newField:
@@ -700,12 +700,12 @@ class McsCmd(object):
         cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
 
         # read xmlFile
-        #instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
+        instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
         #if(self.geomFile == None):
         #    self.geomFile = os.path.join(instPath, 'data/pfi/modules/ALL/ALL_final_20210920_mm.xml')
-        #if(self.dotFile == None):
-        #    self.dotFile = os.path.join(
-        #        instPath, "data/pfi/dot/black_dots_mm.csv")
+        if(self.dotFile == None):
+            self.dotFile = os.path.join(
+                instPath, "data/pfi/dot/black_dots_mm.csv")
 
         pfi = self.butler.get("moduleXml", moduleName="ALL", version="")
         dots = self.butler.get("black_dots", moduleName="ALL", version="")
@@ -1048,8 +1048,9 @@ class McsCmd(object):
         points[:,-1]=np.repeat(self.avBack,len(points))
 
         # Swap last two fields
+        #points[:,[-2,-3]] = points[:,[-3,-2]]
+        points[:,[-1,-2]] = points[:,[-2,-1]]
         points[:,[-1,-3]] = points[:,[-3,-1]]
-        #points[:,[-1,-2]] = points[:,[-2,-1]]
 
         self.centroids = points
 
@@ -1171,7 +1172,8 @@ class McsCmd(object):
         for l_i in range(nItems):
             line = '%d,%d,%f,%f,%f,%f,%f,%f,%f\n' % (frameId, l_i+1, centArr[l_i,1], 
                                         centArr[l_i,2], centArr[l_i,3], centArr[l_i,4], 
-                                        centArr[l_i,7], centArr[l_i,6], centArr[l_i,5])
+                                        centArr[l_i,5], centArr[l_i,6], centArr[l_i,7])
+            
             buf.write(line)
         
         line = line = '%d,%d,%f,%f,%f,%f,%f,%f,%f\n' % (frameId, -1, np.nan, 
