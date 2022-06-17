@@ -170,7 +170,7 @@ def writeCobraCenterToDB(db, frameId, centers, mpos):
             }
 
     df = pd.DataFrame(data=targetTable)
-    db.insert("cobra_target", df)
+    db.bulkInsert("cobra_target", df)
 
 def writeBoresightToDB(db, pfsVisitId, boresight):
     """ write boresight to database with current timestamp """
@@ -179,7 +179,7 @@ def writeBoresightToDB(db, pfsVisitId, boresight):
    
     df = pd.DataFrame({'pfs_visit_id': [pfsVisitId], 'mcs_boresight_x_pix': [boresight[0]], 'mcs_boresight_y_pix': [boresight[1]],
                        'calculated_at': [dt]})
-    db.insert('mcs_boresight', df)
+    db.bulkInsert('mcs_boresight', df)
 
 
 def writeCentroidsToDB(db, centroids, mcsFrameId):
@@ -205,7 +205,7 @@ def writeCentroidsToDB(db, centroids, mcsFrameId):
                'mcs_second_moment_y_pix', 'peakvalue', 'bgvalue', 'mcs_second_moment_xy_pix']
 
     df = pd.DataFrame(frame, columns=columns)
-    db.insert("mcs_data", df)
+    db.bulkInsert("mcs_data", df)
 
 def readMatchFromDB(db, mcsFrameId):
     
@@ -241,7 +241,7 @@ def writeMatchesToDB(db, cobraMatch, mcsFrameId):
                'spot_id', 'pfi_center_x_mm', 'pfi_center_y_mm', 'flags']
     
     df = pd.DataFrame(data=frame, columns=columns)
-    db.insert("cobra_match", df)
+    db.bulkInsert("cobra_match", df)
 
     #ind = np.where(cobraMatch[:, 1] != -1)
     #np.save("frame.npy", frame)
@@ -277,7 +277,7 @@ def writeAffineToDB(db, afCoeff, frameId):
 
     df = pd.DataFrame({'mcs_frame_id': [frameId], 'x_trans': [xd], 'y_trans': [
                       yd], 'x_scale': [sx], 'y_scale': [sy], 'angle': [rotation]})
-    db.insert('mcs_pfi_transformation', df)
+    db.bulkInsert('mcs_pfi_transformation', df)
 
 def writeFidToDB(db, ffid,  mcs_frame_id):
 
@@ -308,5 +308,5 @@ def writeFidToDB(db, ffid,  mcs_frame_id):
     df = pd.DataFrame(frame, columns=columns)
 
     #insert
-    db.insert("fiducial_fiber_match", df)
+    db.bulkInsert("fiducial_fiber_match", df)
  
