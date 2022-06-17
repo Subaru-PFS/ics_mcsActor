@@ -264,7 +264,7 @@ def writeMatchesToDB(db, cobraMatch, mcsFrameId):
                     'spot_id':cobraMatch[:,1].astype('int'),
                     'pfi_center_x_mm':cobraMatch[:,2],
                     'pfi_center_y_mm':cobraMatch[:,3],
-                    'flags':cobraMatch[:,3].astype('int')
+                    'flags':cobraMatch[:,4].astype('int')
                    }
     df = pd.DataFrame(data=targetTable)                   
     db.insert("cobra_match", df)
