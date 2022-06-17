@@ -116,7 +116,7 @@ def loadTargetsFromDB(db, frameId):
     iteration = frameId % 100
 
     sql = f'SELECT cobra_target.cobra_id,cobra_target.pfi_nominal_x_mm,cobra_target.pfi_nominal_y_mm FROM cobra_target WHERE cobra_target.iteration={iteration} and cobra_target.pfs_visit_id={visitId}'
-    df = db.fetch_query(sql)
+    df = db.bulkSelect('cobra_target',sql)
 
     return np.array([df['cobra_id'], df['pfi_nominal_x_mm'], df['pfi_nominal_y_mm']]).T
 
@@ -133,7 +133,8 @@ def writeTargetToDB(db, frameId, target, mpos):
 
     df = pd.DataFrame(data=data)
     db.insert("cobra_target", df)
-def writeFakeTargetToDB(db, frameId, goodIdx):
+
+def writeFakeTargetToDB(db, centers, frameId):
 
     """
     make sure there is a target value if the target d
@@ -144,10 +145,23 @@ def writeFakeTargetToDB(db, frameId, goodIdx):
     nCob = 2394
     
     # To-Do here we need a better implementation.
-    data = {'pfs_visit_id': np.repeat(visitId,nCob),
-            'iteration' : np.repeat(iteration,nCob),
-            'cobra_id':np.arange(2394)+1,
-
+    data = {'pfs_visit_id': np.repeat(visitId,nCob).astype('int'),
+            'iteration' : np.repeat(iteration,nCob).astype('int'),
+            'cobra_id':np.arange(2394).astype('int')+1,
+            'pfs_config_id':np.repeat(0,2394).astype('int'),
+            'pfi_nominal_x_mm':centers.real,
+            'pfi_nominal_y_mm':centers.imag,
+            'pfi_target_x_mm': centers.real,
+            'pfi_target_y_mm':centers.imag,
+            'cobra_mortor_model_id_theta': np.repeat(0,2394).astype('int'),
+            'motor_target_theta':np.repeat(0,2394),
+            'motor_num_step_theta':np.repeat(0,2394),
+            'motor_on_time_theta':np.repeat(0,2394),
+            'cobra_mortor_model_id_phi': np.repeat(0,2394).astype('int'),
+            'motor_target_phi':np.repeat(0,2394),
+            'motor_num_step_phi':np.repeat(0,2394),
+            'motor_on_time_phi':np.repeat(0,2394),
+            'flags':np.repeat(0,2394).astype('int')
     }
 
     df = pd.DataFrame(data=data)
@@ -206,6 +220,7 @@ def writeCentroidsToDB(db, centroids, mcsFrameId):
 
     df = pd.DataFrame(frame, columns=columns)
     db.bulkInsert("mcs_data", df)
+    
 
 def readMatchFromDB(db, mcsFrameId):
     
@@ -239,9 +254,20 @@ def writeMatchesToDB(db, cobraMatch, mcsFrameId):
 
     columns = ['pfs_visit_id', 'iteration', 'mcs_frame_id', 'cobra_id',
                'spot_id', 'pfi_center_x_mm', 'pfi_center_y_mm', 'flags']
-    
-    df = pd.DataFrame(data=frame, columns=columns)
-    db.bulkInsert("cobra_match", df)
+
+    visitId = mcsFrameId // 100
+    iteration = mcsFrameId % 100
+    targetTable = {'pfs_visit_id':np.repeat(visitId,2394).astype('int'),
+                    'iteration':np.repeat(iteration,2394).astype('int'),
+                    'cobra_id':cobraMatch[:,0].astype('int'),
+                    'mcs_frame_id':np.repeat(mcsFrameId,2394).astype('int'),
+                    'spot_id':cobraMatch[:,1].astype('int'),
+                    'pfi_center_x_mm':cobraMatch[:,2],
+                    'pfi_center_y_mm':cobraMatch[:,3],
+                    'flags':cobraMatch[:,3].astype('int')
+                   }
+    df = pd.DataFrame(data=targetTable)                   
+    db.insert("cobra_match", df)
 
     #ind = np.where(cobraMatch[:, 1] != -1)
     #np.save("frame.npy", frame)

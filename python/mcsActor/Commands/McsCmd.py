@@ -870,10 +870,14 @@ class McsCmd(object):
         if(self.fMethod == 'target'):
             # load target positions
             tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
+            db.close()
+            
             cmd.inform(f'text="loaded {len(tarPos)} targets from DB"')
             if(len(tarPos)==0):
+                db = self.connectToDB(cmd)
+                dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
+                db.close()
 
-                dbTools.writeFakeTargetToDB(db, int(frameId), self.goodIdx)
                 visitId = frameId // 100
                 iteration = frameId % 100
                 cmd.inform(f'text="Fall back using cobra centers as target." ')
@@ -882,15 +886,15 @@ class McsCmd(object):
                 tarPos = self.prevPos
         else:
             tarPos = self.prevPos
-
         # do the identification
-
+        cmd.inform(f'text="Starting Fiber ID"')
         cobraMatch, unaPoints = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
                                       self.fids, self.dotPos, self.goodIdx, self.adjacentCobras)
-        cmd.inform(f'text="identified fibres"')
+        cmd.inform(f'text="Fiber ID dinished"')
 
+        db = self.connectToDB(cmd)
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
-
+        db.close()
         cmd.inform(f'text="wrote matched cobras to database"')
 
         # save the values to the previous position
