@@ -625,7 +625,7 @@ class McsCmd(object):
             else:
                 newField = False
 
-            enableEasyID=False
+            enableEasyID=True
 
             if enableEasyID:
                 #if newField:
@@ -839,10 +839,12 @@ class McsCmd(object):
         iteration = frameId % 100
         cobraTarget = db.bulkSelect('cobra_target','select pfs_visit_id from cobra_target where '
             f'(pfs_visit_id = {visitId}) AND iteration = {iteration}').reset_index()
+        db.close()
 
+        db = self.connectToDB(cmd)
         if len(cobraTarget) == 0:
             cmd.inform(f'text="Fall back using cobra centers as target." ')
-            dbTools.writeCobraCenterToDB(db, int(frameId), target, mpos)
+            dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
     
         cobraMatch = np.zeros((2394, 5))
         cobraMatch[:,0] = np.arange(2394)+1 

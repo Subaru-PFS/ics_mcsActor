@@ -219,7 +219,7 @@ def writeCentroidsToDB(db, centroids, mcsFrameId):
                'mcs_second_moment_y_pix', 'peakvalue', 'bgvalue', 'mcs_second_moment_xy_pix']
 
     df = pd.DataFrame(frame, columns=columns)
-    db.bulkInsert("mcs_data", df)
+    db.insert("mcs_data", df)
     
 
 def readMatchFromDB(db, mcsFrameId):
