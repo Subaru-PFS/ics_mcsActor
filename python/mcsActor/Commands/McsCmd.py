@@ -872,9 +872,7 @@ class McsCmd(object):
             tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
             cmd.inform(f'text="loaded {len(tarPos)} targets from DB"')
             if(len(tarPos)==0):
-                db=opdb.OpDB(hostname='db-ics', port=5432,
-                   dbname='opdb',
-                   username='pfs')
+
                 dbTools.writeFakeTargetToDB(db, int(frameId), self.goodIdx)
                 visitId = frameId // 100
                 iteration = frameId % 100
@@ -890,9 +888,7 @@ class McsCmd(object):
         cobraMatch, unaPoints = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
                                       self.fids, self.dotPos, self.goodIdx, self.adjacentCobras)
         cmd.inform(f'text="identified fibres"')
-        db=opdb.OpDB(hostname='db-ics', port=5432,
-                   dbname='opdb',
-                   username='pfs')
+
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
 
         cmd.inform(f'text="wrote matched cobras to database"')
