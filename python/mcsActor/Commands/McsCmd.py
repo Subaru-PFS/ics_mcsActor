@@ -625,7 +625,7 @@ class McsCmd(object):
             else:
                 newField = False
 
-            enableEasyID=True
+            enableEasyID=False
 
             if enableEasyID:
                 #if newField:
