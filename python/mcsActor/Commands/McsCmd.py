@@ -625,7 +625,7 @@ class McsCmd(object):
             else:
                 newField = False
 
-            enableEasyID=True
+            enableEasyID=False
 
             if enableEasyID:
                 #if newField:
@@ -887,12 +887,21 @@ class McsCmd(object):
 
                 tarPos = self.prevPos
         else:
+            db.close()
+            
+            tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
+            if(len(tarPos)==0):
+                db = self.connectToDB(cmd)
+                dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
+                db.close()
             tarPos = self.prevPos
+            
         # do the identification
         cmd.inform(f'text="Starting Fiber ID"')
         cobraMatch, unaPoints = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
                                       self.fids, self.dotPos, self.goodIdx, self.adjacentCobras)
-        cmd.inform(f'text="Fiber ID dinished"')
+        cmd.inform(f'text="Fiber ID finished"')
+
 
         db = self.connectToDB(cmd)
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
@@ -1044,7 +1053,9 @@ class McsCmd(object):
 
         nSpots = centroids.shape[0]
         points = np.empty((nSpots, 8))
-        points[:, 0] = np.arange(nSpots)
+
+        # ADD A PLUS 1 TO MATCH THE OTHER CENTROIDING AND STOP CAUSING INDEXING ERRORS
+        points[:, 0] = np.arange(nSpots)+1
         points[:, 1:] = centroids[:, 0:]
 
         points[:,-1]=np.repeat(self.avBack,len(points))
