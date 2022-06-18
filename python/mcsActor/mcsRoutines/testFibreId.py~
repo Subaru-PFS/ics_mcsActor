@@ -1,5 +1,4 @@
 
-
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
@@ -34,6 +33,7 @@ def checkTransform(dataPath,frameIds,camera_name,centParms, centrePos, armLength
 
     centrePosPix = [5033,3447]
 
+    cameraName = 'rmod_71m'
 
     #centrePosPix = np.array([[5033,5033],[5033,5033],[3447,3447]]).T
     tarPos = centrePos
@@ -228,11 +228,10 @@ def testFibreIDDB(frameIds,camera_name,centParms, centrePos, armLength, dotPos, 
             
 
         
-def testFibreIDNearest(dataPath,frameIds,cameraName,centParms, centrePos, armLength, dotPos, goodIdx, des, adjacentCobras, fids, fidPos,calibModel):
+def testFibreIDNearest(dataPath,frameIds,camera_name,centParms, centrePos, armLength, dotPos, goodIdx, des, adjacentCobras, fids, fidPos,calibModel):
 
+    cameraName = 'rmod_71m'
 
-    cobraMatches=[]
-    allCentroids=[]
     centrePosPix = np.array([5033,3447]).T
     tarPos = centrePos
     prevPos = centrePos
@@ -241,13 +240,8 @@ def testFibreIDNearest(dataPath,frameIds,cameraName,centParms, centrePos, armLen
     fig1,ax1=plt.subplots()
     fig2,ax2=plt.subplots()
     for frameId in frameIds:
-    
         print("frameId = ",frameId)
         fName=dataPath+"PFSC0"+str(frameId)+".fits"
-        hdu = fits.open(fName)
-        hdr = hdu[0].header
-        altitude = hdr['altitude']
-        insrot = hdr['insrot']
         image=fits.getdata(fName)
         if(iter==0):
             findThresh, centThresh, avBack = mcsTools.getThresh(
@@ -277,8 +271,8 @@ def testFibreIDNearest(dataPath,frameIds,cameraName,centParms, centrePos, armLen
             'mcs_second_moment_y_pix', 'peakvalue', 'bgvalue', 'mcs_second_moment_xy_pix']
         mcsData = pd.DataFrame(frame, columns=columns)
         centroids = points
-        print(altitude,insrot)
-        pfiTransform = transformUtils.fromCameraName(cameraName, altitude=altitude, insrot=insrot)
+        
+        pfiTransform = transformUtils.fromCameraName(cameraName, altitude=60, insrot=0)
         fids = pd.read_csv("/Users/karr/Science/PFS/newestMHS/pfs_instdata/data/pfi/fiducial_positions.csv", comment='#')
 
         fidList=list(fids['fiducialId'].values)
@@ -303,12 +297,12 @@ def testFibreIDNearest(dataPath,frameIds,cameraName,centParms, centrePos, armLen
         pfiTrans = pfiTransform
 
         centroids[:,1], centroids[:,2] = pfiTransform.mcsToPfi(centroids[:,1],centroids[:,2])
-        cobraMatch, unaPoints = mcsTools.fibreId(centroids, centrePos, armLength, prevPos, fids, dotPos, goodIdx, adjacentCobras)
+        cobraMatch, unaPoints = mcsTools.fibreId(centroids, centrePos, armLength, prevPos, fids, dotPos, goodIdx, adjacentCobras, calibModel)
         targets = cobraMatch[:,[0,2,3]]
 
         #fig3,ax3=plt.subplots()
         for i in range(len(goodIdx)):
-            ax1.plot([cobraMatch[i,2],calibModel.centers.real[goodIdx[i]]],[cobraMatch[i,3],calibModel.centers.imag[goodIdx[i]]])
+            ax1.plot([cobraMatch[i,2],calibModel.centers.real[i]],[cobraMatch[i,3],calibModel.centers.imag[i]])
         ax2.scatter(centroids[:,1],centroids[:,2],color="tab:blue")
     
         #ax3.scatter(centroids[:,1],centroids[:,2])
@@ -335,6 +329,5 @@ def testFibreIDNearest(dataPath,frameIds,cameraName,centParms, centrePos, armLen
             a=ax2.add_artist(circle1)
             #a=ax3.add_artist(circle3)
 
-        cobraMatches.append(cobraMatch)
-        allCentroids.append(centroids)
-    return cobraMatches,allCentroids
+
+        return cobraMatch
