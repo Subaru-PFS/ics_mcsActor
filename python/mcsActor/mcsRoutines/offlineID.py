@@ -95,7 +95,7 @@ def runMatchFile(frameID,dataPath,centParms,cameraName,fids,centrePos,armLength,
 
     # match fiducials
     ffids0,dist0=pfiTransform.updateTransform(mcsData, fids[outerRing], matchRadius=8.0, nMatchMin=0.1)
-    ffids1,dist1=pfiTransform.updateTransform(mcsData, fids[goodFid], matchRadius=4,nMatchMin=0.1)
+    ffids1,dist1=pfiTransform.updateTransform(mcsData, fids[goodFid], matchRadius=4, nMatchMin=0.1)
 
     # transform
     
@@ -105,7 +105,7 @@ def runMatchFile(frameID,dataPath,centParms,cameraName,fids,centrePos,armLength,
 
     
     # identify
-    cobraMatch, unaPoints = mcsTools.fibreId(centroids, centrePos, armLength, targetPos, fids, dotPos, goodIdx, adjacentCobras)
+    cobraMatch, unaPoints = mcsTools.fibreId(mmCentroids, centrePos, armLength, targetPos, fids, dotPos, goodIdx, adjacentCobras)
     fidPos =  np.array([fids['fiducialId'],fids['x_mm'],fids['y_mm']]).T
     fidMatch=np.zeros((len(fidPos),4))
     # get the matching for fiducials
@@ -125,6 +125,7 @@ def runMatchFile(frameID,dataPath,centParms,cameraName,fids,centrePos,armLength,
             fidMatch[i,3]=-1
     
     return cobraMatch,fidMatch,centroids
+
 def runMatchDF(frameID,mcsData,expData,cameraName,fids,centrePos,armLength,dotPos,goodIdx,adjacentCobras,targetPos):
 
 
