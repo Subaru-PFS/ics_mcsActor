@@ -29,7 +29,7 @@ def initFibreID(xmlFile,dotFile):
 
 
 
-def runMatch(frameID,dataPath,centParms,cameraName,fids,centrePos,armLength,dotPos,goodIdx,adjacentCobras,targetPos):
+def runMatchFile(frameID,dataPath,centParms,cameraName,fids,centrePos,armLength,dotPos,goodIdx,adjacentCobras,targetPos):
 
 
     # get fits file information and data
@@ -74,6 +74,68 @@ def runMatch(frameID,dataPath,centParms,cameraName,fids,centrePos,armLength,dotP
                'mcs_second_moment_y_pix', 'peakvalue', 'bgvalue', 'mcs_second_moment_xy_pix']
     mcsData = pd.DataFrame(frame, columns=columns)
     centroids = points
+
+    # load the transformations
+    pfiTransform = transformUtils.fromCameraName(cameraName, altitude=altitude, insrot=insrot)
+
+    fidList=list(fids['fiducialId'].values)
+    badFid = [1,32,34,61,68,75,88,89,2,4,33,36,37,65,66,67,68,69]
+
+    for i in badFid:
+        try:
+            fidList.remove(i)
+        except:
+                pass
+    outerRing = np.zeros(len(fids), dtype=bool)   
+    goodFid = np.zeros(len(fids), dtype=bool)   
+    for i in [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]:
+        outerRing[fids.fiducialId == i] = True
+    for i in fidList:
+        goodFid[fids.fiducialId == i] = True
+
+    # match fiducials
+    ffids0,dist0=pfiTransform.updateTransform(mcsData, fids[outerRing], matchRadius=8.0, nMatchMin=0.1)
+    ffids1,dist1=pfiTransform.updateTransform(mcsData, fids[goodFid], matchRadius=4,nMatchMin=0.1)
+
+    # transform
+    
+    mmCentroids=np.copy(centroids)
+    mmCentroids[:,1], mmCentroids[:,2] = pfiTransform.mcsToPfi(centroids[:,1],centroids[:,2])
+
+
+    
+    # identify
+    cobraMatch, unaPoints = mcsTools.fibreId(centroids, centrePos, armLength, targetPos, fids, dotPos, goodIdx, adjacentCobras)
+    fidPos =  np.array([fids['fiducialId'],fids['x_mm'],fids['y_mm']]).T
+    fidMatch=np.zeros((len(fidPos),4))
+    # get the matching for fiducials
+    D = cdist(fidPos[:,1:3],mmCentroids[:,1:3])
+    
+    for i in range(len(fidPos)):
+        ind = np.where(D[i, :] < 1)
+        if len(ind[0]) > 0:
+            fidMatch[i,0]=fidPos[i,0]
+            fidMatch[i,1]=ind[0][0]
+            fidMatch[i,2]=mmCentroids[ind[0][0],1]
+            fidMatch[i,3]=mmCentroids[ind[0][0],2]
+        else:
+            fidMatch[i,0]=fidPos[i,0]
+            fidMatch[i,1]=-1
+            fidMatch[i,2]=-1
+            fidMatch[i,3]=-1
+    
+    return cobraMatch,fidMatch,centroids
+def runMatchDF(frameID,mcsData,expData,cameraName,fids,centrePos,armLength,dotPos,goodIdx,adjacentCobras,targetPos):
+
+
+    # get fits file information and data
+
+    altitude = expData['altitude'].values[0]
+    insrot = expData['insrot'].values[0]
+
+    # the format the matching wants
+    
+    centroids = np.array([mcsData['spot_id'].values,mcsData['mcs_center_x_pix'].values,mcsData['mcs_center_y_pix']]).T
 
     # load the transformations
     pfiTransform = transformUtils.fromCameraName(cameraName, altitude=altitude, insrot=insrot)
