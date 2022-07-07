@@ -168,7 +168,7 @@ def runMatchDF(frameID,mcsData,expData,cameraName,fids,centrePos,armLength,dotPo
 
     
     # identify
-    cobraMatch, unaPoints = mcsTools.fibreId(centroids, centrePos, armLength, targetPos, fids, dotPos, goodIdx, adjacentCobras)
+    cobraMatch, unaPoints = mcsTools.fibreId(mmCentroids, centrePos, armLength, targetPos, fids, dotPos, goodIdx, adjacentCobras)
     fidPos =  np.array([fids['fiducialId'],fids['x_mm'],fids['y_mm']]).T
     fidMatch=np.zeros((len(fidPos),4))
     # get the matching for fiducials
