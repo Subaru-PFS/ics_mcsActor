@@ -99,7 +99,7 @@ class McsCmd(object):
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
             ('resetThreshold', '', self.resetThreshold),
-            ('setCentroidParams', '[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<maxIt>]',
+            ('setCentroidParams', '[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<maxIt>] [<centSigma>] [<findSigma>]',
              self.setCentroidParams),
             ('calcThresh', '[<threshSigma>] [<threshFact>]', self.calcThresh),
             ('simulate', '<path>', self.simulateOn),
@@ -986,6 +986,9 @@ class McsCmd(object):
         """
 
         self.centParms = mcsTools.getCentroidParams(cmd)
+        centParms['findSigma']=50
+        centParms['centSigma']=50
+
         self.logger.info(f'centParms: {self.centParms}')
 
     def runCentroidSEP(self, cmd):
@@ -1042,14 +1045,36 @@ class McsCmd(object):
 
         
         cmd.inform(f'state="measuring cached image: {image.shape}"')
-        a = centroid.centroid_only(image.astype('<i4'),
+
+
+        # get hte active region, based on the current boresight
+        xmin = self.rotCent[0] + centParms['activeX']
+        ymin = self.rotCent[1] + centParms['activeY']
+        xmax = self.rotCent[0] + centParms['activeX']
+        ymax = self.rotCent[1] + centParms['activeY']
+        
+        # crop the region to the active image section
+        
+        subImage = image[xmin:xmax,ymin:ymax]
+        a = centroid.centroid_only(subImage.astype('<i4'),
                                    centParms['fwhmx'], centParms['fwhmy'], self.findThresh, self.centThresh,
                                    centParms['boxFind'], centParms['boxCent'],
                                    centParms['nmin'], centParms['maxIt'], 0)
 
         centroids = np.frombuffer(a, dtype='<f8')
         centroids = np.reshape(centroids, (len(centroids)//7, 7))
+                         
 
+        # adjust the coordinates back to global values
+        centroids[:,1] += xmin
+        centroids[:,2] += ymin
+        
+        # TEMPORARY FILTER STUFF FOR STRAY LIGHT DURING COMMISSIONING RUN, NEED TO FIX THIS
+        # MORE ELEGANTLY ONCE DB SCHEMA HAS FLAGS COLUMN IN MCS_DATA??!!!
+
+        # get rid of overly large points
+        ind=np.where(centroids[:,2] > 15)
+        centroids=centroids[ind].squeeze()
 
         nSpots = centroids.shape[0]
         points = np.empty((nSpots, 8))

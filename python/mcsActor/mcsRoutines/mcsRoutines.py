@@ -67,6 +67,13 @@ def getCentroidParams(cmd):
     if('maxIt' in cmdKeys):
         centParms['maxIt'] = cmd.cmd.keywords["maxIt"].values[0]
 
+
+    if('activeX' in cmdKeys):
+        centParms['activeX'] = cmd.cmd.keywords["activeY"].values[0]
+        
+    if('activeY' in cmdKeys):
+        centParms['activeX'] = cmd.cmd.keywords["activeY"].values[0]
+           
     return centParms
 
 def readCobraGeometry(des,dotData):
@@ -119,8 +126,6 @@ def readCobraGeometry(des,dotData):
 
 
     return centrePos, armLength, dotPos, goodIdx, des
-
-
 
 def calcAffineTransform(pos1, pos2):
     """
