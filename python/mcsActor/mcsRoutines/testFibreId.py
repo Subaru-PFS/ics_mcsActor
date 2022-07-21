@@ -130,43 +130,34 @@ def checkTransform(dataPath,frameIds,camera_name,centParms, centrePos, armLength
         ax.hist(d,bins=np.arange(0,2,0.1))
 
 
-def testFibreIDDB(frameIds,camera_name,centParms, centrePos, armLength, dotPos, goodIdx, des, adjacentCobras, fids, fidPos, calibModel):
-    cameraName = 'rmod_71m'
+def testFibreIDCSV(dataPath,frameIds,cameraName, df, centParms, centrePos, armLength, dotPos, goodIdx, des, adjacentCobras, fids, fidPos, calibModel):
+                   
 
-    db = dbTools.connectToDB(hostname='localhost',port='5432', dbname='opdb', username='karr')
-    
-    centrePosPix = np.array([5033,3447]).T
+    targets = centrePos
     tarPos = centrePos
     prevPos = centrePos
     iter = 0
     #orphans = []
-    fig1,ax1=plt.subplots()
-    fig2,ax2=plt.subplots()
+    #fig1,ax1=plt.subplots()
+    #fig2,ax2=plt.subplots()
     for frameId in frameIds:
         
-        points = dbTools.loadCentroidsFromDB(db, frameId)
+        fName=dataPath+"PFSC0"+str(frameId)+".fits"
+        hdu = fits.open(fName)
+        hdr = hdu[0].header
+        altitude = hdr['altitude']
+        insrot = hdr['insrot']
 
-        fix,ax=plt.subplots()
-        
-        ax.scatter(points[:,1],points[:,2])
-        plt.savefig(str(int(frameId))+".png")
 
-        
-        sz = points.shape
-        mcsFrameId = frameId
-        mcsFrameIDs = np.repeat(mcsFrameId, sz[0]).astype('int')
-        # make a data frame
-        frame = np.zeros((sz[0], 4))
-        frame[:, 0] = mcsFrameIDs
-        frame[:, 1:] = points
-        # column names
-        columns = ['mcs_frame_id', 'spot_id', 'mcs_center_x_pix', 'mcs_center_y_pix']
-        mcsData = pd.DataFrame(frame, columns=columns)
-        centroids = points
-        pfiTransform = transformUtils.fromCameraName(cameraName, altitude=60, insrot=0)
-        fids = pd.read_csv("/Users/karr/Science/PFS/newestMHS/pfs_instdata/data/pfi/fiducial_positions.csv", comment='#')
+        mcsData=df.loc[df['mcs_frame_id']==frameId]
 
+        centroids = np.array([mcsData['spot_id'].values,mcsData['mcs_center_x_pix'],mcsData['mcs_center_y_pix']]).T
+        pfiTransform = transformUtils.fromCameraName(cameraName, altitude=altitude, insrot=insrot)
+        #fix,ax=plt.subplots()
         
+        #ax.scatter(centroids[:,1],centroids[:,2])
+        #plt.savefig(str(int(frameId))+".png")
+
         fidList=list(fids['fiducialId'].values)
         badFid = [1,32,34,61,68,75,88,89,2,4,33,36,37,65,66,67,68,69]
 
@@ -188,18 +179,14 @@ def testFibreIDDB(frameIds,camera_name,centParms, centrePos, armLength, dotPos, 
         #ffids2,dist2=pfiTransform.updateTransform(mcsData, fids[goodFid], matchRadius=3.0,nMatchMin=0.1)
         pfiTrans = pfiTransform
 
-        
-        centroids[:,1], centroids[:,2] = pfiTransform.mcsToPfi(centroids[:,1],centroids[:,2])
-        cobraMatch, unaPoints = mcsTools.fibreId(centroids, centrePos, armLength, prevPos, fids, dotPos, goodIdx, adjacentCobras,calibModel)
-
-        np.save("cobraMatchMine.npy",cobraMatch)
-        
-        targets = dbTools.loadTargetsFromDB(db,frameId)
-
+        mmCentroids=np.copy(centroids)
+        mmCentroids[:,1], mmCentroids[:,2] = pfiTransform.mcsToPfi(centroids[:,1],centroids[:,2])
+        cobraMatch, unaPoints = mcsTools.fibreId(mmCentroids, centrePos, armLength, prevPos, fids, dotPos, goodIdx, adjacentCobras)
+ 
         #fig3,ax3=plt.subplots()
-        for i in range(len(goodIdx)):
-            ax1.plot([cobraMatch[i,2],centrePos[i,1]],[cobraMatch[i,3],centrePos[i,2]])
-        ax2.scatter(centroids[:,1],centroids[:,2],color="tab:blue")
+        #for i in range(len(goodIdx)):
+        #    ax1.plot([cobraMatch[i,2],centrePos[i,1]],[cobraMatch[i,3],centrePos[i,2]])
+        #ax2.scatter(mmCentroids[:,1],mmCentroids[:,2],color="tab:blue")
     
         #ax3.scatter(centroids[:,1],centroids[:,2])
         #diff = np.sqrt((cobraMatch[:,2]-c[:,1])**2+(cobraMatch[:,3]-prevPos[:,2])**2)
@@ -211,23 +198,22 @@ def testFibreIDDB(frameIds,camera_name,centParms, centrePos, armLength, dotPos, 
         prevPos = cobraMatch[:,[0,2,3]]
         #orphans.append(centroids[unaPoints,:])
 
-        ax1.scatter(centrePos[:,1],centrePos[:,2])
-        ax1.scatter(fids['x_mm'],fids['y_mm'],marker="d")
-        ax2.scatter(centrePos[:,1],centrePos[:,2],color="black")
-        ax2.scatter(fids['x_mm'],fids['y_mm'],marker="d",color="tab:orange")
-        #ax3.scatter(centrePos[:,1],centrePos[:,2])
+        #ax1.scatter(centrePos[:,1],centrePos[:,2])
+        #ax1.scatter(fids['x_mm'],fids['y_mm'],marker="d")
+        #ax2.scatter(centrePos[:,1],centrePos[:,2],color="black")
+        #ax2.scatter(fids['x_mm'],fids['y_mm'],marker="d",color="tab:orange")
+        ##ax3.scatter(centrePos[:,1],centrePos[:,2])
+        #
+        #for i in range(len(centrePos)):
+        #    circle=plt.Circle((centrePos[i,1],centrePos[i,2]),armLength[i],fill=False,color='black')
+        #    circle1=plt.Circle((centrePos[i,1],centrePos[i,2]),armLength[i],fill=False,color='black')
+        #    circle3=plt.Circle((centrePos[i,1],centrePos[i,2]),armLength[i],fill=False,color='black')
+        #    a=ax1.add_artist(circle)
+        #    a=ax2.add_artist(circle1)
+        #    #a=ax3.add_artist(circle3)
 
-        for i in range(len(centrePos)):
-            circle=plt.Circle((centrePos[i,1],centrePos[i,2]),armLength[i],fill=False,color='black')
-            circle1=plt.Circle((centrePos[i,1],centrePos[i,2]),armLength[i],fill=False,color='black')
-            circle3=plt.Circle((centrePos[i,1],centrePos[i,2]),armLength[i],fill=False,color='black')
-            a=ax1.add_artist(circle)
-            a=ax2.add_artist(circle1)
-            #a=ax3.add_artist(circle3)
+    return cobraMatch,centroids, mmCentroids, unaPoints
 
-            
-
-        
 def testFibreIDNearest(dataPath,frameIds,cameraName,centParms, centrePos, armLength, dotPos, goodIdx, des, adjacentCobras, fids, fidPos,calibModel):
 
 
