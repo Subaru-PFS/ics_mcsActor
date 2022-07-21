@@ -1047,6 +1047,7 @@ class McsCmd(object):
         cmd.inform(f'state="measuring cached image: {image.shape}"')
 
 
+        # get hte active region, based on the current boresight
         xmin = self.rotCent[0] + centParms['activeX']
         ymin = self.rotCent[1] + centParms['activeY']
         xmax = self.rotCent[0] + centParms['activeX']
