@@ -25,8 +25,10 @@ import copy
 import os
 import yaml
 from scipy import optimize
+import time
 
 from ics.cobraCharmer import pfiDesign
+import time
 
 def getCentroidParams(cmd):
 
@@ -221,14 +223,17 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     anyChange = 0
     targets = tarPos
 
+
+    
     # these are the effective number of cobras (ie, goodIdx)
     nPoints = points.shape[0]
     nCobras = targets.shape[0]
 
+
     # set up variables
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod = prepWork(
         points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge=0.5)
-    
+
 
     # first pass - assign cobra/spot pairs based on the spots poiint of view
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange = firstPass(
@@ -495,8 +500,6 @@ def firstPass(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMat
                 for l in unaCobras:
                     if(iPoint in potPointMatch[l]):
                         potPointMatch[l].remove(iPoint)
-            #potCobraMatch[iPoint] = [iCob]
-            #potPointMatch[iCob] = [iPoint]
 
         # we then need to iterate, to take into account newly freed cobras
 
@@ -515,10 +518,6 @@ def secondPass(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch,
     returns
       same as firstPass
     """
-
-    # temporary list of unassigned cobras, to keep track
-    tempUnaCobras = copy.deepcopy(unaCobras)
-    tempUnaPoints = copy.deepcopy(unaPoints)
 
     # set the change variables
     change = 1
@@ -585,6 +584,11 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
 
     # repeat of first pass to account for newly singled points/cobras
     change = 1
+
+    
+    masterUnaPoints = np.copy(unaPoints)
+    masterUnaCobras = np.copy(unaCobras)
+
     while(change == 1):
         change = 0
         for iPoint in unaPoints:
@@ -613,42 +617,51 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
                 change = 1
 
 
-    # this loop is for debugging purposes while trying to break the code.
-
+    nLoop=0
     change = 1
+
+    tsum=0
+
+    #get distances between unassigned points and unassigned cobras
+    #sort, to find the lowest value
+    D = cdist(points[unaPoints, 1:3], targets[unaCobras, 1:3])
+    ind = np.unravel_index(np.argsort(D, axis = None), D.shape)
+    
+
+
+    nnn=0
+    # turn inds in to lists so we can remove values. We crop the indices to the
+    # 3* the number of unassigned points, which will give us all the points-cobras
+    # distances that are w/i a patrol (one cobra can be in at most 3 patrol regions)
+    
+    ind1 = list(ind[0][0:3*len(unaPoints)])
+    ind2 = list(ind[1][0:3*len(unaPoints)])
+
     while(change == 1):
+
         change = 0
         
-
-        #get distances between unassigned points and unassigned cobras
-        D = cdist(points[unaPoints, 1:3], targets[unaCobras, 1:3])
-        #ind = np.unravel_index(D.argmin(), D.shape)
-
-        #sort, to find the lowest value
-        ind = np.unravel_index(np.argsort(D, axis = None), D.shape)
+        nLoop=nLoop+1
+        
         #now find the smallest separation among the allowed values
         found = False
         i = 0
             
-        while (not found and i < len(ind[0])):
-            iPoint = unaPoints[ind[0][i]]
-            iCob = unaCobras[ind[1][i]]
-            #print("AA",iPoint,iCob)
-            #print("DD",D[ind[0][i],ind[1][i]])
-            #print(iCob, potPointMatch[iCob])
-            #print(iPoint, potCobraMatch[iPoint])
+        while (not found and i < len(ind1)):
+
+            # use the master values to keep track of the original indices. 
+            iPoint = masterUnaPoints[ind1[i]]
+            iCob = masterUnaCobras[ind2[i]]
         
             if(iPoint in potPointMatch[iCob]):
                 if(iCob in potCobraMatch[iPoint]):
                    found = True
-                   #print("found == true")
             else:
                 pass
-                #print("found == false")
                     
             i = i+1
-            
         if(found == True):
+        
                 change = 1
                 #update variables
                 if(iPoint in unaPoints):
@@ -664,13 +677,19 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
                 for l in tempUnaCobras:
                     if(iPoint in potPointMatch[l]):
                         potPointMatch[l].remove(iPoint)
-                
-                #print("GG", iPoint, iCob)
+
                 potCobraMatch[iPoint] = [iCob]
                 potPointMatch[iCob] = [iPoint]
+
+                ind1.remove(ind1[i-1])
+                ind2.remove(ind2[i-1])
+
+
+                
         #print()
         #get singled points to not break things
         nchange = 1
+ 
         while(nchange == 1):
             nchange = 0
             for iPoint in unaPoints:
@@ -678,8 +697,10 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
         
                 if(len(elem) == 1):
                     iCob = elem[0]
+                    
                     if(iCob in unaCobras):
                         unaCobras.remove(iCob)
+                        
                     aCobras.append(iCob)
                 
                     if(iPoint in unaPoints):
@@ -696,8 +717,7 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
                     potCobraMatch[iPoint] = [iCob]
                     potPointMatch[iCob] = [iPoint]
                     nchange = 1
-
-
+    
     return aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange
 
 
