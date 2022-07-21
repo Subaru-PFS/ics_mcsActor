@@ -25,6 +25,7 @@ import copy
 import os
 import yaml
 from scipy import optimize
+import time
 
 from ics.cobraCharmer import pfiDesign
 import time
@@ -228,41 +229,31 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     nPoints = points.shape[0]
     nCobras = targets.shape[0]
 
-    t1=time.time()
+
     # set up variables
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod = prepWork(
         points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge=0.5)
 
-    t2=time.time()
-    print("prep ",t2-t1)
 
     # first pass - assign cobra/spot pairs based on the spots poiint of view
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange = firstPass(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange)
 
-    t3=time.time()
-    print("first ",t3-t2)
 
     # second pass - assign cobra/spot pairs based on the cobra point of view
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange = secondPass(
         aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras, assignMethod, anyChange)
 
-    t4=time.time()
-    print("second ",t4-t3)
 
     # last pass - figure out the spots that can belong to more than one cobra, and things hidden by dots
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange = lastPassDist(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, tarPos, 't', assignMethod, anyChange, goodIdx)
 
-    t5=time.time()
-    print("last ",t5-t4)
 
     # some final tidying up
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange = secondPass(
         aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras, assignMethod, anyChange)
 
-    t6=time.time()
-    print("second ",t6-t5)
 
     # turn the results into an array to be written to teh database
     cobraMatch = np.empty((nCobras, 5))
@@ -594,13 +585,10 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     # repeat of first pass to account for newly singled points/cobras
     change = 1
 
-    import time
-    t1=time.time()
     
     masterUnaPoints = np.copy(unaPoints)
     masterUnaCobras = np.copy(unaCobras)
 
-    t2=time.time()
     while(change == 1):
         change = 0
         for iPoint in unaPoints:
@@ -636,13 +624,11 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
 
     #get distances between unassigned points and unassigned cobras
     #sort, to find the lowest value
-    t1=time.time()
     D = cdist(points[unaPoints, 1:3], targets[unaCobras, 1:3])
     ind = np.unravel_index(np.argsort(D, axis = None), D.shape)
     
-    t2-time.time()
 
-    ttt=0
+
     nnn=0
     # turn inds in to lists so we can remove values. We crop the indices to the
     # 3* the number of unassigned points, which will give us all the points-cobras
@@ -651,10 +637,8 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     ind1 = list(ind[0][0:3*len(unaPoints)])
     ind2 = list(ind[1][0:3*len(unaPoints)])
 
-    t1=time.time()
     while(change == 1):
 
-        ta=time.time()
         change = 0
         
         nLoop=nLoop+1
@@ -676,8 +660,6 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
                 pass
                     
             i = i+1
-        tb=time.time()
-        ttt=ttt+tb-ta
         if(found == True):
         
                 change = 1
@@ -736,8 +718,6 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
                     potPointMatch[iCob] = [iPoint]
                     nchange = 1
     
-    t2=time.time()
-    print("loops",t2-t1,nLoop,ttt,nnn)
     return aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange
 
 
