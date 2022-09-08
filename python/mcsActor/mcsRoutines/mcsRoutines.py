@@ -76,6 +76,21 @@ def getCentroidParams(cmd):
            
     return centParms
 
+def readFiducialMasks(fids):
+
+    instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
+
+    fidFile = os.path.join(instPath,"data/pfi/fiducials/fiducialFiberFlags.yaml")
+    with open(fidFile, 'r') as inFile:
+        fiducialFlags = yaml.safe_load(inFile)
+
+    fidsOuterRing = fids[fids.fiducialId.isin(fiducialFlags['outerRingIds'])]
+    badFids = fiducialFlags['badFidIds']
+    goodFids = list(set(fids['fiducialId'].values)-set(badFids))
+    fidsGood = fids[fids.fiducialId.isin(goodFids)]
+
+    return fidsOuterRing, fidsGood
+    
 def readCobraGeometry(des,dotData):
     """
     read cobra geometry from configuration file/inst_config
