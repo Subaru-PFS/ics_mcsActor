@@ -598,7 +598,6 @@ class McsCmd(object):
                 self.cMethod = 'sep'
                 cmd.inform(f'text="Bench camera RMOD-71M is used. Using SEP" ')
 
-            
             if(self.cMethod == 'sep'):
                 cmd.inform(f'text="Using SExtractor for centroid" ')
                 self.runCentroidSEP(cmd)
@@ -909,9 +908,11 @@ class McsCmd(object):
             
         # do the identification
         cmd.inform(f'text="Starting Fiber ID"')
+        t0 = time.time()
         cobraMatch, unaPoints = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
                                       self.fids, self.dotPos, self.goodIdx, self.adjacentCobras)
-        cmd.inform(f'text="Fiber ID finished"')
+        t1 = time.time()
+        cmd.inform(f'text="Fiber ID finished in {t1-t0:0.2f}s"')
 
 
         db = self.connectToDB(cmd)
