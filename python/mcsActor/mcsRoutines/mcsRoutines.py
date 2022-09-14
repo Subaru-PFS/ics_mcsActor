@@ -78,6 +78,10 @@ def getCentroidParams(cmd):
 
 def readFiducialMasks(fids):
 
+    """
+    read good/bad/outer ring fiducial information from yaml file
+    """
+
     instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
 
     fidFile = os.path.join(instPath,"data/pfi/fiducials/fiducialFiberFlags.yaml")
