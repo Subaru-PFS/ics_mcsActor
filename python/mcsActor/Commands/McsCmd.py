@@ -75,6 +75,8 @@ class McsCmd(object):
         self.geometrySet = False
         self.geomFile = None
         self.dotFile = None
+        self.fidsGood = None
+        self.fidsOuterRing = None
 
         logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
                             datefmt="%Y-%m-%dT%H:%M:%S")
@@ -714,6 +716,8 @@ class McsCmd(object):
         cmd.inform(f'text="loading DOT location from butler"')
         self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.calibModel = mcsTools.readCobraGeometry(
             pfi, dots)
+
+        self.outerRingIds, self.badFidIds = mcsTools.readFiducialMasks(fids)
         cmd.inform('text="cobra geometry read"')
         self.geometrySet = True
 
@@ -742,21 +746,27 @@ class McsCmd(object):
 
         pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, 
             altitude=altitude, insrot=insrot,nsigma=0, alphaRot=1)
+
+        # these values are now read via mcsToolds.readFiducialMasks
+
+        # set the good fiducials and outer ring fiducials if not yet set
+        if(self.fidsGood == None):
+            self.fidsOuterRing, self.fidsGood = mcsTools.readFiducialMasks(fids)
         
-        outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
-        fidsOuterRing = fids[fids.fiducialId.isin(outerRingIds)]
-        badFids = [1,32,34,61,68,75,88,89,2,4,33,36,37,65,66,67,68,69]
-        goodFids = list(set(fids['fiducialId'].values)-set(badFids))
-        fidsGood = fids[fids.fiducialId.isin(goodFids)]
+        #outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
+        #fidsOuterRing = fids[fids.fiducialId.isin(outerRingIds)]
+        #badFids = [1,32,34,61,68,75,88,89,2,4,33,36,37,65,66,67,68,69]
+        #goodFids = list(set(fids['fiducialId'].values)-set(badFids))
+        #fidsGood = fids[fids.fiducialId.isin(goodFids)]
         
-        pfiTransform.updateTransform(mcsData, fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
+        pfiTransform.updateTransform(mcsData, self.fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
 
         nsigma = 0
         pfiTransform.nsigma = nsigma
         pfiTransform.alphaRot = 0
 
         for i in range(2):
-            ffid, dist = pfiTransform.updateTransform(mcsData, fidsGood, matchRadius=4.2,nMatchMin=0.1)
+            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=4.2,nMatchMin=0.1)
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
         
         #dbTools.writeFidToDB(db, ffid, frameID)
