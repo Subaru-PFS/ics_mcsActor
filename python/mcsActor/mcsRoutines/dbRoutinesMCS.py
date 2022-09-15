@@ -120,6 +120,28 @@ def loadTargetsFromDB(db, frameId):
 
     return np.array([df['cobra_id'], df['pfi_nominal_x_mm'], df['pfi_nominal_y_mm']]).T
 
+def writeTransformToDB(db, frameId, pfiTransform, cameraName):
+
+    """
+    write transformation coefficients to database
+    """
+
+    # get updated values 
+    trans=pfiTransform.mcsDistort.getArgs()
+    
+    data = {'mcs_frame_id': [frameId],
+            'x0': [trans[0]],
+            'y0': [trans[1]],
+            'dscale': [trans[2]],
+            'scale2': [trans[3]],
+            'theta': [trans[4]],
+            'alpha_rot': [pfiTransform.alphaRot],
+            'camera_name': [cameraName]}
+    
+    df = pd.DataFrame(data=data)
+    
+    db.bulkInsert('mcs_pfi_transformation', df)
+
 def writeTargetToDB(db, frameId, target, mpos):
     visitId = frameId // 100
     iteration = frameId % 100
