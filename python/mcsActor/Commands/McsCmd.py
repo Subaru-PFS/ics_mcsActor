@@ -1061,15 +1061,15 @@ class McsCmd(object):
 
 
         # get hte active region, based on the current boresight
-        xmin = self.rotCent[0] + centParms['activeX']
-        ymin = self.rotCent[1] + centParms['activeY']
-        xmax = self.rotCent[0] + centParms['activeX']
-        ymax = self.rotCent[1] + centParms['activeY']
+        #xmin = self.rotCent[0] + centParms['activeX']
+        #ymin = self.rotCent[1] + centParms['activeY']
+        #xmax = self.rotCent[0] + centParms['activeX']
+        #ymax = self.rotCent[1] + centParms['activeY']
         
         # crop the region to the active image section
         
-        subImage = image[xmin:xmax,ymin:ymax]
-        a = centroid.centroid_only(subImage.astype('<i4'),
+        #subImage = image[xmin:xmax,ymin:ymax]
+        a = centroid.centroid_only(image.astype('<i4'),
                                    centParms['fwhmx'], centParms['fwhmy'], self.findThresh, self.centThresh,
                                    centParms['boxFind'], centParms['boxCent'],
                                    centParms['nmin'], centParms['maxIt'], 0)
@@ -1079,8 +1079,8 @@ class McsCmd(object):
                          
 
         # adjust the coordinates back to global values
-        centroids[:,1] += xmin
-        centroids[:,2] += ymin
+        #centroids[:,1] += xmin
+        #centroids[:,2] += ymin
         
         # TEMPORARY FILTER STUFF FOR STRAY LIGHT DURING COMMISSIONING RUN, NEED TO FIX THIS
         # MORE ELEGANTLY ONCE DB SCHEMA HAS FLAGS COLUMN IN MCS_DATA??!!!
