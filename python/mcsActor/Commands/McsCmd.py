@@ -769,7 +769,7 @@ class McsCmd(object):
             ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=4.2,nMatchMin=0.1)
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
 
-        dbTools.writeTransformToDB(db, frameId, pfiTransform, self.actor.cameraName)
+        dbTools.writeTransformToDB(db, frameID, pfiTransform, self.actor.cameraName)
         #dbTools.writeFidToDB(db, ffid, frameID)
         
         self.pfiTrans = pfiTransform
