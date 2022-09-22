@@ -1214,7 +1214,7 @@ class McsCmd(object):
         """ Write all measurements for a given (frameId, moveId) """
 
         # if too many centroids have been returned, only save the first 5000
-        
+
         nItems = len(centArr)
         if(nItems > 5000):
             nItems = 5000
@@ -1223,13 +1223,13 @@ class McsCmd(object):
         for l_i in range(nItems):
             line = '%d,%d,%f,%f,%f,%f,%f,%f,%f\n' % (frameId, l_i+1, centArr[l_i,1], 
                                         centArr[l_i,2], centArr[l_i,3], centArr[l_i,4], 
-                                        centArr[l_i,5], centArr[l_i,6], centArr[l_i,7])
+                                                     centArr[l_i,5], centArr[l_i,6], centArr[l_i,7],0)
             
             buf.write(line)
         
         line = line = '%d,%d,%f,%f,%f,%f,%f,%f,%f\n' % (frameId, -1, np.nan, 
                                         np.nan, np.nan, np.nan, 
-                                        np.nan, np.nan, np.nan)
+                                                        np.nan, np.nan, np.nan, np.nan)
         buf.write(line)
         buf.seek(0, 0)
 
