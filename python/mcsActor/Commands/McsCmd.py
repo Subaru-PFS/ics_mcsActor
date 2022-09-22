@@ -1086,8 +1086,8 @@ class McsCmd(object):
         # MORE ELEGANTLY ONCE DB SCHEMA HAS FLAGS COLUMN IN MCS_DATA??!!!
 
         # get rid of overly large points
-        ind=np.where(centroids[:,2] > 15)
-        centroids=centroids[ind].squeeze()
+        #ind=np.where(centroids[:,2] > 15)
+        #centroids=centroids[ind].squeeze()
 
         nSpots = centroids.shape[0]
         points = np.empty((nSpots, 8))
