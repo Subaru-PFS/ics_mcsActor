@@ -1221,13 +1221,13 @@ class McsCmd(object):
             
         buf = io.StringIO()
         for l_i in range(nItems):
-            line = '%d,%d,%f,%f,%f,%f,%f,%f,%f\n' % (frameId, l_i+1, centArr[l_i,1], 
+            line = '%d,%d,%f,%f,%f,%f,%f,%f,%f %d\n' % (frameId, l_i+1, centArr[l_i,1], 
                                         centArr[l_i,2], centArr[l_i,3], centArr[l_i,4], 
                                                      centArr[l_i,5], centArr[l_i,6], centArr[l_i,7],0)
             
             buf.write(line)
         
-        line = line = '%d,%d,%f,%f,%f,%f,%f,%f,%f\n' % (frameId, -1, np.nan, 
+        line = line = '%d,%d,%f,%f,%f,%f,%f,%f,%f %d\n' % (frameId, -1, np.nan, 
                                         np.nan, np.nan, np.nan, 
                                                         np.nan, np.nan, np.nan, np.nan)
         buf.write(line)
