@@ -750,8 +750,8 @@ class McsCmd(object):
         # these values are now read via mcsToolds.readFiducialMasks
 
         # set the good fiducials and outer ring fiducials if not yet set
-        if(self.fidsGood == None):
-            self.fidsOuterRing, self.fidsGood = mcsTools.readFiducialMasks(fids)
+        #if(self.fidsGood == None):
+        self.fidsOuterRing, self.fidsGood = mcsTools.readFiducialMasks(fids)
         
         #outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
         #fidsOuterRing = fids[fids.fiducialId.isin(outerRingIds)]
