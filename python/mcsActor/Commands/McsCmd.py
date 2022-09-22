@@ -715,7 +715,8 @@ class McsCmd(object):
         cmd.inform(f'text="loading DOT location from butler"')
         self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.calibModel = mcsTools.readCobraGeometry(
             pfi, dots)
-
+        
+        fids = self.butler.get('fiducials')
         self.outerRingIds, self.badFidIds = mcsTools.readFiducialMasks(fids)
         cmd.inform('text="cobra geometry read"')
         self.geometrySet = True
