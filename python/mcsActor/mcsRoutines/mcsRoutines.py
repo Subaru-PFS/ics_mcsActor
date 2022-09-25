@@ -899,8 +899,8 @@ def initialBoresight(db, frameIDs):
         points = dbTools.loadCentroidsFromDB(db, frameId)
 
         # get means
-        xC.append(points[:, 1].mean())
-        yC.append(points[:, 2].mean())
+        xC.append(np.nanmean(points[:, 1]))
+        yC.append(np.nanmean(points[:, 2]))
 
     # do the fit
     xCentre, yCentre, radius, residuals = least_squares_circle(xC, yC)
@@ -927,6 +927,9 @@ def refineBoresight(db, frameId1, frameId2, boresightEstimate):
     points = dbTools.loadCentroidsFromDB(db, frameId1)
     points1 = dbTools.loadCentroidsFromDB(db, frameId2)
 
+    points=points[~np.isnan(points).any(axis=1)]
+    points1=points1[~np.isnan(points1).any(axis=1)]
+    
     # and their instrumetn rotation
     zenithAngle1, insRot1 = dbTools.loadTelescopeParametersFromDB(db, frameId1)
     zenithAngle2, insRot2 = dbTools.loadTelescopeParametersFromDB(db, frameId2)
