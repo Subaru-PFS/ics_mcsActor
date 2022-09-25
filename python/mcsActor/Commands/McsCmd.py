@@ -588,7 +588,12 @@ class McsCmd(object):
             if self.findThresh is None or frameId % 100 == 0:
                 cmd.inform('text="Calculating threshold." ')
                 self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
-
+                self.oldExpTime = expTime
+            elif(self.oldExpTime != expTime):
+                cmd.inform('text="Exposure time changed, re-calculating threshold." ')
+                self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
+                self.oldExpTime = expTime
+                
             cmd.inform('text="Running centroid on current image" ')
 
             # switch for different centroid methods. Call with switchCMethod
