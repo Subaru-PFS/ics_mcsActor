@@ -139,10 +139,9 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
             'camera_name': [cameraName]}
     
     df = pd.DataFrame(data=data)
-    
     db.bulkInsert('mcs_pfi_transformation', df)
 
-    return df['mcs_frame_id'],df['x0'],df['y0'],df['dscale'],df['scale2'],df['theta'],df['alpha_rot'],df['camera_name']
+    return df['mcs_frame_id'].values,df['x0'].values,df['y0'].values,df['dscale'].values,df['scale2'].values,df['theta'].values,df['alpha_rot'].values,df['camera_name'].values
 
 def writeTargetToDB(db, frameId, target, mpos):
     visitId = frameId // 100
@@ -327,7 +326,7 @@ def writeAffineToDB(db, afCoeff, frameId):
 
     df = pd.DataFrame({'mcs_frame_id': [frameId], 'x_trans': [xd], 'y_trans': [
                       yd], 'x_scale': [sx], 'y_scale': [sy], 'angle': [rotation]})
-    db.bulkInsert('mcs_pfi_transformation', df)
+    db.insert('mcs_pfi_transformation', df)
 
 def writeFidToDB(db, ffid,  mcs_frame_id):
 
