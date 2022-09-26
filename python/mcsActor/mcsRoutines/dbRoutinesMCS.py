@@ -142,6 +142,8 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
     
     db.bulkInsert('mcs_pfi_transformation', df)
 
+    return df['mcs_frame_id'],df['x0'],df['y0'],df['dscale'],df['scale2'],df['theta'],df['alpha_rot'],df['camera_name']
+
 def writeTargetToDB(db, frameId, target, mpos):
     visitId = frameId // 100
     iteration = frameId % 100

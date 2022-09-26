@@ -769,11 +769,13 @@ class McsCmd(object):
             ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=4.2,nMatchMin=0.1)
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
 
-        dbTools.writeTransformToDB(db, frameID, pfiTransform, self.actor.cameraName)
+        t_frame,t_x0,t_y0,t_dscale,t_scale2,t_theta,t_alpha_rot,t_camera_name = dbTools.writeTransformToDB(db, frameID, pfiTransform, self.actor.cameraName)
+        cmd.inform(f'text="wrote transform to DB"')
+        cmd.inform(f'text="paramters = {t_frame} {t_x0} {t_y0} {t_dscale} {t_scale2} {t_theta} {t_alpha_rot, t_camera_name}"')
+
         #dbTools.writeFidToDB(db, ffid, frameID)
         
         self.pfiTrans = pfiTransform
-
 
         cmd.inform(f'text="PFI transformation method built"')
 
