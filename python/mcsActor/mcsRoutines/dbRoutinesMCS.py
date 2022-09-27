@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 import pathlib
 import sys
 import io 
+import logging
 
 import pandas as pd
 from scipy.stats import sigmaclip
@@ -148,7 +149,7 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
             'alpha_rot': [pfiTransform.alphaRot],
             'camera_name': [cameraName]}
     df = pd.DataFrame(data=data)
-    return df['mcs_frame_id'].values,df['x0'].values,df['y0'].values,df['dscale'].values,
+    return df['mcs_frame_id'].values,df['x0'].values,df['y0'].values,df['dscale'].values, \
         df['scale2'].values,df['theta'].values,df['alpha_rot'].values,df['camera_name'].values
     
     
@@ -166,7 +167,11 @@ def _writeData(tableName, columnNames, dataBuf):
             cursor.close()
         session.execute('commit')
     except Exception as e:
-        self.logger.warn(f"failed to write with {sql}: {e}")
+        logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
+                            datefmt="%Y-%m-%dT%H:%M:%S")
+        logger = logging.getLogger('mcscmd')
+        logger.setLevel(logging.INFO)
+        logger.warn(f"failed to write with {sql}: {e}")
 
 def writeTargetToDB(db, frameId, target, mpos):
     visitId = frameId // 100

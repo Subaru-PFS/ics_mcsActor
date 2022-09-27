@@ -679,7 +679,7 @@ class McsCmd(object):
         cmd.inform(f'text="cMethod = {self.cMethod}"')
         cmd.finish('switchCMethod=done')
 
-    def resetGeometry():
+    def resetGeometry(self):
         """
         reset the geometry flag. Next call of getGeometry will reload parameters.
         """
