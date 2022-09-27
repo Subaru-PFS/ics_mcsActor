@@ -1002,8 +1002,6 @@ class McsCmd(object):
         """
 
         self.centParms = mcsTools.getCentroidParams(cmd)
-        self.centParms['findSigma']=50
-        self.centParms['centSigma']=50
 
         self.logger.info(f'centParms: {self.centParms}')
 
