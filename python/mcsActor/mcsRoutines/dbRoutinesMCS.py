@@ -25,6 +25,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pathlib
 import sys
+import io 
 
 import pandas as pd
 from scipy.stats import sigmaclip
@@ -128,7 +129,7 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
     res = db.session.execute('select * FROM "mcs_pfi_transformation" where false')
     colnames = tuple(res.keys())
     realcolnames = colnames[0:]
-    line = '%d,%f,%f,%f,%f,%f,%f,%s' % (frameid, trans[0].astype('float64'),
+    line = '%d,%f,%f,%f,%f,%f,%f,%s' % (frameId, trans[0].astype('float64'),
            trans[1], trans[2], trans[3],trans[4],
            pfiTransform.alphaRot, 'canon50M')
                                                                         
@@ -137,6 +138,19 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
     buf.seek(0, 0)
     _writeData('mcs_pfi_transformation', realcolnames, buf)
 
+
+    data = {'mcs_frame_id': [frameId],
+            'x0': [trans[0]],
+            'y0': [trans[1]],
+            'dscale': [trans[2]],
+            'scale2': [trans[3]],
+            'theta': [trans[4]],
+            'alpha_rot': [pfiTransform.alphaRot],
+            'camera_name': [cameraName]}
+    df = pd.DataFrame(data=data)
+    return df['mcs_frame_id'].values,df['x0'].values,df['y0'].values,df['dscale'].values,
+        df['scale2'].values,df['theta'].values,df['alpha_rot'].values,df['camera_name'].values
+    
     
 def _writeData(tableName, columnNames, dataBuf):
     """Wrap a direct COPY_FROM via sqlalchemy. """
