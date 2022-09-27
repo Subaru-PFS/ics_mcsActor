@@ -121,27 +121,38 @@ def loadTargetsFromDB(db, frameId):
     return np.array([df['cobra_id'], df['pfi_nominal_x_mm'], df['pfi_nominal_y_mm']]).T
 
 def writeTransformToDB(db, frameId, pfiTransform, cameraName):
-
     """
     write transformation coefficients to database
     """
-
-    # get updated values 
     trans=pfiTransform.mcsDistort.getArgs()
-    
-    data = {'mcs_frame_id': [frameId],
-            'x0': [trans[0]],
-            'y0': [trans[1]],
-            'dscale': [trans[2]],
-            'scale2': [trans[3]],
-            'theta': [trans[4]],
-            'alpha_rot': [pfiTransform.alphaRot],
-            'camera_name': [cameraName]}
-    
-    df = pd.DataFrame(data=data)
-    db.bulkInsert('mcs_pfi_transformation', df)
+    res = db.session.execute('select * FROM "mcs_pfi_transformation" where false')
+    colnames = tuple(res.keys())
+    realcolnames = colnames[0:]
+    line = '%d,%f,%f,%f,%f,%f,%f,%s' % (frameid, trans[0].astype('float64'),
+           trans[1], trans[2], trans[3],trans[4],
+           pfiTransform.alphaRot, 'canon50M')
+                                                                        
+    buf = io.StringIO()
+    buf.write(line)
+    buf.seek(0, 0)
+    _writeData('mcs_pfi_transformation', realcolnames, buf)
 
-    return df['mcs_frame_id'].values,df['x0'].values,df['y0'].values,df['dscale'].values,df['scale2'].values,df['theta'].values,df['alpha_rot'].values,df['camera_name'].values
+    
+def _writeData(tableName, columnNames, dataBuf):
+    """Wrap a direct COPY_FROM via sqlalchemy. """
+    columns = ','.join('"{}"'.format(k) for k in columnNames)
+    sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(
+        tableName, columns)
+    try:
+        db=opdb.OpDB(hostname='db-ics', port=5432,dbname='opdb',
+                        username='pfs')
+        session = db.session
+        with session.connection().connection.cursor() as cursor:
+            cursor.copy_expert(sql, dataBuf)
+            cursor.close()
+        session.execute('commit')
+    except Exception as e:
+        self.logger.warn(f"failed to write with {sql}: {e}")
 
 def writeTargetToDB(db, frameId, target, mpos):
     visitId = frameId // 100
