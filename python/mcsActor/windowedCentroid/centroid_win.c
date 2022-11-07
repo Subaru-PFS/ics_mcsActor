@@ -108,6 +108,7 @@ void* subimage_Thread(void *arg)
   cand_list=getRegions(image,thresh1,thresh2,boxFind,boxCent,n_x,n_y,nmin,imagemask,&np,verbose);
 
 
+  printf("np=%d\n",np);
   /* exit with an intermediate values if there are too many points (threshold too low) */
   if(np > 10000)
     {
