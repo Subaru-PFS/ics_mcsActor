@@ -21,6 +21,7 @@ typedef struct thread_data
   int nmin;
   int maxIt;
   int verbose;
+  int np;
 
   struct cand_point *cand_list;  //LIST OF CANDIDATE POINTS (PASSED BACK TO ROUTINE)
 

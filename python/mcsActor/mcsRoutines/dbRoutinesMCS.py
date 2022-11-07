@@ -130,7 +130,7 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
     res = db.session.execute('select * FROM "mcs_pfi_transformation" where false')
     colnames = tuple(res.keys())
     realcolnames = colnames[0:]
-    line = '%d,%f,%f,%f,%f,%f,%f,%s' % (frameId, trans[0].astype('float64'),
+    line = '%d,%f,%f,%f,%e,%f,%f,%s' % (frameId, trans[0].astype('float64'),
            trans[1], trans[2], trans[3],trans[4],
            pfiTransform.alphaRot, 'canon50M')
                                                                         

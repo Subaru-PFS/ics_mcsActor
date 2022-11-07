@@ -1,5 +1,3 @@
-
-
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -85,6 +83,7 @@ void* subimage_Thread(void *arg)
 
   struct cand_point *cand_head=((struct thread_data*)arg)->cand_list;  //output list of found points
   int verbose=((struct thread_data*)arg)->verbose;
+  int np=((struct thread_data*)arg)->np;
 
   int boxsize;
   struct cand_point *cand_list;
@@ -103,16 +102,19 @@ void* subimage_Thread(void *arg)
     }
 
   
-  int np;
+  //int np;
   //printf("%d %d %d %d %d %d %d\n",thresh1,thresh2,n_x,n_y,boxFind,nmin);
 
   cand_list=getRegions(image,thresh1,thresh2,boxFind,boxCent,n_x,n_y,nmin,imagemask,&np,verbose);
 
+
+  printf("np=%d\n",np);
   /* exit with an intermediate values if there are too many points (threshold too low) */
   if(np > 10000)
     {
       ((struct thread_data*)arg)->cand_list=cand_list;
-
+      ((struct thread_data*)arg)->np=np;
+     
       //free memory
       free(image);
       free(imagemask);
@@ -178,6 +180,7 @@ void* subimage_Thread(void *arg)
 
   //now assign the list back to the thread variable to pass it back
   ((struct thread_data*)arg)->cand_list=cand_list;
+  ((struct thread_data*)arg)->np=np;
 
   //free memory
   free(image);
@@ -267,7 +270,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	  ind=ii+XSPLIT*jj;
 	  
 	  cand_list[ind]=NULL;      //Initialize list of candidate points
-
 	  /*Calculate boundaries of subimages. Different cases for subrejions on the edge of the image,
 	    or interior, to properly calculate the overlaps. */
 
@@ -333,6 +335,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 		  //!! something is going wrong here, in the second index - fixed!
 		  ind2=(i+fpix1-1)*n_x+(j+fpix0-1);
 		  thread_data_array[ind].image[ind1]=image[ind2];
+		  
 		}
 	    }
 
@@ -353,6 +356,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	  thread_data_array[ind].maxIt=maxIt;
 	  thread_data_array[ind].cand_list=cand_list[ind];
 	  thread_data_array[ind].verbose=verbose;
+	  thread_data_array[ind].np=0;
 
 	  //Set up the individual threads
 	  ret[ind]=pthread_create(&pth[ind],NULL,subimage_Thread,(void *) &thread_data_array[ind]);
@@ -377,7 +381,14 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
     int inloop=0;
     cand_val=NULL;
     iii=0;
+    int nPoint=0;
+    
+    for(ii=0;ii<NTHREAD;ii++)
+      {
 
+	nPoint=nPoint+thread_data_array[ii].np;
+      }
+    
     for(ii=0;ii<NTHREAD-1;ii++)
       {
 
@@ -501,6 +512,38 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
     cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
     }
 
+
+    // exit out of the code if the number of points is too large
+    // there's a second exit because if nPoint is very large
+    // the O(n2) checking for duplicate points hangs the process
+
+    if(nPoint > 10000)
+      {
+
+	int nMax=nPoint;
+	output=malloc(sizeof(centroids)*nMax);
+	curr_val=top_val;
+	for(i=0; i<nMax;i++)
+	  {
+	    output[i].x=curr_val->x;
+	    output[i].y=curr_val->y;
+	    output[i].x2=curr_val->x2;
+	    output[i].y2=curr_val->y2;
+	    output[i].peak=curr_val->peak;
+	    output[i].xy=curr_val->xy;
+	    output[i].back=curr_val->back;
+	    
+	    curr_val=curr_val->next;
+	  }
+
+
+	freeAll(&top_val);
+	np[0]=nPoint;
+
+	return output;
+
+      }
+    
     //Now filter out points with badly failed fits (fqual > 5)
 
     curr_val=top_val;

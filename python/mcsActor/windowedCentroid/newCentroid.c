@@ -211,7 +211,7 @@ struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int
     }
   if (verbose==1)
     {
-      //printf("Found %d Regions",(*npoints));
+      printf("Found %d Regions",(*npoints));
     }
   return cand_head;
 
