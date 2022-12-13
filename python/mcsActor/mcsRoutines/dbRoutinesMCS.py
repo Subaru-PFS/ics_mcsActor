@@ -131,7 +131,7 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
     colnames = tuple(res.keys())
     realcolnames = colnames[0:]
     line = '%d,%f,%f,%f,%e,%e,%f,%s' % (frameId, trans[0].astype('float64'),
-           trans[1], trans[2], trans[3],trans[4],
+           trans[1], trans[3], trans[4],trans[2],
            pfiTransform.alphaRot, 'canon50M')
                                                                         
     buf = io.StringIO()
