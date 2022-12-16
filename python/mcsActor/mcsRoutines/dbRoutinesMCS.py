@@ -140,15 +140,15 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
     _writeData('mcs_pfi_transformation', realcolnames, buf)
 
 
-    #data = {'mcs_frame_id': [frameId],
-    #        'x0': [trans[0]],
-    #        'y0': [trans[1]],
-    #        'dscale': [trans[2]],
-    #        'scale2': [trans[3]],
-    #        'theta': [trans[4]],
-    #        'alpha_rot': [pfiTransform.alphaRot],
-    #        'camera_name': [cameraName]}
-    #df = pd.DataFrame(data=data)
+    data = {'mcs_frame_id': [frameId],
+            'x0': [trans[0]],
+            'y0': [trans[1]],
+            'dscale': [trans[2]],
+            'scale2': [trans[3]],
+            'theta': [trans[4]],
+            'alpha_rot': [pfiTransform.alphaRot],
+            'camera_name': [cameraName]}
+    df = pd.DataFrame(data=data)
     return df['mcs_frame_id'].values,df['x0'].values,df['y0'].values,df['dscale'].values, \
         df['scale2'].values,df['theta'].values,df['alpha_rot'].values,df['camera_name'].values
     
