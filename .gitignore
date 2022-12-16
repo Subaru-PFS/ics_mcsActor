@@ -9,3 +9,6 @@ build/
 /.project
 
 centroid_wrapper.c
+callgrind.out.*
+*.png
+\#*
