@@ -25,7 +25,7 @@ class Mcs(actorcore.ICC.ICC):
         # For the mcsActor at Subaru, we have two possible cameras:
         #  - on the pfic host from ASRD, use the rmod. Else use the canon.
         if camera is None:
-            if socket.gethostname() == 'pfic':
+            if socket.gethostname() == 'us-mcs':
                 camera = 'rmod_71m'
             else:
                 camera = 'canon_50m'
