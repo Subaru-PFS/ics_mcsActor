@@ -737,15 +737,18 @@ class McsCmd(object):
 
         if 'rmod' in self.actor.cameraName.lower():
             altitude = 90.0
-            insrot = 0
+            insrot = 91
+            pfiTransform = transformUtils.fromCameraName('usmcs', 
+                altitude=altitude, insrot=insrot,nsigma=0, alphaRot=1)
+        else:
+            pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, 
+                altitude=altitude, insrot=insrot,nsigma=0, alphaRot=1)
 
         self.logger.info(f'Camera name: {self.actor.cameraName}')
         cmd.inform(f'text="camera name: {self.actor.cameraName} altitude using {altitude}"')
         cmd.inform(f'text="camera name: {self.actor.cameraName} altitude using {insrot}"')
 
-
-        pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, 
-            altitude=altitude, insrot=insrot,nsigma=0, alphaRot=1)
+       
 
         # these values are now read via mcsToolds.readFiducialMasks
 
