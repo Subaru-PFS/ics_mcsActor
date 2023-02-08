@@ -291,7 +291,7 @@ def writeMatchesToDB(db, cobraMatch, mcsFrameId):
               mcs_second_moment_xy_pix,bgvalue,peakvalue
     """
 
-    np.save("cobraMatch.npy", cobraMatch)
+    #np.save("cobraMatch.npy", cobraMatch)
     # get size of array
     sz = cobraMatch.shape
     # create array of frameIDs (same for all spots)
