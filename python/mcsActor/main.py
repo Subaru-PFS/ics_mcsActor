@@ -17,6 +17,8 @@ class Mcs(actorcore.ICC.ICC):
                          modelNames=('gen2', 'meb', 'mcs', 'peb', 'sps'),
                          configFile=configFile)
 
+        print(f'   actorConfig: {self.actorConfig}')
+
         self.connectCamera(self.bcast)
 
         self.cameraName = None
