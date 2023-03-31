@@ -737,9 +737,9 @@ class McsCmd(object):
 
         if 'rmod' in self.actor.cameraName.lower():
             altitude = 90.0
-            insrot = 91
+            insrot = 0
             pfiTransform = transformUtils.fromCameraName('usmcs', 
-                altitude=altitude, insrot=insrot,nsigma=0, alphaRot=1)
+                altitude=altitude, insrot=insrot,nsigma=0, alphaRot=0)
         else:
             pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, 
                 altitude=altitude, insrot=insrot,nsigma=0, alphaRot=1)
