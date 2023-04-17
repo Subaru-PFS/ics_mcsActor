@@ -160,11 +160,11 @@ class McsCmd(object):
             cmd = self.actor.bcast
 
         try:
-            config = self.actor.config
-            hostname = config.get('db', 'hostname', fallback='db-ics')
-            dbname = config.get('db', 'dbname', fallback='opdb')
-            port = config.get('db', 'port', fallback=5432)
-            username = config.get('db', 'username', fallback='pfs')
+            config = self.actor.actorConfig
+            hostname = config['db']['hostname']
+            dbname = config['db']['dbname']
+            port = config['db']['port']
+            username = config['db']['username']
         except Exception as e:
             raise RuntimeError(f'failed to load opdb configuration: {e}')
 
