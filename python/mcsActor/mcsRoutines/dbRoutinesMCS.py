@@ -387,5 +387,5 @@ def writeFidToDB(db, ffid,  mcs_frame_id):
     df = pd.DataFrame(frame, columns=columns)
 
     #insert
-    db.bulkInsert("fiducial_fiber_match", df)
- 
+    #db.bulkInsert("fiducial_fiber_match", df)
+    db.insert("fiducial_fiber_match", df)
