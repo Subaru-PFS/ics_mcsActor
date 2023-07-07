@@ -206,14 +206,14 @@ def writeFakeTargetToDB(db, centers, frameId):
             'pfi_nominal_y_mm':centers.imag,
             'pfi_target_x_mm': centers.real,
             'pfi_target_y_mm':centers.imag,
-            'cobra_mortor_model_id_theta': np.repeat(0,2394).astype('int'),
-            'motor_target_theta':np.repeat(0,2394),
-            'motor_num_step_theta':np.repeat(0,2394),
-            'motor_on_time_theta':np.repeat(0,2394),
-            'cobra_mortor_model_id_phi': np.repeat(0,2394).astype('int'),
-            'motor_target_phi':np.repeat(0,2394),
-            'motor_num_step_phi':np.repeat(0,2394),
-            'motor_on_time_phi':np.repeat(0,2394),
+            #'cobra_mortor_model_id_theta': np.repeat(0,2394).astype('int'),
+            #'motor_target_theta':np.repeat(0,2394),
+            #'motor_num_step_theta':np.repeat(0,2394),
+            #'motor_on_time_theta':np.repeat(0,2394),
+            #'cobra_mortor_model_id_phi': np.repeat(0,2394).astype('int'),
+            #'motor_target_phi':np.repeat(0,2394),
+            #'motor_num_step_phi':np.repeat(0,2394),
+            #'motor_on_time_phi':np.repeat(0,2394),
             'flags':np.repeat(0,2394).astype('int')
     }
 
