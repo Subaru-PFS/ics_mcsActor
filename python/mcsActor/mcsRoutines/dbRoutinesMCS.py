@@ -187,6 +187,41 @@ def writeTargetToDB(db, frameId, target, mpos):
     df = pd.DataFrame(data=data)
     db.insert("cobra_target", df)
 
+
+def writeFakeMoveToDB(db, frameId):
+    """
+    make sure there is a target value if the target d
+    """
+    visitId = frameId // 100
+    iteration = frameId % 100
+
+    nCob = 2394
+    
+    # To-Do here we need a better implementation.
+    data = {'pfs_visit_id': np.repeat(visitId,nCob).astype('int'),
+            'iteration' : np.repeat(iteration,nCob).astype('int'),
+            'cobra_id':np.arange(2394).astype('int')+1,
+            #'pfs_config_id':np.repeat(0,2394).astype('int'),
+            #'pfi_nominal_x_mm':centers.real,
+            #'pfi_nominal_y_mm':centers.imag,
+            #'pfi_target_x_mm': centers.real,
+            #'pfi_target_y_mm':centers.imag,
+            'cobra_mortor_model_id_theta': np.repeat(0,2394).astype('int'),
+            'motor_target_theta':np.repeat(0,2394),
+            'motor_num_step_theta':np.repeat(0,2394),
+            'motor_on_time_theta':np.repeat(0,2394),
+            'cobra_mortor_model_id_phi': np.repeat(0,2394).astype('int'),
+            'motor_target_phi':np.repeat(0,2394),
+            'motor_num_step_phi':np.repeat(0,2394),
+            'motor_on_time_phi':np.repeat(0,2394),
+            'flags':np.repeat(0,2394).astype('int')
+    }
+
+    df = pd.DataFrame(data=data)
+    db.insert("cobra_move", df)
+
+
+
 def writeFakeTargetToDB(db, centers, frameId):
 
     """
@@ -206,14 +241,14 @@ def writeFakeTargetToDB(db, centers, frameId):
             'pfi_nominal_y_mm':centers.imag,
             'pfi_target_x_mm': centers.real,
             'pfi_target_y_mm':centers.imag,
-            'cobra_mortor_model_id_theta': np.repeat(0,2394).astype('int'),
-            'motor_target_theta':np.repeat(0,2394),
-            'motor_num_step_theta':np.repeat(0,2394),
-            'motor_on_time_theta':np.repeat(0,2394),
-            'cobra_mortor_model_id_phi': np.repeat(0,2394).astype('int'),
-            'motor_target_phi':np.repeat(0,2394),
-            'motor_num_step_phi':np.repeat(0,2394),
-            'motor_on_time_phi':np.repeat(0,2394),
+            #'cobra_mortor_model_id_theta': np.repeat(0,2394).astype('int'),
+            #'motor_target_theta':np.repeat(0,2394),
+            #'motor_num_step_theta':np.repeat(0,2394),
+            #'motor_on_time_theta':np.repeat(0,2394),
+            #'cobra_mortor_model_id_phi': np.repeat(0,2394).astype('int'),
+            #'motor_target_phi':np.repeat(0,2394),
+            #'motor_num_step_phi':np.repeat(0,2394),
+            #'motor_on_time_phi':np.repeat(0,2394),
             'flags':np.repeat(0,2394).astype('int')
     }
 
