@@ -894,6 +894,7 @@ class McsCmd(object):
             tarPos = self.prevPos
 
         if(len(tarPos)==0):
+            writeFakeCobraMove = True
             db.close()    
             db = self.connectToDB(cmd)
             dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
@@ -952,10 +953,11 @@ class McsCmd(object):
         self.prevPos = cobraMatch[:, [0, 2, 3]]
 
         # Handling the case of 0 target case
-        if(len(tarPos)==0):
+        if (writeFakeCobraMove):
             db.close()
             db = self.connectToDB(cmd)
             dbTools.writeFakeMoveToDB(db, int(frameId))
+            cmd.inform(f'text="wrote fake cobra move to DB"')
             db.close()
 
 
