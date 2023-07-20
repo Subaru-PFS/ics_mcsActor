@@ -897,6 +897,8 @@ class McsCmd(object):
             if(len(tarPos)==0):
                 db = self.connectToDB(cmd)
                 dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
+                #dbTools.writeFakeMoveToDB(db, int(frameId))
+
                 db.close()
 
                 visitId = frameId // 100
@@ -912,6 +914,7 @@ class McsCmd(object):
             if(len(tarPos)==0):
                 db = self.connectToDB(cmd)
                 dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
+                #dbTools.writeFakeMoveToDB(db, int(frameId))
                 db.close()
             tarPos = self.prevPos
             
@@ -928,7 +931,7 @@ class McsCmd(object):
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
         db.close()
         cmd.inform(f'text="wrote matched cobras to database"')
-
+        
         # save the values to the previous position
         self.prevPos = cobraMatch[:, [0, 2, 3]]
 
