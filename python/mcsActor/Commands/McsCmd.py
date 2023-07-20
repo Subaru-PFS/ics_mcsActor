@@ -887,36 +887,52 @@ class McsCmd(object):
         #transform the coordinates to mm in place
         self.mmCentroids[:,1], self.mmCentroids[:,2] = self.pfiTrans.mcsToPfi(self.centroids[:,1],self.centroids[:,2])
 
-        # if the method is target, load from database, otherwise the target = previous position
-        if(self.fMethod == 'target'):
-            # load target positions
-            tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
-            db.close()
-            
-            cmd.inform(f'text="loaded {len(tarPos)} targets from DB"')
-            if(len(tarPos)==0):
-                db = self.connectToDB(cmd)
-                dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
-                #dbTools.writeFakeMoveToDB(db, int(frameId))
-
-                db.close()
-
-                visitId = frameId // 100
-                iteration = frameId % 100
-                cmd.inform(f'text="Fall back using cobra centers as target." ')
-                cmd.inform(f'text="Writing minimal information to target database."')
-
-                tarPos = self.prevPos
-        else:
-            db.close()
-            
-            tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
-            if(len(tarPos)==0):
-                db = self.connectToDB(cmd)
-                dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
-                #dbTools.writeFakeMoveToDB(db, int(frameId))
-                db.close()
+        # load target positions
+        tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
+        
+        if (self.fMethod != 'target'):
             tarPos = self.prevPos
+
+        if(len(tarPos)==0):
+            db.close()    
+            db = self.connectToDB(cmd)
+            dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
+            db.close()
+            cmd.inform(f'text="Fall back using cobra centers as target." ')
+            cmd.inform(f'text="Writing minimal information to target database."')
+
+            tarPos = self.prevPos
+        
+        # if the method is target, load from database, otherwise the target = previous position
+        #if(self.fMethod == 'target'):
+            # load target positions
+        #    tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
+        #    db.close()
+            
+        #    cmd.inform(f'text="loaded {len(tarPos)} targets from DB"')
+        #    if(len(tarPos)==0):
+        #        db = self.connectToDB(cmd)
+        #        dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
+                #dbTools.writeFakeMoveToDB(db, int(frameId))
+
+        #        db.close()
+
+        #        visitId = frameId // 100
+        #        iteration = frameId % 100
+        #        cmd.inform(f'text="Fall back using cobra centers as target." ')
+        #        cmd.inform(f'text="Writing minimal information to target database."')
+
+        #        tarPos = self.prevPos
+        #else:
+        #    db.close()
+            
+        #    tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
+        #    if(len(tarPos)==0):
+        #        db = self.connectToDB(cmd)
+        #        dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
+                #dbTools.writeFakeMoveToDB(db, int(frameId))
+        #        db.close()
+        #    tarPos = self.prevPos
             
         # do the identification
         cmd.inform(f'text="Starting Fiber ID"')
@@ -931,9 +947,14 @@ class McsCmd(object):
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
         db.close()
         cmd.inform(f'text="wrote matched cobras to database"')
-        
+
         # save the values to the previous position
         self.prevPos = cobraMatch[:, [0, 2, 3]]
+
+        # Handling the case of 0 target case
+        if(len(tarPos)==0):
+            dbTools.writeFakeMoveToDB(db, int(frameId))
+
 
     def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
         if self.simulationPath is None:
