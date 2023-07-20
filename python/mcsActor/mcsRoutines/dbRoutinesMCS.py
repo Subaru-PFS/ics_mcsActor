@@ -214,7 +214,7 @@ def writeFakeMoveToDB(db, frameId):
             'motor_target_phi':np.repeat(0,2394),
             'motor_num_step_phi':np.repeat(0,2394),
             'motor_on_time_phi':np.repeat(0,2394),
-            'flags':np.repeat(0,2394).astype('int')
+            'flags':np.repeat(0,2394).astype('int'),
     }
 
     df = pd.DataFrame(data=data)

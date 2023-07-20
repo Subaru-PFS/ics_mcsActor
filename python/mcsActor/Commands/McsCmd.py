@@ -953,7 +953,10 @@ class McsCmd(object):
 
         # Handling the case of 0 target case
         if(len(tarPos)==0):
+            db.close()
+            db = self.connectToDB(cmd)
             dbTools.writeFakeMoveToDB(db, int(frameId))
+            db.close()
 
 
     def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
