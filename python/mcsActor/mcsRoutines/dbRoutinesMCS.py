@@ -393,7 +393,7 @@ def writeAffineToDB(db, afCoeff, frameId):
                       yd], 'x_scale': [sx], 'y_scale': [sy], 'angle': [rotation]})
     db.insert('mcs_pfi_transformation', df)
 
-def writeFidToDB(db, ffid,  mcs_frame_id):
+def writeFidToDB(db, ffid, mcsData,  mcs_frame_id):
 
     """
     write the fiducial fibre matches to db.
@@ -415,7 +415,7 @@ def writeFidToDB(db, ffid,  mcs_frame_id):
     frame[:,1] = np.repeat(iteration,sz)
     frame[:,2] = np.repeat(mcs_frame_id,sz)
     frame[:,3] = ffids
-    frame[:,4] = ind[0]
+    frame[:,4] = mcsData['spot_id'][ind[0]].values
     frame[:,5] = np.repeat(0,sz)
     columns = ['pfs_visit_id','iteration','mcs_frame_id', 'fiducial_fiber_id', 'spot_id', 'flags']
 
