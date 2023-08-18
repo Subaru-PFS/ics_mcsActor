@@ -772,7 +772,7 @@ def getThresh(image, boreSight, sigmaThresh, findSigma, centSigma):
     
     # crop to a radius of 1500 for hte whole PFI, to select the illuminated region
     
-    ind = np.where(dfromc < 1500)
+    ind = np.where(dfromc < 500)
     # sigma clip values
     a, b, c = sigmaclip(image[ind], sigmaThresh, sigmaThresh)
 
