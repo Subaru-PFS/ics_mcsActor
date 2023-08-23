@@ -416,7 +416,9 @@ def writeFidToDB(db, ffid, mcsData,  mcs_frame_id):
     frame[:,2] = np.repeat(mcs_frame_id,sz)
     frame[:,3] = ffids
     frame[:,4] = mcsData['spot_id'][ind[0]].values
-    frame[:,5] = np.repeat(0,sz)
+    frame[:,5] = mcsData['pfi_center_x_mm'][ind[0]].values
+    frame[:,5] = mcsData['pfi_center_y_mm'][ind[0]].values
+    frame[:,7] = np.repeat(0,sz)
     columns = ['pfs_visit_id','iteration','mcs_frame_id', 'fiducial_fiber_id', 'spot_id', 'flags']
 
     df = pd.DataFrame(frame, columns=columns)
