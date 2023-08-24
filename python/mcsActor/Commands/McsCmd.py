@@ -778,7 +778,11 @@ class McsCmd(object):
         cmd.inform(f'text="wrote transform to DB"')
         cmd.inform(f'text="paramters = {t_frame} {t_x0} {t_y0} {t_dscale} {t_scale2} {t_theta} {t_alpha_rot, t_camera_name}"')
         
-        dbTools.writeFidToDB(db, ffid, mcsData, frameID)
+        x_mm, y_mm = pfiTransform.mcsToPfi(mcsData['mcs_center_x_pix'].values,mcsData['mcs_center_y_pix'].values)
+        mcsData['pfi_center_x_mm'] = x_mm
+        mcsData['pfi_center_y_mm'] = y_mm
+
+        dbTools.writeFidToDB(ffid, mcsData, frameID)
         cmd.inform(f'text="wrote matched FF to opdb."')
         
         self.pfiTrans = pfiTransform
