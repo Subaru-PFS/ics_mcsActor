@@ -33,6 +33,8 @@ from scipy.stats import sigmaclip
 import copy
 from opdb import opdb
 from datetime import datetime, timezone
+import psycopg2
+from sqlalchemy import create_engine
 
 def connectToDB(hostname='', port='', dbname='opdb', username='pfs'):
 
@@ -393,7 +395,7 @@ def writeAffineToDB(db, afCoeff, frameId):
                       yd], 'x_scale': [sx], 'y_scale': [sy], 'angle': [rotation]})
     db.insert('mcs_pfi_transformation', df)
 
-def writeFidToDB(db, ffid, mcsData,  mcs_frame_id):
+def writeFidToDB(ffid, mcsData,  mcs_frame_id):
 
     """
     write the fiducial fibre matches to db.
@@ -410,19 +412,25 @@ def writeFidToDB(db, ffid, mcsData,  mcs_frame_id):
     pfs_visit_id = mcs_frame_id // 100
     iteration = mcs_frame_id % 100
     sz = len(ffids)
-    frame = np.zeros((sz, 6))
+    frame = np.zeros((sz, 8))
     frame[:,0] = np.repeat(pfs_visit_id,sz)
     frame[:,1] = np.repeat(iteration,sz)
     frame[:,2] = np.repeat(mcs_frame_id,sz)
     frame[:,3] = ffids
     frame[:,4] = mcsData['spot_id'][ind[0]].values
-    frame[:,5] = mcsData['pfi_center_x_mm'][ind[0]].values
-    frame[:,5] = mcsData['pfi_center_y_mm'][ind[0]].values
-    frame[:,7] = np.repeat(0,sz)
-    columns = ['pfs_visit_id','iteration','mcs_frame_id', 'fiducial_fiber_id', 'spot_id', 'flags']
+    frame[:,5] = np.repeat(0,sz)
+    frame[:,6] = mcsData['pfi_center_x_mm'][ind[0]].values
+    frame[:,7] = mcsData['pfi_center_y_mm'][ind[0]].values
+    columns = ['pfs_visit_id','iteration','mcs_frame_id', 
+               'fiducial_fiber_id', 'spot_id', 'flags',
+               'pfi_center_x_mm','pfi_center_y_mm']
 
     df = pd.DataFrame(frame, columns=columns)
 
+    connection_url = f'postgresql+psycopg2://pfs@db-ics/opdb'
+    engine = create_engine(connection_url)
+    df.to_sql("fiducial_fiber_match", engine, index=False, if_exists='append')
     #insert
     #db.bulkInsert("fiducial_fiber_match", df)
-    db.insert("fiducial_fiber_match", df)
+    #db.insert("fiducial_fiber_match", df)
+    engine.close()

@@ -782,7 +782,7 @@ class McsCmd(object):
         mcsData['pfi_center_x_mm'] = x_mm
         mcsData['pfi_center_y_mm'] = y_mm
 
-        dbTools.writeFidToDB(db, ffid, mcsData, frameID)
+        dbTools.writeFidToDB(ffid, mcsData, frameID)
         cmd.inform(f'text="wrote matched FF to opdb."')
         
         self.pfiTrans = pfiTransform
