@@ -35,6 +35,8 @@ from opdb import opdb
 from datetime import datetime, timezone
 import psycopg2
 from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 
 def connectToDB(hostname='', port='', dbname='opdb', username='pfs'):
 
@@ -429,8 +431,11 @@ def writeFidToDB(ffid, mcsData,  mcs_frame_id):
 
     connection_url = f'postgresql+psycopg2://pfs@db-ics/opdb'
     engine = create_engine(connection_url)
+    # Create a session
+    Session = sessionmaker(bind=engine)
+    session = Session()
     df.to_sql("fiducial_fiber_match", engine, index=False, if_exists='append')
     #insert
     #db.bulkInsert("fiducial_fiber_match", df)
     #db.insert("fiducial_fiber_match", df)
-    engine.close()
+    session.close()
