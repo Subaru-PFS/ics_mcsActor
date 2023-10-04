@@ -1058,7 +1058,7 @@ class McsCmd(object):
         # Run centroid
 
         bkg = sep.Background(image.astype(float), bw=64, bh=64, fw=3, fh=3)
-        bkg_image = bkg.back()
+        #bkg_image = bkg.back()
 
         data_sub = image - bkg
 

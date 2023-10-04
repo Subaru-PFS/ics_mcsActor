@@ -121,10 +121,10 @@ def loadTargetsFromDB(db, frameId):
     visitId = frameId // 100
     iteration = frameId % 100
 
-    sql = f'SELECT cobra_target.cobra_id,cobra_target.pfi_nominal_x_mm,cobra_target.pfi_nominal_y_mm FROM cobra_target WHERE cobra_target.iteration={iteration} and cobra_target.pfs_visit_id={visitId}'
+    sql = f'SELECT cobra_target.cobra_id,cobra_target.pfi_target_x_mm,cobra_target.pfi_target_y_mm FROM cobra_target WHERE cobra_target.iteration={iteration} and cobra_target.pfs_visit_id={visitId}'
     df = db.bulkSelect('cobra_target',sql)
 
-    return np.array([df['cobra_id'], df['pfi_nominal_x_mm'], df['pfi_nominal_y_mm']]).T
+    return np.array([df['cobra_id'], df['pfi_target_x_mm'], df['pfi_target_y_mm']]).T
 
 def writeTransformToDB(db, frameId, pfiTransform, cameraName):
     """
