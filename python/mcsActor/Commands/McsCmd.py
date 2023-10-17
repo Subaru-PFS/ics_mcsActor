@@ -734,7 +734,9 @@ class McsCmd(object):
                    username='pfs')
         mcsData = db.bulkSelect('mcs_data',f'select spot_id, mcs_center_x_pix, mcs_center_y_pix '
                 f'from mcs_data where mcs_frame_id = {frameID}')
-
+        
+        
+        self.logger.info(f'Initiating the transformation function')
         if 'rmod' in self.actor.cameraName.lower():
             altitude = 90.0
             insrot = 0
@@ -745,11 +747,11 @@ class McsCmd(object):
                 altitude=altitude, insrot=insrot,nsigma=0, alphaRot=1)
 
         self.logger.info(f'Camera name: {self.actor.cameraName}')
-        cmd.inform(f'text="camera name: {self.actor.cameraName} altitude using {altitude}"')
-        cmd.inform(f'text="camera name: {self.actor.cameraName} altitude using {insrot}"')
+        cmd.inform(f'text="camera name: {self.actor.cameraName} altitude = {altitude}"')
+        cmd.inform(f'text="camera name: {self.actor.cameraName} rotation = {insrot}"')
 
        
-
+        self.logger.info(f'Calcuating transofmtaion using FF at outter region')
         # these values are now read via mcsToolds.readFiducialMasks
 
         # set the good fiducials and outer ring fiducials if not yet set
@@ -768,19 +770,23 @@ class McsCmd(object):
         pfiTransform.nsigma = nsigma
         pfiTransform.alphaRot = 0
 
+        self.logger.info(f'Re-calcuating transofmtaion using ALL FFs.')
         for i in range(2):
             ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=4.2,nMatchMin=0.1)
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
 
+        self.logger.info(f'Writing transformation coefficients to DB.')
         db = self.connectToDB(cmd)
         t_frame,t_x0,t_y0,t_dscale,t_scale2,t_theta,t_alpha_rot,t_camera_name = dbTools.writeTransformToDB(db, frameID, pfiTransform, self.actor.cameraName)
         db.close()
         cmd.inform(f'text="wrote transform to DB"')
         cmd.inform(f'text="paramters = {t_frame} {t_x0} {t_y0} {t_dscale} {t_scale2} {t_theta} {t_alpha_rot, t_camera_name}"')
         
+        self.logger.info(f'Apply transformation to MCS data points.')
         x_mm, y_mm = pfiTransform.mcsToPfi(mcsData['mcs_center_x_pix'].values,mcsData['mcs_center_y_pix'].values)
         mcsData['pfi_center_x_mm'] = x_mm
         mcsData['pfi_center_y_mm'] = y_mm
+
 
         dbTools.writeFidToDB(ffid, mcsData, frameID)
         cmd.inform(f'text="wrote matched FF to opdb."')
