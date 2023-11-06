@@ -14,6 +14,8 @@ import queue
 import threading
 import sep
 import sys
+import copy
+from multiprocessing import Pool
 
 import os
 import astropy.io.fits as pyfits
@@ -43,6 +45,8 @@ from procedures.moduleTest import calculation
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
+import mcsActor.mcsRoutines.speedCentroid as speedCentriod
+
 from pfs.utils import butler
 
 from opdb import opdb
@@ -600,7 +604,8 @@ class McsCmd(object):
 
             if(self.cMethod == 'sep'):
                 cmd.inform(f'text="Using SExtractor for centroid" ')
-                self.runCentroidSEP(cmd)
+                self.runCentroidSEPMP(cmd)
+                #self.runCentroid(cmd,self.centParms)
             else:
                 self.runCentroid(cmd, self.centParms)
             
@@ -1050,7 +1055,46 @@ class McsCmd(object):
         self.centParms = mcsTools.getCentroidParams(cmd)
 
         self.logger.info(f'centParms: {self.centParms}')
+    
+    
+    
+    def runCentroidSEPMP(self, cmd):
 
+
+        cmdKeys = cmd.cmd.keywords
+        self.newTable = "newTable" in cmdKeys
+
+        cmd.debug('text="newTable value = %s"' % (self.newTable))
+
+        #image = copy.deepcopy(self.actor.image)
+
+        cmd.inform(f'state="measuring cached image: {self.actor.image.shape}"')
+        t0 = time.time()
+        spCent = speedCentriod.speedCentroid(self.actor.image)
+        spCent.runCentroidMP()
+        spCent.arrangeCentroid()
+        centroids = spCent.centroids
+
+        t1 = time.time()
+        cmd.inform(f'text="Finished centroid with { spCent.cores } cores"')
+    
+        npoint = centroids.shape[0]
+        tCentroids = np.zeros((npoint, 8))
+
+        tCentroids[:, 0] = np.arange(npoint)+1
+        tCentroids[:, 1] = centroids['x']
+        tCentroids[:, 2] = centroids['y']
+        tCentroids[:, 3] = centroids['x2']
+        tCentroids[:, 4] = centroids['y2']
+        tCentroids[:, 5] = centroids['xy']
+        tCentroids[:, 6] = centroids['thresh']
+        tCentroids[:, 7] = centroids['peak']
+
+        self.centroids = tCentroids
+        self.nCentroid = len(centroids)
+        cmd.inform('text="%d centroids in %f"' % (len(centroids), (t1-t0)))
+        cmd.inform('state="centroids measured"')
+    
     def runCentroidSEP(self, cmd):
         cmdKeys = cmd.cmd.keywords
         self.newTable = "newTable" in cmdKeys
