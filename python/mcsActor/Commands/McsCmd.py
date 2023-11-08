@@ -1074,7 +1074,8 @@ class McsCmd(object):
         spCent.runCentroidMP()
         spCent.arrangeCentroid()
         centroids = spCent.centroids
-
+        spCent.close()
+        
         t1 = time.time()
         cmd.inform(f'text="Finished centroid with { spCent.cores } cores"')
     

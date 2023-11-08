@@ -25,8 +25,10 @@ class speedCentroid(object):
         
         self.logger.info(f'Setting background to be {bkg.globalrms}')
         self.bkgglobalrms = bkg.globalrms
-        self.logger.info(f'Creating share memory')
 
+        
+
+        self.logger.info(f'Creating share memory')
         self.shm_name, self.shm_dtype, self.shm_shape = self.shareData(image)
         
         
@@ -81,7 +83,7 @@ class speedCentroid(object):
         for p in process:
             p.join()
     
-    def __del__(self):
+    def close(self):
         shm = shared_memory.SharedMemory(name=self.shm_name, create=False)
 
         shm.close()
@@ -109,6 +111,7 @@ def main(argv=None):
     t2 = time.time()
 
     print(f'Single-Process = {t2 - t1}')
-
+    spCenMT.close()
+    
 if __name__ == "__main__":
     main()
