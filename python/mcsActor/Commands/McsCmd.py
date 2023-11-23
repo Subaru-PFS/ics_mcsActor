@@ -1036,8 +1036,12 @@ class McsCmd(object):
         """        
         image = self.actor.image
 
-        self.findThresh, self.centThresh, self.avBack = mcsTools.getThresh(
-            image, self.rotCent, self.centParms['threshSigma'], self.centParms['findSigma'], self.centParms['centSigma'])
+        if self.actor.cameraName == 'rmod_71m':
+            self.findThreshBench, self.centThresh, self.avBack = mcsTools.getThresh(
+                image, self.rotCent, self.centParms['threshSigma'], self.centParms['findSigma'], self.centParms['centSigma'])
+        else:
+            self.findThresh, self.centThresh, self.avBack = mcsTools.getThresh(
+                image, self.rotCent, self.centParms['threshSigma'], self.centParms['findSigma'], self.centParms['centSigma'])
 
         a1 = self.centParms['threshSigma']
         a2 = self.centParms['findSigma']
