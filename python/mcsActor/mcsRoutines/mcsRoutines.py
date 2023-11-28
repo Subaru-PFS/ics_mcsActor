@@ -745,6 +745,9 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     return aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange
 
 def getThreshBench(image, boreSight, sigmaThresh, findSigma, centSigma):
+  
+    mpx = boreSight[0]
+    mpy = boreSight[1]
 
     # grid of pixels value, and distance from the center
     xx, yy = np.meshgrid(np.arange(image.shape[0]), np.arange(image.shape[1]))
@@ -753,7 +756,7 @@ def getThreshBench(image, boreSight, sigmaThresh, findSigma, centSigma):
     # crop to a radius of 1500 for hte whole PFI, to select the illuminated region
 
     ind = np.where(dfromc < 500)
-    if(np.median(image(ind))==0):
+    if(np.median(image[ind])==0):
         ind = np.where(image > 0)
     # sigma clip values
     a, b, c = sigmaclip(image[ind], sigmaThresh, sigmaThresh)

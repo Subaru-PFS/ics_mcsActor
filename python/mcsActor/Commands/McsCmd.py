@@ -598,17 +598,21 @@ class McsCmd(object):
             # switch for different centroid methods. Call with switchCMethod
             t1 = time.time()
             
-            if self.actor.cameraName == 'rmod_71m':
-                self.cMethod = 'sep'
-                cmd.inform(f'text="Bench camera RMOD-71M is used. Using SEP" ')
+            #if self.actor.cameraName == 'rmod_71m':
+            #    self.cMethod = 'sep'
+            #s    cmd.inform(f'text="Bench camera RMOD-71M is used. Using SEP" ')
 
-            if(self.cMethod == 'sep'):
-                cmd.inform(f'text="Using SExtractor for centroid" ')
-                self.runCentroidSEPMP(cmd)
-                #self.runCentroid(cmd,self.centParms)
-            else:
-                self.runCentroid(cmd, self.centParms)
+            #if(self.cMethod == 'sep'):
+            #    cmd.inform(f'text="Using SExtractor for centroid" ')
+            #    self.runCentroidSEPMP(cmd)
+            #    self.runCentroid(cmd,self.centParms)
+            #else:
+            #    self.runCentroid(cmd, self.centParms)
             
+  
+            # Use only one version of Centroid code.
+            self.runCentroid(cmd, self.centParms)
+
             t2 = time.time()
             cmd.inform(f'text="Centroids done in {t2-t1} second" ')
 
@@ -1037,16 +1041,18 @@ class McsCmd(object):
         image = self.actor.image
 
         if self.actor.cameraName == 'rmod_71m':
-            self.findThreshBench, self.centThresh, self.avBack = mcsTools.getThresh(
+            self.findThresh, self.centThresh, self.avBack = mcsTools.getThreshBench(
                 image, self.rotCent, self.centParms['threshSigma'], self.centParms['findSigma'], self.centParms['centSigma'])
         else:
             self.findThresh, self.centThresh, self.avBack = mcsTools.getThresh(
                 image, self.rotCent, self.centParms['threshSigma'], self.centParms['findSigma'], self.centParms['centSigma'])
+            
+        cmd.inform(f'text="findThresh ={self.findThresh:.2}, centThresh = {self.centThresh:.2}"')
 
         a1 = self.centParms['threshSigma']
         a2 = self.centParms['findSigma']
         a3 = self.centParms['centSigma']
-        cmd.inform(f'text="findThresh ={self.findThresh:.2}, centThresh = {self.centThresh:.2}"')
+       
         cmd.inform(f'text="threshSigma={a1} findSigma={a2} centSigma={a3}"')
 
     def setCentroidParams(self, cmd):
