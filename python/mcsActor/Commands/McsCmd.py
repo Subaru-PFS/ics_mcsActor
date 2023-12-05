@@ -63,6 +63,7 @@ class McsCmd(object):
         # This lets us access the rest of the actor.
         self.actor = actor
         self.expTime = 1000
+        self.prevExpTime = 1000
         self.newTable = None
         self.simulationPath = None
         self._connectionToDB = None
@@ -553,6 +554,7 @@ class McsCmd(object):
         # set exposure time
         if expType in ('bias', 'test'):
             expTime = self.expTime
+            
         else:
             expTime = cmd.cmd.keywords["expTime"].values[0] * 1000
 
@@ -589,8 +591,9 @@ class McsCmd(object):
             cmd.inform('text="Setting centroid parameters." ')
             self.setCentroidParams(cmd)
 
-            if self.findThresh is None or frameId % 100 == 0:
+            if self.findThresh is None or frameId % 100 == 0 or self.prevExpTime != self.expTime:
                 cmd.inform('text="Calculating threshold." ')
+                self.prevExpTime = self.expTime
                 self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
 
             cmd.inform('text="Running centroid on current image" ')
