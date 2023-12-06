@@ -749,7 +749,7 @@ def getThreshBench(image, boreSight, sigmaThresh, findSigma, centSigma):
     mpx = boreSight[0]
     mpy = boreSight[1]
 
-    fact = 2;
+    fact = 1;
 
     # grid of pixels value, and distance from the center
     xx, yy = np.meshgrid(np.arange(image.shape[0]), np.arange(image.shape[1]))
@@ -760,12 +760,14 @@ def getThreshBench(image, boreSight, sigmaThresh, findSigma, centSigma):
     ind = np.where(dfromc < 500)
     if(np.median(image[ind])==0):
         ind = np.where(image > 0)
+        fact = 2;
+
     # sigma clip values
     a, b, c = sigmaclip(image[ind], sigmaThresh, sigmaThresh)
 
     # return the mean + sigma value
-    threshFind = a.mean()+a.std()*findSigma / fact
-    threshCent = a.mean()+a.std()*centSigma / fact
+    threshFind = (a.mean()+a.std()*findSigma) / fact
+    threshCent = (a.mean()+a.std()*centSigma) / fact
 
     return threshFind, threshCent, a.mean()
 
