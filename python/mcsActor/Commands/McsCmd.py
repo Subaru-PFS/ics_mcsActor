@@ -614,6 +614,7 @@ class McsCmd(object):
             
   
             # Use only one version of Centroid code.
+            #self.runCentroidSEPMP(cmd)
             self.runCentroid(cmd, self.centParms)
 
             t2 = time.time()

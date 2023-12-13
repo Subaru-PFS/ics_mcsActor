@@ -21,7 +21,7 @@ class speedCentroid(object):
         self.cores = 12
         
         self.logger.info(f'Estimating background')
-        bkg = sep.Background(image[0:200,0:200].astype(float), bw=64, bh=64, fw=3, fh=3)
+        bkg = sep.Background(image[3200:3400,5200:5400].astype(float), bw=64, bh=64, fw=3, fh=3)
         
         self.logger.info(f'Setting background to be {bkg.globalrms}')
         self.bkgglobalrms = bkg.globalrms
@@ -92,26 +92,28 @@ class speedCentroid(object):
 
 
 def main(argv=None):
-    file='/data/raw/2023-10-03/mcs/PFSC10055606.fits'
-    image = pyfits.open(file)[1].data
-    
-    t0 = time.time()
+    for i in range(10):
 
-    spCenMT = speedCentroid(image)
-    spCenMT.runCentroidMP()
-    spCenMT.arrangeCentroid()
-    t1 = time.time()
+        file='/data/raw/2023-10-03/mcs/PFSC10055606.fits'
+        image = pyfits.open(file)[1].data
+        
+        t0 = time.time()
 
-    print(f'Multi-Process = {t1 - t0}')
+        spCenMT = speedCentroid(image)
+        spCenMT.runCentroidMP()
+        spCenMT.arrangeCentroid()
+        t1 = time.time()
 
-    bkg = sep.Background(image.astype(float), bw=64, bh=64, fw=3, fh=3)
-    centroids = sep.extract(image.astype(float), 20 , err=bkg.globalrms,
-            filter_type='conv', minarea=10)
+        print(f'Multi-Process = {t1 - t0}')
 
-    t2 = time.time()
+        bkg = sep.Background(image.astype(float), bw=64, bh=64, fw=3, fh=3)
+        centroids = sep.extract(image.astype(float), 20 , err=bkg.globalrms,
+                filter_type='conv', minarea=10)
 
-    print(f'Single-Process = {t2 - t1}')
-    spCenMT.close()
+        t2 = time.time()
+
+        print(f'Single-Process = {t2 - t1}')
+        spCenMT.close()
     
 if __name__ == "__main__":
     main()
