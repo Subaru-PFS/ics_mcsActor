@@ -593,8 +593,8 @@ class McsCmd(object):
 
             if self.findThresh is None or frameId % 100 == 0 or self.prevExpTime != self.expTime:
                 cmd.inform('text="Calculating threshold." ')
-                self.prevExpTime = self.expTime
                 self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
+            self.prevExpTime = self.expTime
 
             cmd.inform('text="Running centroid on current image" ')
 
