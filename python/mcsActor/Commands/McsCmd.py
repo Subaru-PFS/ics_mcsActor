@@ -581,7 +581,8 @@ class McsCmd(object):
         # get the geometry if it hasn't been loaded yet
         cmd.inform('text="loading geometry"')
         self.getGeometry(cmd)
-
+        self.expTime = expTime
+        
         # if the centroid flag is set
         if doCentroid:
             
@@ -591,9 +592,9 @@ class McsCmd(object):
             cmd.inform('text="Setting centroid parameters." ')
             self.setCentroidParams(cmd)
 
-            cmd.inform('text="findThresh={self.findThresh} frameId={frameId} prevExpTime = {self.prevExpTime} expTime = {expTime}" ')
-            cmd.inform('text="checking if statment {self.findThresh is None or frameId % 100 == 0 or self.prevExpTime != expTime}" ')
-            if self.findThresh is None or frameId % 100 == 0 or self.prevExpTime != expTime:
+            cmd.inform(f'text="findThresh={self.findThresh} frameId={frameId} prevExpTime = {self.prevExpTime} expTime = {self.expTime}" ')
+            cmd.inform('text="checking if statment {self.findThresh is None or frameId % 100 == 0 or self.prevExpTime != self.expTime}" ')
+            if self.findThresh is None or frameId % 100 == 0 or self.prevExpTime != self.expTime:
                 cmd.inform('text="Calculating threshold." ')
                 self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
             self.prevExpTime = expTime
