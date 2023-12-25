@@ -560,7 +560,10 @@ class McsCmd(object):
 
         if (expTime != self.expTime):
             self.actor.camera.setExposureTime(cmd, expTime)
-
+            
+        # Put exposure time to class attribute.
+        self.expTime = expTime
+        
         cmd.inform('text="Exposure time now is %d ms." ' % (expTime))
         filename, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
 
@@ -581,7 +584,7 @@ class McsCmd(object):
         # get the geometry if it hasn't been loaded yet
         cmd.inform('text="loading geometry"')
         self.getGeometry(cmd)
-        self.expTime = expTime
+       
         
         # if the centroid flag is set
         if doCentroid:
