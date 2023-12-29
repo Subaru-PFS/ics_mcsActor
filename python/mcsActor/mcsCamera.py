@@ -111,9 +111,12 @@ class mcsCamera(Camera):
             cmd.inform('text="slice name: %s"' % (slicename))
             
             p = sub.Popen(['canonexp', '-e', expType, '-f', '-', '-t', str(expTime), '-c','--noheader'],
-                cwd=self.coaddDir, bufsize=1, stdout=sub.PIPE, stderr=sub.PIPE)
+                cwd=self.coaddDir, stdout=sub.PIPE, stderr=sub.PIPE)
             
             output, errors = p.communicate()
+            if errors is not None:
+                cmd.warn('text="exposure command failed with error."')
+
             data=np.frombuffer(output, dtype='u2').reshape((5778, 8960))
             
             t2 = time.time()
