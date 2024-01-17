@@ -15,7 +15,6 @@ import threading
 import sep
 import sys
 import copy
-from multiprocessing import Pool
 
 import os
 import astropy.io.fits as pyfits
@@ -40,12 +39,13 @@ from scipy.spatial import cKDTree
 import psycopg2
 import psycopg2.extras
 from xml.etree.ElementTree import dump
-from procedures.moduleTest import calculation
+from ics.cobraCharmer.cobraCoach import calculation
 
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
 import mcsActor.mcsRoutines.speedCentroid as speedCentriod
+import multiprocessing
 
 from pfs.utils import butler
 
@@ -503,7 +503,16 @@ class McsCmd(object):
         pHdr = phdu.header
         pHdr.set('EXTEND', comment='Presence of FITS Extension')
 
-        hduList.writeto(filename, checksum=True, overwrite=True)
+        def write_to_disk(filename, hduList):
+            hduList.writeto(filename, checksum=True, overwrite=True)
+        
+        write_process = multiprocessing.Process(target=write_to_disk, args=(filename, hduList))
+        write_process.start()
+
+        #write_thread = threading.Thread(target=write_to_disk, args=(filename, hduList))
+        #write_thread.start()
+
+        #hduList.writeto(filename, checksum=True, overwrite=True)
         cmd.inform(f'text="write image to filename={filename}"')
 
         cmd.inform(f'mcsFileIds={fileIds["pfsDay"]},{fileIds["visit"]},{fileIds["frame"]}')
