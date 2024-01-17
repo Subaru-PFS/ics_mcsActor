@@ -99,7 +99,13 @@ int main(int argc, char* argv[]){
 
 	/* Enable GPIO_1 to output mode*/
 	res = ioctl(i, GP0_OUTPUT_ENABLE,&iOUTPUT_ENABLE);
-	if (res==-1) {
+	if (verbose == 1) {
+		printf("GP0_OUTPUT_ENABLE = %d %x\n",GP0_OUTPUT_ENABLE,GP0_OUTPUT_ENABLE);
+		printf("GP0_SET_VALUE = %d %x\n",GP0_SET_VALUE, GP0_SET_VALUE);
+		printf("GP0_GET_VALUE = %d %x\n",GP0_GET_VALUE, GP0_GET_VALUE);
+	}
+
+	if (res == -1) {
 		printf("Unable to access shutter, check device.\n");
 		return EXIT_FAILURE;	
 	}
