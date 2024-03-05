@@ -10,7 +10,7 @@
 
 //Definitions for parallizing the code (NTHREAD=# of cores)
 
-#define XSPLIT  4//# of subregions in X direction
+#define XSPLIT  4//# of subregions in X direction 
 #define YSPLIT  2//# of subregions in Y direction
 #define NTHREAD 8//# of cores
 
