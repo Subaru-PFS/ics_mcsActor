@@ -10,7 +10,7 @@
 
 //Definitions for parallizing the code (NTHREAD=# of cores)
 
-#define XSPLIT  4//# of subregions in X direction
+#define XSPLIT  4//# of subregions in X direction 
 #define YSPLIT  2//# of subregions in Y direction
 #define NTHREAD 8//# of cores
 
@@ -108,7 +108,7 @@ void* subimage_Thread(void *arg)
   cand_list=getRegions(image,thresh1,thresh2,boxFind,boxCent,n_x,n_y,nmin,imagemask,&np,verbose);
 
 
-  printf("np=%d\n",np);
+  //printf("np=%d\n",np);
   /* exit with an intermediate values if there are too many points (threshold too low) */
   if(np > 10000)
     {
@@ -621,7 +621,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	  x2=check_val->x;
 	  y2=check_val->y;
 	  p2=check_val->peak;
-
+	  //printf("%lf %lf\n",x2,y2);
 	  //Get the radius squared
 	  rs=sqrt((x1-x2)*(x1-x2)+(y1-y2)*(y1-y2));
 	  //if within the radius
@@ -629,8 +629,12 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	    {
 	      /*We want to delete the second node - they are either the same point, duplicated,
 		or the second point is fainter than the first*/
-
-	      if((fabs(rs-rmin)<1) || (p1 > p2))  //delete pointed to node
+	      //if(rs > 0.001)
+	      //	{
+	      //	  printf("DD %lf %lf %lf %lf %lf %lf\n",x1,y1,x2,y2,p1,p2);
+	      //	  
+	      //	}
+	      if((fabs(rs-rmin)<1) && (p1 > p2))  //delete pointed to node
 		{
 
 		  if(check_val->next != NULL)  //Not the last node
