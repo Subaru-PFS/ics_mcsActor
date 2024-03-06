@@ -412,18 +412,16 @@ class McsCmd(object):
         return hdr
 
     def _makeImageHeader(self, cmd):
-        """ Create a complete WCS header.
+        """ Create a complete WCS header for the IMAGE HDU
 
         Notes
         ----
         - We need to get image center from config file.
-        - So far, just spit out MCS-to-PFI linear conversion. Later, add SIP terms, and MCS-to-sky.
-        - Needs to be pulled out into actorcore or pfs_utils.
+        - Simply pass along whatever the ics_utils module generates
 
         Returns
         -------
         hdr : pyfits.Header instance.
-
         """
 
         gen2Keys = self.actor.models['gen2'].keyVarDict
@@ -441,8 +439,102 @@ class McsCmd(object):
 
         return hdr
 
+    def _makeSpotHDU(self, cmd):
+        """ Create a binary table HDU with spot positions. """
+
+        nspots = min(5000, len(self.centroids))
+        spots = [pyfits.Column(name='x', format='E', unit='mm', 
+                               array=self.centroids[:nspots, 1]),
+                 pyfits.Column(name='y', format='E', unit='mm', 
+                               array=self.centroids[:nspots, 2])]
+        return pyfits.BinTableHDU.from_columns(spots, name='SPOTS')
+
+    def writeFITS(self, fileIds, hdr, image, cmd):
+        """Arrange to create and save PFSC file in the background.
+
+        Args
+        ----
+        fileIds : dict
+          The filename components for the new file.
+        hdr : pyfits.Header
+          The PHDU content
+        image : np.ndarray
+          The image data. This is what takes long to write
+        cmd : MHS command
+          The command to report to.
+        """
+        filename = fileIds['filename']
+        
+        t0 = time.time()
+        phdu = pyfits.PrimaryHDU(header=hdr)
+
+        try:
+            imgHdr = self._makeImageHeader(cmd)
+        except Exception as e:
+            cmd.warn(f'text="FAILED to generate WCS header: {e}"')
+            imgHdr = pyfits.Header()
+        imgHdu = pyfits.CompImageHDU(image.astype('uint16'), name='IMAGE', compression_type='RICE_1')
+        imgHdu.header.extend(imgHdr)
+
+        spotsHdu = self._makeSpotHDU(cmd)
+        hduList = pyfits.HDUList([phdu, imgHdu, spotsHdu])
+
+        # Patch core FITS card comments to match Subaru requirements.
+        imgHdr = imgHdu.header
+        imgHdr.set('BZERO', comment='Real=fits-value*BSCALE+BZERO')
+        imgHdr.set('BSCALE', comment='Real=fits-value*BSCALE+BZERO')
+        imgHdr.append(('BUNIT', 'ADU', 'Unit of original pixel values'))
+        imgHdr.append(('BLANK', 32767, 'Value used for NULL pixels'))  # 12-bit camera
+        imgHdr.append(('BIN-FCT1', 1, '[pixel] Binning factor of X axis'))
+        imgHdr.append(('BIN-FCT2', 1, '[pixel] Binning factor of X axis'))
+
+        # Slightly intricate dance:
+        #  - we want the slow disk i/o to be in separate process
+        #  - we want to finish the current comand ASAP
+        #  - we want the keyword declaring that i/o is finished to be sent after the file is closed.
+        #
+        # So create a subprocess to write the data, *and* a thread to wait for the subprocess to finish.
+        # The subprocess communicates with the thread over a Queue.
+        #
+        writerQueue = multiprocessing.Queue()
+        def reportFinishedFile(fileIds=fileIds, q=writerQueue, 
+                               cmd=self.actor.bcast, logger=self.logger):
+            """Wait for the subprocess to finish writing, then generate mcsFileIds key.
+
+            Note that we report to the bcast command, so that we can finish the current 
+            expose command.
+            """
+            t0 = time.time()
+            try:
+                ok, details = q.get(timeout=15)
+            except queue.Empty:
+                cmd.warn(f'text="probably failed to write {fileIds["filename"]}: {details}"')
+                return
+            
+            t1 = time.time()
+            cmd.inform(f'mcsFileIds={fileIds["pfsDay"]},{fileIds["visit"]},{fileIds["frame"]}; '
+                       f'filename={fileIds["filename"]}')
+            cmd.inform(f'text="writing {fileIds["filename"]} took {t1-t0:0.3f}s"')
+            
+        def write_to_disk(filename, hduList, writerQueue=writerQueue):
+            try:
+                hduList.writeto(filename, checksum=True, overwrite=True)
+            except Exception as e:
+                writerQueue.put((False, f'failed to write {filename}: {e}'))
+                return
+            writerQueue.put((True, 'ok'))
+            
+        reportThread = threading.Thread(target=reportFinishedFile, daemon=True)
+        reportThread.start()
+        
+        write_process = multiprocessing.Process(target=write_to_disk, args=(filename, hduList))
+        write_process.start()
+
+        cmd.inform(f'text="triggered writing image to filename={filename}"')
+        return filename, image
+
     def _doExpose(self, cmd, expTime, expType, frameId, mask=None):
-        """ Take an exposure and save it to disk. """
+        """ Take an exposure and  """
 
         fileIdsQ = self.requestNextFileIds(cmd, frameId)
         cmd.diag(f'text="new exposure"')
@@ -461,10 +553,15 @@ class McsCmd(object):
 
         frameId = fileIds['frameId']
         filename = self.butler.getPath('mcsFile', **fileIds)
+        fileIds['filename'] = filename
+        
         pathdir = filename.parent
         if not os.path.isdir(pathdir):
             os.makedirs(pathdir, 0o755, exist_ok=True)
         cmd.inform(f'text="newpath={filename}"')
+
+        hdr = self._constructHeader(cmd, filename, expType, expTime, expStart)
+        cmd.diag(f'text="hdr done: {len(hdr)}"')
 
         # Now, after getting the filename, get predicted locations
         if self.simulationPath is not None:
@@ -477,46 +574,7 @@ class McsCmd(object):
             cmd.inform(f'text="image shape: {image.shape} type:{image.dtype}"')
             image = image*mask.astype('uint16')
 
-        hdr = self._constructHeader(cmd, filename, expType, expTime, expStart)
-        cmd.diag(f'text="hdr done: {len(hdr)}"')
-        phdu = pyfits.PrimaryHDU(header=hdr)
-
-        try:
-            imgHdr = self._makeImageHeader(cmd)
-        except Exception as e:
-            cmd.warn(f'text="FAILED to generate WCS header: {e}"')
-            imgHdr = pyfits.Header()
-        imgHdu = pyfits.CompImageHDU(image.astype('uint16'), name='IMAGE', compression_type='RICE_1')
-
-        imgHdu.header.extend(imgHdr)
-        hduList = pyfits.HDUList([phdu, imgHdu])
-
-        # Patch core FITS card comments to match Subaru requirements.
-        imgHdr = imgHdu.header
-        imgHdr.set('BZERO', comment='Real=fits-value*BSCALE+BZERO')
-        imgHdr.set('BSCALE', comment='Real=fits-value*BSCALE+BZERO')
-        imgHdr.append(('BUNIT', 'ADU', 'Unit of original pixel values'))
-        imgHdr.append(('BLANK', 32767, 'Value used for NULL pixels'))  # 12-bit camera
-        imgHdr.append(('BIN-FCT1', 1, '[pixel] Binning factor of X axis'))
-        imgHdr.append(('BIN-FCT2', 1, '[pixel] Binning factor of X axis'))
-
-        pHdr = phdu.header
-        pHdr.set('EXTEND', comment='Presence of FITS Extension')
-
-        def write_to_disk(filename, hduList):
-            hduList.writeto(filename, checksum=True, overwrite=True)
-        
-        write_process = multiprocessing.Process(target=write_to_disk, args=(filename, hduList))
-        write_process.start()
-
-        #write_thread = threading.Thread(target=write_to_disk, args=(filename, hduList))
-        #write_thread.start()
-
-        #hduList.writeto(filename, checksum=True, overwrite=True)
-        cmd.inform(f'text="write image to filename={filename}"')
-
-        cmd.inform(f'mcsFileIds={fileIds["pfsDay"]},{fileIds["visit"]},{fileIds["frame"]}')
-        return filename, image
+        return fileIds, hdr, image
 
     def resetThreshold(self, cmd):
         """reset the thresholds"""
@@ -574,8 +632,9 @@ class McsCmd(object):
         self.expTime = expTime
         
         cmd.inform('text="Exposure time now is %d ms." ' % (expTime))
-        filename, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
-
+        fileIds, hdr, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
+        filename = fileIds['filename']
+        
         if frameId is None:
             filename = pathlib.Path(filename)
             frameId = int(filename.stem[4:], base=10)
@@ -594,10 +653,8 @@ class McsCmd(object):
         cmd.inform('text="loading geometry"')
         self.getGeometry(cmd)
        
-        
         # if the centroid flag is set
         if doCentroid:
-            
             # connect to DB
             db = self.connectToDB(cmd)
 
@@ -627,7 +684,7 @@ class McsCmd(object):
             #else:
             #    self.runCentroid(cmd, self.centParms)
             
-  
+
             # Use only one version of Centroid code.
             #self.runCentroidSEPMP(cmd)
             self.runCentroid(cmd, self.centParms)
@@ -637,9 +694,9 @@ class McsCmd(object):
 
             # dumpCentroidtoDB
             self.dumpCentroidtoDB(cmd, frameId)
-           
+        
             cmd.inform('text="Sending centroid data to database" ')
-
+                
         # do the fibre identification
         if doFibreID:
         
@@ -656,24 +713,28 @@ class McsCmd(object):
 
             enableEasyID=False
 
-            if enableEasyID:
-                #if newField:
-                self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
+            try:
+                if enableEasyID:
+                    #if newField:
+                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
+                    
+                    self.easyFiberID(cmd, frameId)
+
+                else:
+
+                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
+                    if(self.adjacentCobras == None):
+                        self.adjacentCobras = mcsTools.makeAdjacentList(self.centrePos, self.armLength)
+                        cmd.inform(f'text="made adjacent lists"')
+
+                    # fibreID
+                    self.fibreID(cmd, frameId, zenithAngle, insRot)
+            except Exception as e:
+                cmd.warn(f'text="Failed to do fibreID: {e}"')
                 
-                self.easyFiberID(cmd, frameId)
-
-            else:
-
-                self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
-                if(self.adjacentCobras == None):
-                    self.adjacentCobras = mcsTools.makeAdjacentList(self.centrePos, self.armLength)
-                    cmd.inform(f'text="made adjacent lists"')
-
-                # fibreID
-                self.fibreID(cmd, frameId, zenithAngle, insRot)
-
         cmd.inform(f'frameId={frameId}; filename={filename}')
 
+        self.writeFITS(fileIds, hdr, image, cmd)
 
         cmd.finish('exposureState=done')
 
