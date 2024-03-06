@@ -94,6 +94,9 @@ class rmodCamera(Camera):
             p = sub.Popen(['rmodexposure', '-f', slicename, '-l', '1'], stdout=sub.PIPE, stderr=sub.PIPE)
 
             output, errors = p.communicate()
+            if errors is not None:
+                cmd.warn(f'text="exposure command failed with error: {errors}"')
+
             t2 = time.time()
 
         if cmd:

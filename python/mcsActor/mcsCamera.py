@@ -115,7 +115,7 @@ class mcsCamera(Camera):
             
             output, errors = p.communicate()
             if errors is not None:
-                cmd.warn('text="exposure command failed with error."')
+                cmd.warn(f'text="exposure command failed with error: {errors}"')
 
             data=np.frombuffer(output, dtype='u2').reshape((5778, 8960))
             

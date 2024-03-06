@@ -23,6 +23,17 @@ class Mcs(actorcore.ICC.ICC):
 
         self.cameraName = None
 
+    def reloadConfiguration(self, cmd):
+        """Use our hostname to set the interface we listen on for tron.
+
+        This is a hook which is called after the pfs_instdata configs/actor/yaml 
+        file has been loaded. 
+        """
+
+        host = os.uname().nodename
+        if host in {'mcs', 'us-mcs'}:
+            self.actorConfig['listen']['interface'] = host
+            
     def connectCamera(self, cmd, camera=None, doFinish=True):
         # For the mcsActor at Subaru, we have two possible cameras:
         #  - on the pfic host from ASRD, use the rmod. Else use the canon.
