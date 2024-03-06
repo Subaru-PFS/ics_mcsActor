@@ -409,6 +409,13 @@ class McsCmd(object):
         except Exception as e:
             cmd.warn(f'text="FAILED to gather instrument cards: {e}"')
 
+        # Stray fixups from the default SPS-oriented headers.
+        # Basically, the MCS is an imager at Cass, not a spectrograph at Prime.
+        obsmode = hdr['OBS-MOD']
+        hdr['OBS-MOD'] =  obsmode.replace('SPEC', 'IMAG')
+        hdr['TELFOCUS'] = 'CS_OPT'
+        hdr['FOC-POS'] = 'Cassegrain'
+
         return hdr
 
     def _makeImageHeader(self, cmd):
