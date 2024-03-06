@@ -409,12 +409,13 @@ class McsCmd(object):
         except Exception as e:
             cmd.warn(f'text="FAILED to gather instrument cards: {e}"')
 
-        # Stray fixups from the default SPS-oriented headers.
+        # Stray fixups from the default SPS-oriented headers, per INSTRM-1351
         # Basically, the MCS is an imager at Cass, not a spectrograph at Prime.
         obsmode = hdr['OBS-MOD']
         hdr['OBS-MOD'] =  obsmode.replace('SPEC', 'IMAG')
         hdr['TELFOCUS'] = 'CS_OPT'
         hdr['FOC-POS'] = 'Cassegrain'
+        hdr['FOC-VAL'] = 0.0
 
         return hdr
 
@@ -520,7 +521,7 @@ class McsCmd(object):
             
             t1 = time.time()
             cmd.inform(f'mcsFileIds={fileIds["pfsDay"]},{fileIds["visit"]},{fileIds["frame"]}; '
-                       f'filename={fileIds["filename"]}')
+                       f'frameId={fileIds["frameId"]}; filename={fileIds["filename"]}')
             cmd.inform(f'text="writing {fileIds["filename"]} took {t1-t0:0.3f}s"')
             
         def write_to_disk(filename, hduList, writerQueue=writerQueue):
@@ -738,7 +739,7 @@ class McsCmd(object):
                     self.fibreID(cmd, frameId, zenithAngle, insRot)
             except Exception as e:
                 cmd.warn(f'text="Failed to do fibreID: {e}"')
-                
+
         cmd.inform(f'frameId={frameId}; filename={filename}')
 
         self.writeFITS(fileIds, hdr, image, cmd)
