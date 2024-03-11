@@ -760,6 +760,7 @@ class McsCmd(object):
             #self._makeTables(conn, doDrop=False)
             cmd.inform('text="Attaching centroid to exsiting table. "')
 
+        np.save(f'{frameId}_centroids.npy',self.centroids)
         buf = self._writeCentroids(self.centroids, frameId, 1, conn)
 
         cmd.inform('text="Centroids of exposure ID %08d dumped."' % (frameId))
