@@ -19,9 +19,10 @@ class speedCentroid(object):
     
         self.image = image
         self.cores = 12
-        
+        self.sigma = 400
+
         self.logger.info(f'Estimating background')
-        bkg = sep.Background(image[3200:3400,5200:5400].astype(float), bw=64, bh=64, fw=3, fh=3)
+        bkg = sep.Background(image[2500:2700,4200:4400].astype(float), bw=64, bh=64, fw=3, fh=3)
         
         self.logger.info(f'Setting background to be {bkg.globalrms}')
         self.bkgglobalrms = bkg.globalrms
@@ -44,7 +45,7 @@ class speedCentroid(object):
     
     def runCentroid(self, image, queue=None, yshift=None):
 
-        centroids = sep.extract(image.astype(float), 20 , err=self.bkgglobalrms,
+        centroids = sep.extract(image.astype(float), self.sigma , err=self.bkgglobalrms,
             filter_type='conv', minarea=10)
         
         if yshift is not None:
@@ -107,7 +108,7 @@ def main(argv=None):
         print(f'Multi-Process = {t1 - t0}')
 
         bkg = sep.Background(image.astype(float), bw=64, bh=64, fw=3, fh=3)
-        centroids = sep.extract(image.astype(float), 20 , err=bkg.globalrms,
+        centroids = sep.extract(image.astype(float), spCenMT.sigma , err=bkg.globalrms,
                 filter_type='conv', minarea=10)
 
         t2 = time.time()
