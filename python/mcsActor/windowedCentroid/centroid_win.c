@@ -10,9 +10,9 @@
 
 //Definitions for parallizing the code (NTHREAD=# of cores)
 
-#define XSPLIT  1//# of subregions in X direction
-#define YSPLIT  1//# of subregions in Y direction
-#define NTHREAD 1//# of cores
+#define XSPLIT  4//# of subregions in X direction
+#define YSPLIT  2//# of subregions in Y direction
+#define NTHREAD 8//# of cores
 
 //toggle screen output for debugging/testing 
 
@@ -630,7 +630,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	      /*We want to delete the second node - they are either the same point, duplicated,
 		or the second point is fainter than the first*/
 
-	      if((fabs(rs-rmin)<1) || (p1 > p2))  //delete pointed to node
+	      if((rs < 3.0) && (p1 >= p2))  //delete pointed to node
 		{
 
 		  if(check_val->next != NULL)  //Not the last node
