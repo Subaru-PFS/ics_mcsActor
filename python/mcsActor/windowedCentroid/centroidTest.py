@@ -7,7 +7,8 @@ import os, fnmatch
 import astropy.io.fits as pyfits
 import pandas as pd
 from opdb import opdb
-
+from photutils.detection import DAOStarFinder
+import time
 from ics.cobraCharmer.cobraCoach import visDianosticPlot
 
 reload(visDianosticPlot)
@@ -184,14 +185,31 @@ def getCobraPixel(visit0, cobraIdx):
     
     return xcenter, ycenter
 
+def runCentroidDAO(visit):
+    image = pyfits.open(pathlib.Path(f'/data/MCS/{visDianosticPlot.findRunDir(int(visit/100))}/data/PFSC{visit}.fits'))
+    data = image[1].data
+    m, s = np.mean(data), np.std(data)
+
+    t0 = time.time()
+    daofind = DAOStarFinder(fwhm=3.0, threshold=7.*s)  
+    centroids = daofind(data - m) 
+    t1 = time.time()
+
+    print(f'Time = {t1 - t0}')
+
+    return centroids
+
 def runCentroidSEP(visit):
     image = pyfits.open(pathlib.Path(f'/data/MCS/{visDianosticPlot.findRunDir(int(visit/100))}/data/PFSC{visit}.fits'))
 
-
+    t0 = time.time()
     spCenMT = speedCentroid.speedCentroid(image[1].data)
     spCenMT.cores = 8
     spCenMT.runCentroidMP()
     spCenMT.arrangeCentroid()
+    t1 = time.time()
+
+    print(f'Time = {t1 - t0}')
 
     return spCenMT.centroids
     
@@ -207,7 +225,7 @@ def runCentroid(visit):
     findThresh =3002.7806658274599
     #centThresh = 1902.3914938148669
     centThresh = 3002.3914938148669
-
+    t0 = time.time()
     a = centroid.centroid_only(image[1].data.astype('<i4'),
            centParms['fwhmx'], centParms['fwhmy'], findThresh, centThresh,
            centParms['boxFind'], centParms['boxCent'],
@@ -215,20 +233,26 @@ def runCentroid(visit):
 
     centroids = np.frombuffer(a, dtype='<f8')
     centroids = np.reshape(centroids, (len(centroids)//7, 7))
+    t1 = time.time()
+
+    print(f'Time = {t1 - t0}')
 
     return centroids
 
 
-def showMcsDataImage(visit0, visit1, cobraIdx, centroid0, centroid1):
-    image = pyfits.open(pathlib.Path(f'/data/MCS/{visDianosticPlot.findRunDir(int(visit0/100))}/data/PFSC{visit0}.fits'))
-    
+def showMcsDataImage(visit0, visit1, cobraIdx, 
+                    centroid0, centroid1, boxSize=10, method='win'):
+    image0 = pyfits.open(pathlib.Path(f'/data/MCS/{visDianosticPlot.findRunDir(int(visit0/100))}/data/PFSC{visit0}.fits'))
+    image1 = pyfits.open(pathlib.Path(f'/data/MCS/{visDianosticPlot.findRunDir(int(visit1/100))}/data/PFSC{visit1}.fits'))
+
+
     mcsData, fids = getMCSdata(visit0)
     mcsData2, fids = getMCSdata(visit1)
     
     xcenter, ycenter = getCobraPixel(visit0, cobraIdx)
 
     vis=visDianosticPlot.VisDianosticPlot(xml=newXml)
-    data = image[1].data
+    data = image0[1].data-image1[1].data
     m, s = np.mean(data), np.std(data)
 
     vis.visCreateNewPlot(f'Image  {visit0}', 
@@ -241,12 +265,18 @@ def showMcsDataImage(visit0, visit1, cobraIdx, centroid0, centroid1):
     ax.scatter(mcsData['mcs_center_x_pix'].values,mcsData['mcs_center_y_pix'].values,label=f'DB {visit0}')
     ax.scatter(mcsData2['mcs_center_x_pix'].values,mcsData2['mcs_center_y_pix'].values,label=f'DB {visit1}')
 
-    #ax.scatter(npdata[:,0],npdata[:,1],marker='x',label='np')
-    #ax.scatter(npdata[:,0],npdata[:,1],marker='x',label='np')
+    if method == 'win':
+        ax.scatter(centroid0[:,0],centroid0[:,1],marker='x',label=f'win {visit0}')
+        ax.scatter(centroid1[:,0],centroid1[:,1],marker='x',label=f'win {visit1}')
 
+    if method == 'sep':
     #ax.scatter(centroids[:,0],centroids[:,1],marker='x',label=f'Manual')
-    ax.scatter(centroid0['x'],centroid0['y'],marker='x',label=f'Manual')
-    ax.scatter(centroid1['x'],centroid1['y'],marker='x',label=f'Manual')
+        ax.scatter(centroid0['x'],centroid0['y'],marker='x',label=f'sep {visit0}')
+        ax.scatter(centroid1['x'],centroid1['y'],marker='x',label=f'sep {visit1}')
+
+    if method == 'dao':
+        ax.scatter(centroid0['xcentroid'].value,centroid0['ycentroid'].value,marker='x',label=f'dao {visit0}')
+        ax.scatter(centroid1['xcentroid'].value,centroid1['ycentroid'].value,marker='x',label=f'dao {visit1}')
     ax.legend()
 
-    vis.visSetAxesLimits([xcenter-100,xcenter+100],[ycenter-100,ycenter+100])
+    vis.visSetAxesLimits([xcenter-boxSize,xcenter+boxSize],[ycenter-boxSize,ycenter+boxSize])
