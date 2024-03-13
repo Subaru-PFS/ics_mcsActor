@@ -23,7 +23,7 @@ class speedDaofind(object):
 
         self.image = image
         self.cores = 12
-        self.sigma = 5
+        self.sigma = 3
 
         self.std = np.std(image[2500:2700,4200:4400])
         self.mean = np.mean(image[2500:2700,4200:4400])

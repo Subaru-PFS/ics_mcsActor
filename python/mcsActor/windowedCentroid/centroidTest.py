@@ -253,6 +253,7 @@ def showMcsDataImage(visit0, visit1, cobraIdx,
 
     vis=visDianosticPlot.VisDianosticPlot(xml=newXml)
     data = image0[1].data-image1[1].data
+    data = image0[1].data
     m, s = np.mean(data), np.std(data)
 
     vis.visCreateNewPlot(f'Image  {visit0}', 

@@ -1155,7 +1155,44 @@ class McsCmd(object):
 
         self.logger.info(f'centParms: {self.centParms}')
     
+    def runDaofind(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+        self.newTable = "newTable" in cmdKeys
+
+        cmd.debug('text="newTable value = %s"' % (self.newTable))
+
+        #image = copy.deepcopy(self.actor.image)
+
+        cmd.inform(f'state="measuring cached image: {self.actor.image.shape}"')
+        t0 = time.time()
+        spCent = speedCentriod.speedDaofind(self.actor.image)
+        spCent.runDaofindMP()
+        spCent.arrangeCentroid()
+        centroids = spCent.centroids
+        
+        
+        t1 = time.time()
+        cmd.inform(f'text="Finished centroid with { spCent.cores } cores"')
     
+        npoint = len(centroids)
+        tCentroids = np.zeros((npoint, 8))
+
+        tCentroids[:, 0] = np.arange(npoint)+1
+        tCentroids[:, 1] = centroids['xcentroid'].value
+        tCentroids[:, 2] = centroids['ycentroid'].value
+        tCentroids[:, 3] = np.zeros(npoint)
+        tCentroids[:, 4] = np.zeros(npoint)
+        tCentroids[:, 5] = np.zeros(npoint)
+        tCentroids[:, 6] = np.zeros(npoint)
+        tCentroids[:, 7] = centroids['peak']
+
+        self.centroids = tCentroids
+        self.nCentroid = len(centroids)
+
+        spCent.close()
+        cmd.inform('text="%d centroids in %f"' % (len(centroids), (t1-t0)))
+        cmd.inform('state="centroids measured"')
+
     
     def runCentroidSEPMP(self, cmd):
 
@@ -1173,7 +1210,7 @@ class McsCmd(object):
         spCent.runCentroidMP()
         spCent.arrangeCentroid()
         centroids = spCent.centroids
-        spCent.close()
+        
         
         t1 = time.time()
         cmd.inform(f'text="Finished centroid with { spCent.cores } cores"')
@@ -1192,6 +1229,8 @@ class McsCmd(object):
 
         self.centroids = tCentroids
         self.nCentroid = len(centroids)
+
+        spCent.close()
         cmd.inform('text="%d centroids in %f"' % (len(centroids), (t1-t0)))
         cmd.inform('state="centroids measured"')
     
