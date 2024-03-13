@@ -152,14 +152,21 @@ void* subimage_Thread(void *arg)
   
   cand_curr=cand_list;
   double *centroidVal=NULL;
-
+  //char *filename = "/Users/karr/dump.txt";
+  //FILE *fp = fopen(filename, "w");
+  double xt, yt;
   int iii=0;
+  
+  
+  iii=0;
   while(cand_curr!=NULL)
   {
     //get the center points of the possible detection, and its value
-  
-    //centroidVal=windowedPos(image,cand_curr->x,cand_curr->y, boxCent,fwhmx,fwhmy,maxIt,n_x,n_y,verbose);
-    centroidVal=windowedPos(image,cand_curr->x,cand_curr->y, boxCent,cand_curr->x2,cand_curr->y2,maxIt,n_x,n_y,verbose);
+
+    centroidVal=windowedPos(image,cand_curr->x,cand_curr->y, boxCent,fwhmx,fwhmy,maxIt,n_x,n_y,verbose);
+    
+    //fprintf(fp,"%lf %lf %lf %lf %lf %lf %lf %lf\n",cand_curr->x, cand_curr->y, centroidVal[0], centroidVal[1], centroidVal[2],cand_curr->x2,cand_curr->y2, cand_curr->peak);
+    
     cand_curr->x=centroidVal[0];
     cand_curr->y=centroidVal[1];
     cand_curr=cand_curr->next;
@@ -167,7 +174,8 @@ void* subimage_Thread(void *arg)
     iii=iii+1;
    	  //-----------------------------------------------------------//
 	  
-  } 
+  }
+  //fclose(fp);
 
   if(verbose == 1)
     {

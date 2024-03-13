@@ -369,7 +369,7 @@ double *windowedPos(int *image,double x, double y,int boxsize,double fwhmx, doub
 
      */
     //required precision
-    double precision=1e-4;
+    double precision=1e-6;
     
     //parameter for windowing
     double swinx=fwhmx/sqrt(8*log(2));
@@ -399,6 +399,7 @@ double *windowedPos(int *image,double x, double y,int boxsize,double fwhmx, doub
     double xwin1,ywin1;
 
     
+
     //cycle through until precision is met *or* maxIt is reached
     while((dx > precision) && (dy > precision) && (nIt < maxIt))
       {
@@ -442,12 +443,12 @@ double *windowedPos(int *image,double x, double y,int boxsize,double fwhmx, doub
 	ywin=ywin1;
       }
 
-    //finally, assign the results and pass back. 
+    //finally, assign the results and pass back.
     double *result=malloc(sizeof(double)*3);
 
     result[0]=xwin1;
     result[1]=ywin1;
-    result[2]=nIt;
+    result[2]=(double)nIt;
 
     return result;
   }
