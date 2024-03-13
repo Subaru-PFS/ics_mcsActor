@@ -261,6 +261,7 @@ class McsCmd(object):
         imagePath = pathlib.Path(imagePath)
         frameId = int(imagePath.stem[4:], base=10)
         self.visitId = frameId // 100
+        self.frameId = frameId
 
         try:
             fwfile = sorted(glob.glob(os.path.join(path, 'thetaFW.npy')))
@@ -1267,7 +1268,6 @@ class McsCmd(object):
         centroids = np.frombuffer(a, dtype='<f8')
         centroids = np.reshape(centroids, (len(centroids)//7, 7))
                          
-
         # adjust the coordinates back to global values
         #centroids[:,1] += xmin
         #centroids[:,2] += ymin
