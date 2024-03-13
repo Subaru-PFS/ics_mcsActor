@@ -10,9 +10,10 @@
 
 //Definitions for parallizing the code (NTHREAD=# of cores)
 
-#define XSPLIT  4//# of subregions in X direction
-#define YSPLIT  2//# of subregions in Y direction
-#define NTHREAD 8//# of cores
+
+#define XSPLIT  1//# of subregions in X direction 
+#define YSPLIT  1//# of subregions in Y direction
+#define NTHREAD 1//# of cores
 
 //toggle screen output for debugging/testing 
 
@@ -105,7 +106,7 @@ void* subimage_Thread(void *arg)
   //int np;
   //printf("%d %d %d %d %d %d %d\n",thresh1,thresh2,n_x,n_y,boxFind,nmin);
 
-  cand_list=getRegions(image,thresh1,thresh2,boxFind,boxCent,n_x,n_y,nmin,imagemask,&np,verbose);
+  cand_list=getRegions(image,thresh1,thresh2,boxFind,boxCent,n_x,n_y,nmin,&imagemask,&np,verbose);
 
 
   printf("np=%d\n",np);
@@ -591,13 +592,15 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
     curr_val=top_val;
     curr_pre=top_val;
 
-    
+    char *filename1 = "/Users/karr/dump2.txt";
+    FILE *fp = fopen(filename1, "w");
+
    /*Filter out extaneous results. If two points are with x pixels of
    each other they are compared. If they are within 1 pixel of each
    other, it's a duplicate point, and the first one is
    retained. Otherwise, the point with the highest value is taken as
    the true point. */
-
+  
   while(curr_val != NULL)
     {
 
@@ -629,7 +632,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	    {
 	      /*We want to delete the second node - they are either the same point, duplicated,
 		or the second point is fainter than the first*/
-
 	      if((rs < 3.0) && (p1 >= p2))  //delete pointed to node
 		{
 
@@ -723,7 +725,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 
 
   //now it's sorted, print the results in region file format if we want to check it.
-
+  fclose(fp);
   if(verbose==1)
     {
       curr_val=top_val;
