@@ -49,7 +49,6 @@ void* subimage_Thread(void *arg)
 
   //do the find algorithm on a subimage
 
-  long i,j,ii,jj;// counters
   /*set the variables for the routine from the structure (threaded part)*/
 
   int n_x=((struct thread_data*)arg)->n_x;         //x dimension of image
@@ -60,18 +59,15 @@ void* subimage_Thread(void *arg)
   //printf("a  n_x = %d\n",n_x);
   //printf("a  n_y = %d\n",n_y);
 
-  int npoint=0;  //number of points found (debugging only)
-  int ismax;     //is the point a max?
  
   //list to contain the guesses
 
-//struct cand_point *cand_head = NULL;
   struct cand_point *cand_curr=NULL;
  
   image=((struct thread_data*)arg)->image;            
 
-  int fpix0=((struct thread_data*)arg)->fpix0;    //first and last pixels
-  int fpix1=((struct thread_data*)arg)->fpix1;   
+  //int fpix0=((struct thread_data*)arg)->fpix0;    //first and last pixels
+  //int fpix1=((struct thread_data*)arg)->fpix1;   
 
   int thresh1=((struct thread_data*)arg)->thresh1;          //data threshold
   double fwhmx=((struct thread_data*)arg)->fwhmx;          //fwhm
@@ -86,7 +82,7 @@ void* subimage_Thread(void *arg)
   int verbose=((struct thread_data*)arg)->verbose;
   int np=((struct thread_data*)arg)->np;
 
-  int boxsize;
+
   struct cand_point *cand_list;
   
   if(verbose == 1)
@@ -244,7 +240,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
   struct cand_point *top_val=NULL;     //top of list
 
   struct cand_point *cand_val=NULL;  //List f points
-  struct cand_point *real_top=NULL;  //List f points
 
   double x1,y1;  //positions of first value
   double x2,y2;  //positions of first value
@@ -254,7 +249,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
   double rmin=boxFind+1;  //radius to look for duplicate/false points
   int deadfirst=0;    //flag that first node has been deleted, to keep track fo pointers
   int firstval=1;     //flag that we're looking at the first node, to keep track of pointers
-  char filename[sizeof "file100.fits"];
 
   /*------------------------------------------------------------*/
   
@@ -378,7 +372,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
       image. */
 
     //First go through the lists and link up each segment. 
-    int iii,jjj;
+    int iii;
     int inloop=0;
     cand_val=NULL;
     iii=0;
@@ -394,7 +388,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
       {
 
 	iii=0;
-	jjj=0;
 	int skipit=0;
 	if(ii > 0 && inloop ==1)
 	  {
@@ -455,7 +448,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	    cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
 	    cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
 		
-	    jjj=1;
 	    
 	      if(iii==1)
 	      {
@@ -592,8 +584,8 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
     curr_val=top_val;
     curr_pre=top_val;
 
-    char *filename1 = "/Users/karr/dump2.txt";
-    FILE *fp = fopen(filename1, "w");
+    //char *filename1 = "dump2.txt";
+    //FILE *fp = fopen(filename1, "w");
 
    /*Filter out extaneous results. If two points are with x pixels of
    each other they are compared. If they are within 1 pixel of each
@@ -632,7 +624,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	    {
 	      /*We want to delete the second node - they are either the same point, duplicated,
 		or the second point is fainter than the first*/
-	      if((rs < 3.0) && (p1 >= p2))  //delete pointed to node
+	      if((p1 > p2))  //delete pointed to node
 		{
 
 		  if(check_val->next != NULL)  //Not the last node
@@ -725,7 +717,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 
 
   //now it's sorted, print the results in region file format if we want to check it.
-  fclose(fp);
+  //fclose(fp);
   if(verbose==1)
     {
       curr_val=top_val;

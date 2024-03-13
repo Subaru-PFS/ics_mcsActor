@@ -20,7 +20,7 @@ struct QNode* newNode(long k)
 }
  
 // create empty queue
-struct Queue* createQueue()
+struct Queue* createQueue(void)
 {
     struct Queue* q
         = (struct Queue*)malloc(sizeof(struct Queue));
@@ -118,8 +118,8 @@ struct cand_point *idSpot(int *image, int **mask, long xsize, long ysize, long i
   struct Queue* xList = createQueue();
   struct Queue* yList = createQueue();
   struct cand_point *cand_curr;
-  char *filename = "/Users/karr/dump4.txt";
-  FILE *fp = fopen(filename, "w");
+  //char *filename = "dump.txt";
+  //FILE *fp = fopen(filename, "w");
 
   enQueue(xList, i);
   enQueue(yList, j);
@@ -313,16 +313,10 @@ struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int
 
    */
 
-  long i,j,ii,jj,ip,jp;
-  //long bx,by,tt,bx2,by2,bxy,peak;
+  long i,j;
   int pixInd;
-  double npt,xval,yval;
   struct cand_point *cand_head = NULL;
   struct cand_point *cand_curr = NULL;
-  char *filename = "/Users/karr/dump1.txt";
-  char *filename2 = "/Users/karr/dump3.txt";
-  FILE *fp = fopen(filename, "w");
-  FILE *fp1 = fopen(filename2, "w");
   (*npoints)=0;
 
   if(verbose==1)
@@ -353,8 +347,7 @@ struct cand_point *getRegions(int *image,int thresh1,int thresh2,int boxsize,int
 	    }
 	}
     }
-  fclose(fp);
-  fclose(fp1);
+
   return cand_head;
 }
 
@@ -396,7 +389,7 @@ double *windowedPos(int *image,double x, double y,int boxsize,double fwhmx, doub
     double xsum, ysum, nsumx, nsumy, ri, wix, wiy;
     int boxsize2=boxsize*boxsize;
 
-    int i,j,ii,jj;
+    int i,j;
     
     int xmin=round(x-boxsize);
     int xmax=round(x+boxsize+1);
@@ -449,7 +442,6 @@ double *windowedPos(int *image,double x, double y,int boxsize,double fwhmx, doub
 	ywin=ywin1;
       }
 
-    //printf("EE %lf %lf %lf %lf\n",x,xwin,y,ywin);
     //finally, assign the results and pass back. 
     double *result=malloc(sizeof(double)*3);
 
