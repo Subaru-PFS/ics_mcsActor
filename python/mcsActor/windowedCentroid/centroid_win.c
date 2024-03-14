@@ -631,7 +631,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	    {
 	      /*We want to delete the second node - they are either the same point, duplicated,
 		or the second point is fainter than the first*/
-	      if((p1 > p2))  //delete pointed to node
+	      if((p1 >= p2))  //delete pointed to node
 		{
 
 		  if(check_val->next != NULL)  //Not the last node
