@@ -70,6 +70,7 @@ class McsCmd(object):
         self._conn = None
         self._db = None
 
+        self.centParms = self.actor.actorConfig['centroidParams']
         self.findThresh = None
         self.centThresh = None
         self.cMethod = 'win'
@@ -1151,8 +1152,7 @@ class McsCmd(object):
 
         """
 
-        self.centParms = mcsTools.getCentroidParams(cmd)
-
+        self.centParms = mcsTools.getCentroidParams(cmd, self.actor.actorConfig['centroidParams'])
         self.logger.info(f'centParms: {self.centParms}')
     
     def runDaofind(self, cmd):
@@ -1283,9 +1283,9 @@ class McsCmd(object):
 
         image = self.actor.image
 
-        cmd.inform(f'text="centroidParms: findThresh {self.findThresh},centThresh {self.centThresh}"')
-        cmd.inform(f'centroidParms: nmin {centParms["nmin"]}, maxIt {centParms["maxIt"]} boxFind {centParms["boxFind"]} boxCent {centParms["boxCent"]}')
-
+        cmd.inform(f'text="centroidParms: findThresh {self.findThresh:0.2f} centThresh {self.centThresh:0.2f}"')
+        cmd.inform(f'text="centroidParms: nmin {centParms["nmin"]} maxIt {centParms["maxIt"]} boxFind {centParms["boxFind"]} boxCent {centParms["boxCent"]}"')
+        cmd.inform(f'text="centroidParms: fwhmx {centParms["fwhmx"]} fwhmy {centParms["fwhmy"]}"')
         
         cmd.inform(f'state="measuring cached image: {image.shape}"')
 
