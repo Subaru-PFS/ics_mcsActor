@@ -66,13 +66,19 @@ void deQueue(struct Queue* q)
 }
 
 
-bool isValid(int *image, int mValue, long xsize, long ysize, long i, long j, long thresh)
+bool isValid(int *image, int *mask, long xsize, long ysize, long i, long j, long thresh)
 {
 
   // is the pixel inside the region, above the threshold and unchecked in the mask
 
   //printf("%ld %ld %ld %ld %d %d %d\n",i,j,xsize, ysize, image[getInd2D(i,j,xsize)],mValue,thresh);
-  if(i < 0 || i > xsize || image[getInd2D(i,j,xsize)] < thresh || mValue > 0)
+
+  if(i < 0 || i > xsize || j < 0 || j > ysize)
+    {
+      return false;
+    }
+  long pixInd = getInd2D(i,j,xsize);
+  if(image[pixInd] < thresh || mask[pixInd] > 0)
     {
       return false;
     }
@@ -147,9 +153,9 @@ struct cand_point *idSpot(int *image, int **mask, long xsize, long ysize, long i
       // check the neighbouring pixels for valid pixels, add to queue and update mask if valid.
       // we check the up, down, left, right pixels
       
-      pixInd = getInd2D(posX+1, posY,xsize);
-      if(isValid(image,(*mask)[pixInd],xsize,ysize,posX + 1,posY,thresh))
+      if(isValid(image,(*mask),xsize,ysize,posX + 1,posY,thresh))
 	{
+	  pixInd = getInd2D(posX+1, posY,xsize);
 	  // update the mask
 	  (*mask)[getInd2D(posX + 1,posY,xsize)] = 1;
 
@@ -163,9 +169,9 @@ struct cand_point *idSpot(int *image, int **mask, long xsize, long ysize, long i
 	  val = running(image,pixInd,posX+1-xRef,posY-yRef,&bx, &by, &tt, &bx2, &by2, &bxy, &peak);
 	  npt += 1.;
 	}
-      pixInd = getInd2D(posX-1,posY,xsize);
-      if(isValid(image,(*mask)[pixInd],xsize,ysize,posX - 1,posY,thresh))
+      if(isValid(image,(*mask),xsize,ysize,posX - 1,posY,thresh))
 	{
+	  pixInd = getInd2D(posX-1,posY,xsize);
 	  (*mask)[getInd2D(posX - 1,posY,xsize)] = 1;
 	  enQueue(xList, posX - 1);
 	  enQueue(yList, posY);
@@ -173,9 +179,9 @@ struct cand_point *idSpot(int *image, int **mask, long xsize, long ysize, long i
 	  val = running(image,pixInd,posX-1-xRef,posY-yRef,&bx, &by, &tt, &bx2, &by2, &bxy, &peak);
 	  npt += 1.;
 	}
-      pixInd = getInd2D(posX,posY+1,xsize);
-      if(isValid(image,(*mask)[pixInd],xsize,ysize,posX,posY+1,thresh))
+      if(isValid(image,(*mask),xsize,ysize,posX,posY+1,thresh))
 	{
+	  pixInd = getInd2D(posX,posY+1,xsize);
 	  (*mask)[getInd2D(posX,posY+1,xsize)] = 1;
 	  enQueue(xList, posX);
 	  enQueue(yList, posY+1);
@@ -183,9 +189,9 @@ struct cand_point *idSpot(int *image, int **mask, long xsize, long ysize, long i
 	  val = running(image,pixInd,posX-xRef,posY+1-yRef,&bx, &by, &tt, &bx2, &by2, &bxy, &peak);
 	  npt += 1.;
 	}
-      pixInd = getInd2D(posX,posY-1,xsize);
-      if(isValid(image,(*mask)[pixInd],xsize,ysize,posX,posY-1,thresh))
+      if(isValid(image,(*mask),xsize,ysize,posX,posY-1,thresh))
 	{
+	  pixInd = getInd2D(posX,posY-1,xsize);
 	  (*mask)[getInd2D(posX,posY-1,xsize)] = 1;
 	  enQueue(xList, posX);
 	  enQueue(yList, posY-1);
