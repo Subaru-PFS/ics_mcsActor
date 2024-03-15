@@ -10,9 +10,9 @@
 
 //Definitions for parallizing the code (NTHREAD=# of cores)
 
-#define XSPLIT  4//# of subregions in X direction
-#define YSPLIT  2//# of subregions in Y direction
-#define NTHREAD 8//# of cores
+#define XSPLIT  1//# of subregions in X direction 
+#define YSPLIT  1//# of subregions in Y direction
+#define NTHREAD 1//# of cores
 
 //toggle screen output for debugging/testing 
 
@@ -48,7 +48,6 @@ void* subimage_Thread(void *arg)
 
   //do the find algorithm on a subimage
 
-  long i,j,ii,jj;// counters
   /*set the variables for the routine from the structure (threaded part)*/
 
   int n_x=((struct thread_data*)arg)->n_x;         //x dimension of image
@@ -59,18 +58,15 @@ void* subimage_Thread(void *arg)
   //printf("a  n_x = %d\n",n_x);
   //printf("a  n_y = %d\n",n_y);
 
-  int npoint=0;  //number of points found (debugging only)
-  int ismax;     //is the point a max?
  
   //list to contain the guesses
 
-//struct cand_point *cand_head = NULL;
   struct cand_point *cand_curr=NULL;
  
   image=((struct thread_data*)arg)->image;            
 
-  int fpix0=((struct thread_data*)arg)->fpix0;    //first and last pixels
-  int fpix1=((struct thread_data*)arg)->fpix1;   
+  //int fpix0=((struct thread_data*)arg)->fpix0;    //first and last pixels
+  //int fpix1=((struct thread_data*)arg)->fpix1;   
 
   int thresh1=((struct thread_data*)arg)->thresh1;          //data threshold
   double fwhmx=((struct thread_data*)arg)->fwhmx;          //fwhm
@@ -85,7 +81,7 @@ void* subimage_Thread(void *arg)
   int verbose=((struct thread_data*)arg)->verbose;
   int np=((struct thread_data*)arg)->np;
 
-  int boxsize;
+
   struct cand_point *cand_list;
   
   if(verbose == 1)
@@ -105,10 +101,10 @@ void* subimage_Thread(void *arg)
   //int np;
   //printf("%d %d %d %d %d %d %d\n",thresh1,thresh2,n_x,n_y,boxFind,nmin);
 
-  cand_list=getRegions(image,thresh1,thresh2,boxFind,boxCent,n_x,n_y,nmin,imagemask,&np,verbose);
+  cand_list=getRegions(image,thresh1,thresh2,boxFind,boxCent,n_x,n_y,nmin,&imagemask,&np,verbose);
 
 
-  printf("np=%d\n",np);
+  //printf("np=%d\n",np);
   /* exit with an intermediate values if there are too many points (threshold too low) */
   if(np > 10000)
     {
@@ -155,14 +151,21 @@ void* subimage_Thread(void *arg)
   
   cand_curr=cand_list;
   double *centroidVal=NULL;
-
+  //char *filename = "/Users/karr/dump.txt";
+  //FILE *fp = fopen(filename, "w");
+  double xt, yt;
   int iii=0;
+  
+  
+  iii=0;
   while(cand_curr!=NULL)
   {
     //get the center points of the possible detection, and its value
-  
-    //centroidVal=windowedPos(image,cand_curr->x,cand_curr->y, boxCent,fwhmx,fwhmy,maxIt,n_x,n_y,verbose);
-    centroidVal=windowedPos(image,cand_curr->x,cand_curr->y, boxCent,cand_curr->x2,cand_curr->y2,maxIt,n_x,n_y,verbose);
+
+    centroidVal=windowedPos(image,cand_curr->x,cand_curr->y, boxCent,fwhmx,fwhmy,maxIt,n_x,n_y,verbose);
+    
+    //fprintf(fp,"%lf %lf %lf %lf %lf %lf %lf %lf\n",cand_curr->x, cand_curr->y, centroidVal[0], centroidVal[1], centroidVal[2],cand_curr->x2,cand_curr->y2, cand_curr->peak);
+    
     cand_curr->x=centroidVal[0];
     cand_curr->y=centroidVal[1];
     cand_curr=cand_curr->next;
@@ -170,7 +173,8 @@ void* subimage_Thread(void *arg)
     iii=iii+1;
    	  //-----------------------------------------------------------//
 	  
-  } 
+  }
+  //fclose(fp);
 
   if(verbose == 1)
     {
@@ -243,7 +247,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
   struct cand_point *top_val=NULL;     //top of list
 
   struct cand_point *cand_val=NULL;  //List f points
-  struct cand_point *real_top=NULL;  //List f points
 
   double x1,y1;  //positions of first value
   double x2,y2;  //positions of first value
@@ -253,7 +256,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
   double rmin=boxFind+1;  //radius to look for duplicate/false points
   int deadfirst=0;    //flag that first node has been deleted, to keep track fo pointers
   int firstval=1;     //flag that we're looking at the first node, to keep track of pointers
-  char filename[sizeof "file100.fits"];
 
   /*------------------------------------------------------------*/
   
@@ -377,7 +379,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
       image. */
 
     //First go through the lists and link up each segment. 
-    int iii,jjj;
+    int iii;
     int inloop=0;
     cand_val=NULL;
     iii=0;
@@ -393,7 +395,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
       {
 
 	iii=0;
-	jjj=0;
 	int skipit=0;
 	if(ii > 0 && inloop ==1)
 	  {
@@ -454,7 +455,6 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	    cand_val->x=cand_val->x+thread_data_array[ii].fpix0-1;
 	    cand_val->y=cand_val->y+thread_data_array[ii].fpix1-1;
 		
-	    jjj=1;
 	    
 	      if(iii==1)
 	      {
@@ -591,13 +591,15 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
     curr_val=top_val;
     curr_pre=top_val;
 
-    
+    //char *filename1 = "dump2.txt";
+    //FILE *fp = fopen(filename1, "w");
+
    /*Filter out extaneous results. If two points are with x pixels of
    each other they are compared. If they are within 1 pixel of each
    other, it's a duplicate point, and the first one is
    retained. Otherwise, the point with the highest value is taken as
    the true point. */
-
+  
   while(curr_val != NULL)
     {
 
@@ -629,8 +631,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 	    {
 	      /*We want to delete the second node - they are either the same point, duplicated,
 		or the second point is fainter than the first*/
-
-	      if((rs < 3.0) && (p1 >= p2))  //delete pointed to node
+	      if((p1 >= p2))  //delete pointed to node
 		{
 
 		  if(check_val->next != NULL)  //Not the last node
@@ -723,7 +724,7 @@ struct centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh
 
 
   //now it's sorted, print the results in region file format if we want to check it.
-
+  //fclose(fp);
   if(verbose==1)
     {
       curr_val=top_val;

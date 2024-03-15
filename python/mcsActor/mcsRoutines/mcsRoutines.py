@@ -30,20 +30,15 @@ import time
 from ics.cobraCharmer import pfiDesign
 import time
 
-def getCentroidParams(cmd):
-
+def getCentroidParams(cmd, configuredCentParms):
+    """Given the default configuration from pfs_instdata, update with any parameters in the command."""
     try:
         cmdKeys = cmd.cmd.keywords
     except:
         cmdKeys = []
 
-    fileName = os.path.join(os.environ['PFS_INSTDATA_DIR'],  'data',  'mcsDefaultCentroidParameters.yaml')
-
-    with open(fileName, 'r') as inFile:
-        defaultParms = yaml.safe_load(inFile)
-
     # returns just the values dictionary
-    centParms = defaultParms['values']
+    centParms = configuredCentParms.copy()
 
     if('fwhmx' in cmdKeys):
         centParms['fwhmx'] = cmd.cmd.keywords["fwhmx"].values[0]
@@ -66,13 +61,6 @@ def getCentroidParams(cmd):
         centParms['nmin'] = cmd.cmd.keywords["nmin"].values[0]
     if('maxIt' in cmdKeys):
         centParms['maxIt'] = cmd.cmd.keywords["maxIt"].values[0]
-
-
-    if('activeX' in cmdKeys):
-        centParms['activeX'] = cmd.cmd.keywords["activeY"].values[0]
-        
-    if('activeY' in cmdKeys):
-        centParms['activeX'] = cmd.cmd.keywords["activeY"].values[0]
            
     return centParms
 

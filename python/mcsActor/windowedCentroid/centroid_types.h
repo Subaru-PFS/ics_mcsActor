@@ -1,6 +1,16 @@
 #ifndef centroid_types_H_   /* Include guard */
 #define centroid_types_H_
 
+typedef struct QNode
+{
+  long key;
+    struct QNode* next;
+}QNode;
+
+typedef 
+struct Queue {
+    struct QNode *front, *rear;
+}Queue;
 
 typedef struct thread_data
 {
