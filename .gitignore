@@ -8,7 +8,7 @@ build/
 /.pydevproject
 /.project
 
-centroid_wrapper.c
+python/mcsActor/windowedCentroid/centroid_wrapper.c
 callgrind.out.*
 *.png
 \#*
