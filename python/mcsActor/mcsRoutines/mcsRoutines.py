@@ -268,8 +268,16 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
 
 
     # turn the results into an array to be written to teh database
-    cobraMatch = np.empty((nCobras, 5))
+    cobraMatch = np.empty((nCobras, 5), dtype='f4')
 
+    # That is HORRIBLE and DANGEROUS: ids are INTs, and you 
+    # basically never need to use doubles. Want something like the following
+    # but that requires more effort should go i=on this ticket. I merely changed to 
+    # 32-bit reals.
+    #cobraMatch = np.empty((nCobras, 5), 
+    #                      dtype=[('cobra_id', 'int32'), ('spot_id', 'int32'), 
+    #                             ('x_mm', 'float32'), ('y_mm', 'float32'), 
+    #                             ('flags', 'int32')])
     ii = 0
     for i in range(int(goodIdx[-1]+2)):
         if(i in goodIdx):
@@ -387,9 +395,8 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
     dotCobras = []
     fidPoints = []
 
-    assignMethod=np.zeros(nCobras)
+    assignMethod=np.zeros(nCobras, dtype=np.int32)
 
-    
     bPoints = []  # non real points (fids, stuck fibres)
 
     fileName = os.path.join(os.environ['ICS_MCSACTOR_DIR'],  'etc',  'stuck.txt')

@@ -38,6 +38,8 @@ from scipy.spatial import cKDTree
 
 import psycopg2
 import psycopg2.extras
+from sqlalchemy import text as sqlText
+
 from xml.etree.ElementTree import dump
 from ics.cobraCharmer.cobraCoach import calculation
 
@@ -54,6 +56,7 @@ from opdb import opdb
 from importlib import reload
 reload(dbTools)
 reload(mcsTools)
+reload(opdb)
 
 reload(CoordTransp)
 
@@ -71,6 +74,7 @@ class McsCmd(object):
         self._db = None
 
         self.centParms = self.actor.actorConfig['centroidParams']
+        self.dbOverride = None
         self.findThresh = None
         self.centThresh = None
         self.cMethod = 'win'
@@ -102,7 +106,7 @@ class McsCmd(object):
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose',
                 'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot] '
-                '[@newField]', self.expose),
+                '[@newField] [<rerunFrameId>]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
@@ -115,7 +119,8 @@ class McsCmd(object):
             ('switchCMethod', '<cMethod>', self.switchCMethod),
             ('switchFMethod', '<fMethod>', self.switchFMethod),
             ('resetGeometry', '', self.resetGeometry),
-            ('resetGeometryFile', '<geomFile>', self.resetGeometryFile)
+            ('resetGeometryFile', '<geomFile>', self.resetGeometryFile),
+            ('setDb', '[<hostname>] [<username>] [<port>] [<db>]', self.setDb)
         ]
 
         # Define typed command arguments for the above commands.
@@ -124,6 +129,7 @@ class McsCmd(object):
                                         keys.Key("expType", types.String(), help="The exposure type"),
                                         keys.Key("cameraName", types.String(), help="The camera used for MCS"),
                                         keys.Key("frameId", types.Int(), help="exposure frameID"),
+                                        keys.Key("rerunFrameId", types.Int(), help="exposure frameID to reprocess"),
                                         keys.Key("filename", types.String(), help="exposure filename"),
                                         keys.Key("path", types.String(), help="Simulated image directory"),
                                         keys.Key("getArc", types.Int(), help="flag for arc image"),
@@ -153,11 +159,75 @@ class McsCmd(object):
                                         keys.Key("cMethod", types.String(),
                                                  help="method for centroiding (of 'win', 'cent', default 'win')"),
                                         keys.Key("fMethod", types.String(),
-                                                 help="method for fibreId (of 'target', 'previous', default 'target')")
+                                                 help="method for fibreId (of 'target', 'previous', default 'target')"),
+                                        keys.Key("hostname", types.String(), help="DB hostname"),
+                                        keys.Key("username", types.String(), help="DB name"),
+                                        keys.Key("db", types.String(), help="DB name"),
+                                        keys.Key("port", types.Int(), help="DB port"),
                                         )
 
+    def setDb(self, cmd):
+        """Set parts of the db URI.
+
+        Override the pfs_instadata config parts of the db URI. If not are set
+        reverts to the default values.
+        """
+        config = self.actor.actorConfig
+        cmdKeys = cmd.cmd.keywords
+
+        anySet = False
+        if 'username' in cmdKeys:
+            username = str(cmdKeys['username'].values[0])
+            anySet = True
+        else:
+            username = config['db']['username']
+
+        if 'hostname' in cmdKeys:
+            hostname = str(cmdKeys['hostname'].values[0])
+            anySet = True
+        else:
+            hostname = config['db']['hostname']
+
+        if 'port' in cmdKeys:
+            port = int(cmdKeys['port'].values[0])
+            anySet = True
+        else:
+            port = config['db']['port']
+
+        if 'db' in cmdKeys:
+            dbname = str(cmdKeys['db'].values[0])
+            anySet = True
+        else:
+            dbname = config['db']['dbname']
+
+        if anySet:
+            self.dbOverride = (username, hostname, port, dbname)
+        else:
+            self.dbOverride = None
+
+        self._db = None
+        cmd.finish(f'text="set db URI to {self.dbOverride}')
+
+    def resolveDb(self, cmd):
+        if self.dbOverride is not None:
+            username, hostname, port, dbname = self.dbOverride
+            cmd.warn(f'text="using overridden db URI: {username}@{hostname}:{port}, db={dbname}"')
+        else:
+            try:
+                config = self.actor.actorConfig
+                hostname = config['db']['hostname']
+                dbname = config['db']['dbname']
+                port = config['db']['port']
+                username = config['db']['username']
+            except Exception as e:
+                raise RuntimeError(f'failed to load opdb configuration: {e}')
+
+        return username, hostname, port, dbname
+
     def connectToDB(self, cmd=None):
-        """connect to the database if not already connected"""
+        """connect to the database if not already connected. 
+
+        ALL code should use this method to connect to the database."""
 
         if self._db is not None:
             return self._db
@@ -165,14 +235,7 @@ class McsCmd(object):
         if cmd is None:
             cmd = self.actor.bcast
 
-        try:
-            config = self.actor.actorConfig
-            hostname = config['db']['hostname']
-            dbname = config['db']['dbname']
-            port = config['db']['port']
-            username = config['db']['username']
-        except Exception as e:
-            raise RuntimeError(f'failed to load opdb configuration: {e}')
+        username, hostname, port, dbname = self.resolveDb(cmd)
 
         cmd.diag(f'text="connecting to db, {username}@{hostname}:{port}, db={dbname}"')
         try:
@@ -188,7 +251,6 @@ class McsCmd(object):
 
         self._db = db
         return self._db
-    
 
     def ping(self, cmd):
         """Query the actor for liveness/happiness."""
@@ -262,7 +324,6 @@ class McsCmd(object):
         imagePath = pathlib.Path(imagePath)
         frameId = int(imagePath.stem[4:], base=10)
         self.visitId = frameId // 100
-        self.frameId = frameId
 
         try:
             fwfile = sorted(glob.glob(os.path.join(path, 'thetaFW.npy')))
@@ -598,6 +659,24 @@ class McsCmd(object):
         self.centThresh = None
         cmd.finish('Centroid threshold=d=reset')
 
+    def _loadExistingFrame(self, cmd, frameId):
+        """ Load an existing frame from disk. """
+
+        fileIds = dict(visit=frameId//100, frame=frameId%100, frameId=frameId)
+        filenames = self.butler.search('mcsFile', fileIds, pfsDay='*')
+        if len(filenames) == 0:
+            raise RuntimeError(f"no MCS files found for {fileIds}")
+        fileIds['filename'] = filename = filenames[0]
+        cmd.inform(f'text="loading existing frame {filename}"')
+        try:
+            image = fitsio.read(filename, ext=1)
+            hdr = fitsio.read_header(filename, ext=0)
+        except Exception as e:
+            cmd.warn(f'text="failed to read {filename}: {e}"')
+            raise
+        expTime = hdr['EXPTIME']
+        return fileIds, hdr, image, expTime
+
     def expose(self, cmd):
         """
         call the sequence of steps for an exposure 
@@ -625,36 +704,46 @@ class McsCmd(object):
             dotmask = None
 
         cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID}')
-        
-        # get frame ID if explicitly set, otherise reset
-        expType = cmdKeys[0].name
-        if 'frameId' in cmdKeys:
-            frameId = cmdKeys['frameId'].values[0]
+
+        if 'rerunFrameId' in cmdKeys:
+            if self.dbOverride is None:
+                cmd.fail('text="rerunFrameId requires a custom DB connection -- see setDb command"')
+                return 
+            rerunFrameId = frameId = cmdKeys['rerunFrameId'].values[0]
+            fileIds, hdr, image, expTime = self._loadExistingFrame(cmd, frameId)
+            filename = fileIds['filename']
         else:
-            frameId = None
-
-        # set exposure time
-        if expType in ('bias', 'test'):
-            expTime = self.expTime
+            rerunFrameId = None
             
-        else:
-            expTime = cmd.cmd.keywords["expTime"].values[0] * 1000
+            # get frame ID if explicitly set, otherise reset
+            expType = cmdKeys[0].name
+            if 'frameId' in cmdKeys:
+                frameId = cmdKeys['frameId'].values[0]
+            else:
+                frameId = None
 
-        if (expTime != self.expTime):
-            self.actor.camera.setExposureTime(cmd, expTime)
+            # set exposure time
+            if expType in ('bias', 'test'):
+                expTime = self.expTime
+                
+            else:
+                expTime = cmd.cmd.keywords["expTime"].values[0] * 1000
+
+            if (expTime != self.expTime):
+                self.actor.camera.setExposureTime(cmd, expTime)
+                
+            # Put exposure time to class attribute.
+            self.expTime = expTime
             
-        # Put exposure time to class attribute.
-        self.expTime = expTime
-        
-        cmd.inform('text="Exposure time now is %d ms." ' % (expTime))
-        fileIds, hdr, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
-        filename = fileIds['filename']
-        
-        if frameId is None:
-            filename = pathlib.Path(filename)
-            frameId = int(filename.stem[4:], base=10)
+            cmd.inform('text="Exposure time now is %d ms." ' % (expTime))
+            fileIds, hdr, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
+            filename = fileIds['filename']
+            
+            if frameId is None:
+                filename = pathlib.Path(filename)
+                frameId = int(filename.stem[4:], base=10)
 
-        self.handleTelescopeGeometry(cmd, filename, frameId, expTime)
+            self.handleTelescopeGeometry(cmd, filename, frameId, expTime)
 
         # set visitID
         self.visitId = frameId // 100
@@ -662,7 +751,9 @@ class McsCmd(object):
 
         # load telescope values from the DB
         cmd.inform(f'text="loading telescope parameters for frame={frameId}"')
-        zenithAngle, insRot = dbTools.loadTelescopeParametersFromDB(self._db, int(frameId))
+        db = self.connectToDB(cmd)
+
+        zenithAngle, insRot = dbTools.loadTelescopeParametersFromDB(db, int(frameId))
 
         # get the geometry if it hasn't been loaded yet
         cmd.inform('text="loading geometry"')
@@ -670,9 +761,6 @@ class McsCmd(object):
        
         # if the centroid flag is set
         if doCentroid:
-            # connect to DB
-            db = self.connectToDB(cmd)
-
             cmd.inform('text="Setting centroid parameters." ')
             self.setCentroidParams(cmd)
 
@@ -749,14 +837,15 @@ class McsCmd(object):
 
         cmd.inform(f'frameId={frameId}; filename={filename}')
 
-        self.writeFITS(fileIds, hdr, image, cmd)
+        if rerunFrameId is None:
+            self.writeFITS(fileIds, hdr, image, cmd)
 
         cmd.finish('exposureState=done')
 
     def dumpCentroidtoDB(self, cmd, frameId):
         """Connect to database and return json string to an attribute."""
 
-        conn = self.connectToDB()
+        conn = self.connectToDB(cmd)
         cmd.diag(f'text="dumping centroids to db {conn}"')
 
         # The section should be removed, replaced by the createTables command.
@@ -833,9 +922,7 @@ class McsCmd(object):
         # need for fibreID later
         self.fids = fids
 
-        db=opdb.OpDB(hostname='db-ics', port=5432,
-                   dbname='opdb',
-                   username='pfs')
+        db = self.connectToDB(cmd)
         mcsData = db.bulkSelect('mcs_data',f'select spot_id, mcs_center_x_pix, mcs_center_y_pix '
                 f'from mcs_data where mcs_frame_id = {frameID}')
         
@@ -888,11 +975,11 @@ class McsCmd(object):
         
         self.logger.info(f'Apply transformation to MCS data points.')
         x_mm, y_mm = pfiTransform.mcsToPfi(mcsData['mcs_center_x_pix'].values,mcsData['mcs_center_y_pix'].values)
-        mcsData['pfi_center_x_mm'] = x_mm
-        mcsData['pfi_center_y_mm'] = y_mm
+        mcsData['pfi_center_x_mm'] = x_mm.astype(np.float32)
+        mcsData['pfi_center_y_mm'] = y_mm.astype(np.float32)
 
-
-        dbTools.writeFidToDB(ffid, mcsData, frameID)
+        db = self.connectToDB(cmd)
+        dbTools.writeFidToDB(db, ffid, mcsData, frameID)
         cmd.inform(f'text="wrote matched FF to opdb."')
         
         self.pfiTrans = pfiTransform
@@ -923,8 +1010,8 @@ class McsCmd(object):
 
         # sorting the spot id, so that the ID returned by matching should 
         # keep the same.
-        mcsData = db.bulkSelect('mcs_data','select * from mcs_data where '
-                f'mcs_frame_id = {frameId}').sort_values(by=['spot_id'])
+        mcsData = db.bulkSelect('mcs_data',sqlText('select * from mcs_data where '
+                f'mcs_frame_id = {frameId}')).sort_values(by=['spot_id'])
 
         renames = dict(mcs_frame_id='mcsId',
                        spot_id='fiberId',
@@ -1311,7 +1398,8 @@ class McsCmd(object):
 
         centroids = np.frombuffer(a, dtype='<f8')
         centroids = np.reshape(centroids, (len(centroids)//7, 7))
-                         
+
+
         # adjust the coordinates back to global values
         #centroids[:,1] += xmin
         #centroids[:,2] += ymin
@@ -1347,7 +1435,7 @@ class McsCmd(object):
 
         # Let the database handle the primary key
         db = self.connectToDB(cmd)
-        res = db.session.execute('select * FROM "mcs_exposure" where false')
+        res = db.session.execute(sqlText('select * FROM "mcs_exposure" where false'))
         colnames = tuple(res.keys())
         realcolnames = colnames[0:]
 
@@ -1425,7 +1513,7 @@ class McsCmd(object):
             with session.connection().connection.cursor() as cursor:
                 cursor.copy_expert(sql, dataBuf)
                 cursor.close()
-            session.execute('commit')
+            session.execute(sqlText('commit'))
         except Exception as e:
             self.logger.warn(f"failed to write with {sql}: {e}")
 
@@ -1438,7 +1526,7 @@ class McsCmd(object):
             db = self.connectToDB(None)
             session = db.session
             with session.connection().connection.cursor() as cursor:
-                cursor.copy_expert(sql, dataBuf)
+                cursor.copy_expert(sqlText(sql), dataBuf)
             dataBuf.seek(0, 0)
             return dataBuf
         except Exception as e:
@@ -1470,7 +1558,7 @@ class McsCmd(object):
 
         # Let the database handle the primary key
         db = self.connectToDB(None)
-        colnames = db.session.execute('select * FROM "mcs_data" where false')
+        colnames = db.session.execute(sqlText('select * FROM "mcs_data" where false'))
         realcolnames = tuple(colnames.keys())[0:]
 
 
@@ -1569,7 +1657,7 @@ class McsCmd(object):
         pfi_y = imgarr2[:, 1]
 
         db = self.connectToDB(None)
-        colnames = db.session.execute('select * FROM "cobra_target" where false')
+        colnames = db.session.execute(sqlText('select * FROM "cobra_target" where false'))
         realcolnames = tuple(colnames.keys())[0:]
 
         buf = io.StringIO()

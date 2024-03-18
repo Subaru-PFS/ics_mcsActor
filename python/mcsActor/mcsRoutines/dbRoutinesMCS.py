@@ -36,6 +36,7 @@ from datetime import datetime, timezone
 import psycopg2
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text as sqlText
 
 
 def connectToDB(hostname='', port='', dbname='opdb', username='pfs'):
@@ -131,7 +132,7 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
     write transformation coefficients to database
     """
     trans=pfiTransform.mcsDistort.getArgs()
-    res = db.session.execute('select * FROM "mcs_pfi_transformation" where false')
+    res = db.session.execute(sqlText('select * FROM "mcs_pfi_transformation" where false'))
     colnames = tuple(res.keys())
     realcolnames = colnames[0:]
     line = '%d,%f,%f,%f,%e,%e,%f,%s' % (frameId, trans[0].astype('float64'),
@@ -141,7 +142,7 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
     buf = io.StringIO()
     buf.write(line)
     buf.seek(0, 0)
-    _writeData('mcs_pfi_transformation', realcolnames, buf)
+    _writeData(db, 'mcs_pfi_transformation', realcolnames, buf)
 
 
     data = {'mcs_frame_id': [frameId],
@@ -157,14 +158,12 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
         df['scale2'].values,df['theta'].values,df['alpha_rot'].values,df['camera_name'].values
     
     
-def _writeData(tableName, columnNames, dataBuf):
+def _writeData(db, tableName, columnNames, dataBuf):
     """Wrap a direct COPY_FROM via sqlalchemy. """
     columns = ','.join('"{}"'.format(k) for k in columnNames)
     sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(
         tableName, columns)
     try:
-        db=opdb.OpDB(hostname='db-ics', port=5432,dbname='opdb',
-                        username='pfs')
         session = db.session
         with session.connection().connection.cursor() as cursor:
             cursor.copy_expert(sql, dataBuf)
@@ -397,7 +396,7 @@ def writeAffineToDB(db, afCoeff, frameId):
                       yd], 'x_scale': [sx], 'y_scale': [sy], 'angle': [rotation]})
     db.insert('mcs_pfi_transformation', df)
 
-def writeFidToDB(ffid, mcsData,  mcs_frame_id):
+def writeFidToDB(db, ffid, mcsData,  mcs_frame_id):
 
     """
     write the fiducial fibre matches to db.
@@ -429,13 +428,4 @@ def writeFidToDB(ffid, mcsData,  mcs_frame_id):
 
     df = pd.DataFrame(frame, columns=columns)
 
-    connection_url = f'postgresql+psycopg2://pfs@db-ics/opdb'
-    engine = create_engine(connection_url)
-    # Create a session
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    df.to_sql("fiducial_fiber_match", engine, index=False, if_exists='append')
-    #insert
-    #db.bulkInsert("fiducial_fiber_match", df)
-    #db.insert("fiducial_fiber_match", df)
-    session.close()
+    db.insert("fiducial_fiber_match", df)
