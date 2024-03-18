@@ -452,11 +452,16 @@ class McsCmd(object):
     def _makeSpotHDU(self, cmd):
         """ Create a binary table HDU with spot positions. """
 
-        nspots = min(5000, len(self.centroids))
+        try:
+            centroids = self.centroids
+        except AttributeError:
+            centroids = np.empty((0,3), dtype='f4')
+        nspots = min(5000, len(centroids))
+
         spots = [pyfits.Column(name='x', format='E', unit='mm', 
-                               array=self.centroids[:nspots, 1]),
+                               array=centroids[:nspots, 1]),
                  pyfits.Column(name='y', format='E', unit='mm', 
-                               array=self.centroids[:nspots, 2])]
+                               array=centroids[:nspots, 2])]
         return pyfits.BinTableHDU.from_columns(spots, name='SPOTS')
 
     def writeFITS(self, fileIds, hdr, image, cmd):
@@ -733,7 +738,7 @@ class McsCmd(object):
                 else:
 
                     self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
-                    if(self.adjacentCobras == None):
+                    if(self.adjacentCobras is None):
                         self.adjacentCobras = mcsTools.makeAdjacentList(self.centrePos, self.armLength)
                         cmd.inform(f'text="made adjacent lists"')
 
