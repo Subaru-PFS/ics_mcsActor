@@ -62,6 +62,7 @@ typedef struct cand_point
   double qual; //quality flag
   double back; //number of points in region
   double npt; //number of points in region
+  double nrad; //number of points in region
   struct cand_point *next;
 } cand_point;
 //--------------------------------------------------//
