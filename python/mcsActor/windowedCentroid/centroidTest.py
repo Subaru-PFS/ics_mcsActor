@@ -281,3 +281,10 @@ def showMcsDataImage(visit0, visit1, cobraIdx,
     ax.legend()
 
     vis.visSetAxesLimits([xcenter-boxSize,xcenter+boxSize],[ycenter-boxSize,ycenter+boxSize])
+
+def main():
+    runCentroid(10749001)
+
+
+if __name__:
+    main()

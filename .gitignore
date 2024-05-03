@@ -12,3 +12,10 @@ python/mcsActor/windowedCentroid/centroid_wrapper.c
 callgrind.out.*
 *.png
 \#*
+*.npy
+*.supp
+source/ShutterDriver/.pl2303.mod.o.cmd
+source/ShutterDriver/.pl2303.o.cmd
+source/ShutterDriver/.pl2303.ko.cmd
+source/ShutterDriver/.tmp_versions/pl2303.mod
+source/ShutterDriver/pl2303.ko
