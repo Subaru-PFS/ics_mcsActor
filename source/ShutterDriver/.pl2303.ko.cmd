@@ -1,1 +1,0 @@
-cmd_/software/devel/pfs/ics_mcsActor/source/ShutterDriver/pl2303.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /software/devel/pfs/ics_mcsActor/source/ShutterDriver/pl2303.ko /software/devel/pfs/ics_mcsActor/source/ShutterDriver/pl2303.o /software/devel/pfs/ics_mcsActor/source/ShutterDriver/pl2303.mod.o
