@@ -45,6 +45,7 @@ from ics.cobraCharmer.cobraCoach import calculation
 
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsTools
+import mcsActor.mcsRoutines.fiducials as fiducials
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
 import mcsActor.mcsRoutines.speedCentroid as speedCentriod
 import multiprocessing
@@ -56,6 +57,7 @@ from opdb import opdb
 from importlib import reload
 reload(dbTools)
 reload(mcsTools)
+reload(fiducials)
 reload(opdb)
 
 reload(CoordTransp)
@@ -908,16 +910,18 @@ class McsCmd(object):
         cmd.inform(f'text="loading DOT location from butler"')
         self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.calibModel = mcsTools.readCobraGeometry(
             pfi, dots)
-        
-        fids = self.butler.get('fiducials')
-        self.outerRingIds, self.badFidIds = mcsTools.readFiducialMasks(fids)
+
+        # not used anymore.
+        # fids = self.butler.get('fiducials')
+        # self.outerRingIds, self.badFidIds = mcsTools.readFiducialMasks(fids)
+
         cmd.inform('text="cobra geometry read"')
         self.geometrySet = True
 
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
         # Read fiducial and spot geometry
-        fids = self.butler.get('fiducials')
+        fids = fiducials.Fiducials.read(self.butler)
 
         # need for fibreID later
         self.fids = fids
@@ -947,7 +951,9 @@ class McsCmd(object):
 
         # set the good fiducials and outer ring fiducials if not yet set
         #if(self.fidsGood == None):
-        self.fidsOuterRing, self.fidsGood = mcsTools.readFiducialMasks(fids)
+        # self.fidsOuterRing, self.fidsGood = mcsTools.readFiducialMasks(fids)
+        self.fidsGood = fids[fids.goodMask]
+        self.fidsOuterRing = fids[fids.goodMask & fids.outerRingMask]
         
         #outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
         #fidsOuterRing = fids[fids.fiducialId.isin(outerRingIds)]
