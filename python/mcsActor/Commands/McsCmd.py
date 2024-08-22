@@ -792,11 +792,12 @@ class McsCmd(object):
 
             # Use only one version of Centroid code.
             #self.runCentroidSEPMP(cmd)
+            
             self.runCentroid(cmd, self.centParms)
 
             t2 = time.time()
             cmd.inform(f'text="Centroids done in {t2-t1} second" ')
-
+            
             # dumpCentroidtoDB
             self.dumpCentroidtoDB(cmd, frameId)
         
@@ -1147,8 +1148,15 @@ class McsCmd(object):
         # do the identification
         cmd.inform(f'text="Starting Fiber ID"')
         t0 = time.time()
-        cobraMatch, unaPoints = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
+        
+        cobraMatch, unaPoints, flag = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
                                       self.fids, self.dotPos, self.goodIdx, self.adjacentCobras)
+
+        # this flag will catch a failure in fibre identification due to very unexpected input (like targets outside the
+        # patrol region)
+        
+        if(flag > 0):
+            cmd.fail('text="Failure in cobra matching, {flag} matches unsuccessful.  An underlying assumption has probably been violated."') 
         t1 = time.time()
         cmd.inform(f'text="Fiber ID finished in {t1-t0:0.2f}s"')
 
@@ -1418,7 +1426,19 @@ class McsCmd(object):
         #centroids=centroids[ind].squeeze()
 
         nSpots = centroids.shape[0]
-        points = np.empty((nSpots, 8))
+
+        # check for no illumination
+        if(nSpots == 0):
+            cmd.fail('text="No spots detected; check the illuminator and light path"')
+
+        maxSize = (centroids[:,3] * centroids[:,2]).max()
+        if(maxSize > 1000):
+            cmd.warn('text="Anomalous spot sizes detected; check for scattered light"')
+
+
+        # increased number of columns to give room for photometry results
+        
+        points = np.empty((nSpots, 10))
 
         # ADD A PLUS 1 TO MATCH THE OTHER CENTROIDING AND STOP CAUSING INDEXING ERRORS
         points[:, 0] = np.arange(nSpots)+1
@@ -1676,3 +1696,5 @@ class McsCmd(object):
 
         self._writeData('cobra_target', realcolnames, buf)
         buf.seek(0, 0)
+
+

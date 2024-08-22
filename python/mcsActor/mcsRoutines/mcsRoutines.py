@@ -61,7 +61,18 @@ def getCentroidParams(cmd, configuredCentParms):
         centParms['nmin'] = cmd.cmd.keywords["nmin"].values[0]
     if('maxIt' in cmdKeys):
         centParms['maxIt'] = cmd.cmd.keywords["maxIt"].values[0]
-           
+
+    if('aperture' in cmdKeys):
+        centParms['aperture'] = cmd.cmd.keywords["aperture"].values[0]
+
+    if('innerAnn' in cmdKeys):
+        centParms['innerAnn'] = cmd.cmd.keywords["innerAnn"].values[0]
+
+    if('outerAnn' in cmdKeys):
+        centParms['outerAnn'] = cmd.cmd.keywords["outerAnn"].values[0]
+
+
+        
     return centParms
 
 def readFiducialMasks(fids):
@@ -279,6 +290,7 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     #                             ('x_mm', 'float32'), ('y_mm', 'float32'), 
     #                             ('flags', 'int32')])
     ii = 0
+    flag = 0
     for i in range(int(goodIdx[-1]+2)):
         if(i in goodIdx):
 
@@ -303,11 +315,12 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
                 if(assignMethod[ii]==0):
                     cobraMatch[ii, 4] += 1
 
+            # if there is more than one potential match for a cobra, something has gone badly wrong
             else:
-                print(ii,i,potPointMatch[ii])
+                flag = flag + 1
             ii = ii+1
             
-    return cobraMatch, unaPoints
+    return cobraMatch, unaPoints, flag
 
 
 def nearestNeighbourMatching(points, targets):
@@ -1013,3 +1026,21 @@ def calcBoresight(db, frameIds, pfsVisitId):
 
     return boresight
 
+
+
+def mcsPhotometry(image, xPos, yPos, cParms):
+
+    """do aperture photometry on the image"""
+
+    # subtract the background 
+    bkg = sep.Background(image)
+    image = image - bkg
+
+    # call do the photometry
+    flux, fluxerr, flag = sep.sum_circle(image, xPos, yPos, centParms['aperture'],err=bkg.globalrms, gain=1.0, bkgann=(centParms['inner_ann'],centParms['outer_ann']))
+
+    
+    
+    
+
+    
