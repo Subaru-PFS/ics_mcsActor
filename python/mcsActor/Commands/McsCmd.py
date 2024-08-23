@@ -1685,9 +1685,63 @@ class McsCmd(object):
 
         for i in range(len(pfi_x)):
             line = '%d,%d,%d,%d, %f,%f,%f,%f,%d,%d,%d,%f,%d,%d,%d,%f,%d\n'%(frameId/100, 1, i+1, 99, pfi_x[i], pfi_y[i],
-                                                                            pfi_x[i], pfi_y[i], 1, 1, 99, 99, 1, 1, 99, 99, 0)
+                                                                            pfi_x[i], pfi_y[i], 1, 1, 99, 99, 1, 1, 99, 99, 0, np.nan, np.nan)
             buf.write(line)
         buf.seek(0, 0)
 
         self._writeData('cobra_target', realcolnames, buf)
         buf.seek(0, 0)
+
+    def doPhotometry(self, cmd):
+        """
+            perform photometry on previously taken MCS images
+             - read mcs_exposure, mcs_data tables
+             - load image from disk
+             - calculate photometry
+             - update table
+        """
+    
+        cmdKeys = cmd.cmd.keywords
+
+        # get frame id
+
+        frameId = cmdKeys['frameId'].values[0]
+        cmd.inform('text="Starting MCS Photometry "')
+
+        
+        db = self.connectToDB(cmd)
+        
+        # retrieve exposure data and obtain file name
+      
+        exData = db.bulkSelect('mcs_expose',sqlText('select * from mcs_expose where '
+                    f'mcs_frame_id = {frameId}')))
+
+        dirname = exdata['taken_in_hst_at'].values[0].split(" ")[0]
+    
+        fileName = f'/data/raw/{dirname}/mcs/PFSC{frameId:0>8}.fits'
+        
+        # load image
+
+        image = fits.getdata(fileName)
+        cmd.inform('text="successfully loaded image {fileName}"')
+
+        # retrieve mcsData
+        mcsData = db.bulkSelect('mcs_data',sqlText('select * from mcs_data where '
+                    f'mcs_frame_id = {frameId}')).sort_values(by=['spot_id'])
+    
+        cmd.inform('text="retrieved {len(mcsData} spots from mcs_data"')
+
+        # do photometry
+        
+        flux, fluxerr = mcsTools.doPhot(mcsData[''],mcsData[''],centParms)
+        cmd.inform('text="photometry finished"')
+    
+        for i in range(len(flux)):
+            if(mcsData['spot_id'] != -1):
+                sql = f"update mcs_data set (flux,ferr) to ({flux[i]},{fluxerr[i]}) where mcs_frame_id={frameId} and spot_id = {mcsData['spot_id'].values[0]}"
+                db.session.execute(sqlText(sql))
+        cmd.inform('text="mcs_data updated"')
+
+        db.close()    
+                
+        cmd.inform('text="database updated"')
