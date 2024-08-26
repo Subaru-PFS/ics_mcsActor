@@ -14,7 +14,7 @@ import pandas as pd
 from scipy.stats import sigmaclip
 import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
-
+import sep
 
 #import ics.cobraCharmer.pfi as pfi
 
@@ -61,7 +61,14 @@ def getCentroidParams(cmd, configuredCentParms):
         centParms['nmin'] = cmd.cmd.keywords["nmin"].values[0]
     if('maxIt' in cmdKeys):
         centParms['maxIt'] = cmd.cmd.keywords["maxIt"].values[0]
-           
+
+    if('aperture' in cmdKeys):
+        centParms['aperture'] = cmd.cmd.keywords["aperture"].values[0]
+    if('innerRad' in cmdKeys):
+        centParms['innerRad'] = cmd.cmd.keywords["innerRad"].values[0]
+   if('outerRad' in cmdKeys):
+        centParms['outerRad'] = cmd.cmd.keywords["outerRad"].values[0]
+
     return centParms
 
 def readFiducialMasks(fids):
@@ -1013,3 +1020,17 @@ def calcBoresight(db, frameIds, pfsVisitId):
 
     return boresight
 
+def mcsPhotometry(image, xPos, yPos, cParms):
+
+    """do aperture photometry on the image"""
+
+    # subtract the background 
+    bkg = sep.Background(image)
+    image = image - bkg
+
+    # call do the photometry
+    flux, fluxerr, flag = sep.sum_circle(image, xPos, yPos, centParms['aperture'],err=bkg.globalrms, gain=1.0, bkgann=(centParms['innerAnn'],centParms['outerAnn']))
+
+
+
+    

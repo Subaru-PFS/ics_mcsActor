@@ -115,6 +115,7 @@ class McsCmd(object):
             ('resetThreshold', '', self.resetThreshold),
             ('setCentroidParams', '[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<maxIt>] [<centSigma>] [<findSigma>]',
              self.setCentroidParams),
+            ('setApertureParams', '[<aperture>] [<innerRad>] [<outerRad>]', self.setApertureParams),
             ('calcThresh', '[<threshSigma>] [<threshFact>]', self.calcThresh),
             ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
@@ -122,6 +123,7 @@ class McsCmd(object):
             ('switchFMethod', '<fMethod>', self.switchFMethod),
             ('resetGeometry', '', self.resetGeometry),
             ('resetGeometryFile', '<geomFile>', self.resetGeometryFile),
+            ('doPhotometry', '<frameId>', self.doPhotometry),
             ('setDb', '[<hostname>] [<username>] [<port>] [<db>]', self.setDb)
         ]
 
@@ -162,6 +164,9 @@ class McsCmd(object):
                                                  help="method for centroiding (of 'win', 'cent', default 'win')"),
                                         keys.Key("fMethod", types.String(),
                                                  help="method for fibreId (of 'target', 'previous', default 'target')"),
+                                        keys.Key("aperture", types.String(), help="Aperture for photometery"),
+                                        keys.Key("innerRad", types.String(), help="Inner radius for photometry background"),
+                                        keys.Key("outerRad", types.String(), help="Outer radius for photometry background"),
                                         keys.Key("hostname", types.String(), help="DB hostname"),
                                         keys.Key("username", types.String(), help="DB name"),
                                         keys.Key("db", types.String(), help="DB name"),
@@ -876,6 +881,19 @@ class McsCmd(object):
         self.cMethod = cmdKeys['cMethod'].values[0]
         cmd.inform(f'text="cMethod = {self.cMethod}"')
         cmd.finish('switchCMethod=done')
+
+    def setApertureParams(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+
+        if('aperture' in cmdKeys):
+            self.centParms['aperture'] = cmdKeys['aperture'].values[0]
+        if('innerRad' in cmdKeys):
+            self.centParms['innerRad'] = cmdKeys['innerRad'].values[0]
+        if('outerRad' in cmdKeys):
+            self.centParms['outerRad'] = cmdKeys['outerRad'].values[0]
+
+        cmd.inform(f'text="setting aperture parameters to  = {self.centParms["aperture"]},  {self.centParms["innerRad"]},  {self.centParms["outerRad"]}"')
+        cmd.finish('setApertureParams=done')
 
     def resetGeometry(self):
         """
@@ -1729,10 +1747,11 @@ class McsCmd(object):
         mcsData = db.bulkSelect('mcs_data',sqlText('select * from mcs_data where '
                     f'mcs_frame_id = {frameId}')).sort_values(by=['spot_id'])
     
+        if(len(mcsData)==0):
+            cmd.fail('text="No MCS data for frameID={frameId}"')
+            
         cmd.inform('text="retrieved {len(mcsData} spots from mcs_data"')
-
-        # do photometry
-        
+        # do photometry        
         flux, fluxerr = mcsTools.doPhot(mcsData[''],mcsData[''],centParms)
         cmd.inform('text="photometry finished"')
     
