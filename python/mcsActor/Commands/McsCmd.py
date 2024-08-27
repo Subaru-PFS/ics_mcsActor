@@ -1600,6 +1600,7 @@ class McsCmd(object):
             
         buf = io.StringIO()
         for l_i in range(nItems):
+
             line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f\n' % (frameId, l_i+1, centArr[l_i,1],
                                         centArr[l_i,2], centArr[l_i,3], centArr[l_i,4], 
                                                      centArr[l_i,5], centArr[l_i,6], centArr[l_i,7],0, np.nan, np.nan)
@@ -1748,16 +1749,23 @@ class McsCmd(object):
         
         # retrieve exposure data and obtain file name
       
-        exData = db.bulkSelect('mcs_expose',sqlText('select * from mcs_expose where '
-                    f'mcs_frame_id = {frameId}')))
+        #exData = db.bulkSelect('mcs_exposure',f'select * from mcs_exposure where mcs_frame_id = {frameId}')
+        res = db.session.execute(f"select taken_in_hst_at from mcs_exposure where mcs_frame_id = {frameId}")
+        dt = [row[0] for row in res]
 
-        if(len(data) == 0):
+        if(len(dt) == 0):
             cmd.fail('text="No mcs_frameId = {frameId}"')
+        dt = dt[0]
+        dirname = f"{dt.year}-{dt.month:02}-{dt.day:02}"
+        #if(len(data) == 0):
+        #    cmd.fail('text="No mcs_frameId = {frameId}"')
 
-
+        cmd.inform('text="loaded exposure data"')
         # get directory of raw data
-        dirname = exdata['taken_in_hst_at'].values[0].split(" ")[0]
-
+        #dirname = exdata['taken_in_hst_at'].values[0].strftime("%Y-%m-%d")
+        #t = exdata['taken_in_hst_at'][0]
+        #dirname = exData['taken_in_hst_at'].values[0].split(" ")[0]
+        #dirname = f"{t.year}-{t.month:02}-{t.day:02}"
         # get filname
         fileName = f'/data/raw/{dirname}/mcs/PFSC{frameId:0>8}.fits'
         
@@ -1765,7 +1773,7 @@ class McsCmd(object):
         cmd.inform('text="loading image {fileName}"')
 
         try:
-            image = fits.getdata(fileName)
+            image = pyfits.getdata(fileName)
         except:
             cmd.fail('text="No file at {fileName}"')
             
@@ -1780,11 +1788,11 @@ class McsCmd(object):
             
         cmd.inform('text="retrieved {len(mcsData} spots from mcs_data"')
         # do photometry        
-        flux, fluxerr = mcsTools.mcsPhotometry(image, mcsData['mcs_center_x_pix'],mcsData['mcs_center_y_pix'],centParms)
+        flux, fluxerr = mcsTools.mcsPhotometry(image, mcsData['mcs_center_x_pix'],mcsData['mcs_center_y_pix'],self.centParms)
         cmd.inform('text="photometry finished"')
-    
+        
         for i in range(len(flux)):
-            if(mcsData['spot_id'] != -1):
+            if(mcsData['spot_id'][i] != -1):
                 sql = f"update mcs_data set flux = {flux[i]}, fluxerr = {fluxerr[i]} where mcs_frame_id={frameId} and spot_id = {mcsData['spot_id'].values[0]}"
                 db.session.execute(sqlText(sql))
         cmd.inform('text="mcs_data updated"')
