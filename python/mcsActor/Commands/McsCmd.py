@@ -164,9 +164,9 @@ class McsCmd(object):
                                                  help="method for centroiding (of 'win', 'cent', default 'win')"),
                                         keys.Key("fMethod", types.String(),
                                                  help="method for fibreId (of 'target', 'previous', default 'target')"),
-                                        keys.Key("aperture", types.String(), help="Aperture for photometery"),
-                                        keys.Key("innerRad", types.String(), help="Inner radius for photometry background"),
-                                        keys.Key("outerRad", types.String(), help="Outer radius for photometry background"),
+                                        keys.Key("aperture", types.Float(), help="Aperture for photometery"),
+                                        keys.Key("innerRad", types.Float(), help="Inner radius for photometry background"),
+                                        keys.Key("outerRad", types.Float(), help="Outer radius for photometry background"),
                                         keys.Key("hostname", types.String(), help="DB hostname"),
                                         keys.Key("username", types.String(), help="DB name"),
                                         keys.Key("db", types.String(), help="DB name"),
@@ -1180,8 +1180,14 @@ class McsCmd(object):
         # do the identification
         cmd.inform(f'text="Starting Fiber ID"')
         t0 = time.time()
-        cobraMatch, unaPoints = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
+        cobraMatch, unaPoints, flag = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
                                       self.fids, self.dotPos, self.goodIdx, self.adjacentCobras)
+
+        # this flag will catch a failure in fibre identification due to very unexpected input (like targets outside the
+        # patrol region)
+        if(flag > 0):
+            cmd.fail('text="Failure in cobra matching, {flag} matches unsuccessful.  An underlying assumption has probably been violated."')
+            
         t1 = time.time()
         cmd.inform(f'text="Fiber ID finished in {t1-t0:0.2f}s"')
 
@@ -1451,6 +1457,18 @@ class McsCmd(object):
         #centroids=centroids[ind].squeeze()
 
         nSpots = centroids.shape[0]
+
+        # check for no illumination
+        if(nSpots == 0):
+            cmd.fail('text="No spots detected; check the illuminator and light path"')
+
+        maxSize = (centroids[:,3] * centroids[:,2]).max()
+        if(maxSize > 1000):
+            cmd.warn('text="Anomalous spot sizes detected; check for scattered light"')
+
+
+        # increased number of columns to give room for photometry results
+        
         points = np.empty((nSpots, 8))
 
         # ADD A PLUS 1 TO MATCH THE OTHER CENTROIDING AND STOP CAUSING INDEXING ERRORS
@@ -1724,9 +1742,8 @@ class McsCmd(object):
         # get frame id
 
         frameId = cmdKeys['frameId'].values[0]
-        cmd.inform('text="Starting MCS Photometry "')
+        cmd.inform('text="Starting MCS Photometry on frameID = {frameId} "')
 
-        
         db = self.connectToDB(cmd)
         
         # retrieve exposure data and obtain file name
@@ -1734,13 +1751,24 @@ class McsCmd(object):
         exData = db.bulkSelect('mcs_expose',sqlText('select * from mcs_expose where '
                     f'mcs_frame_id = {frameId}')))
 
+        if(len(data) == 0):
+            cmd.fail('text="No mcs_frameId = {frameId}"')
+
+
+        # get directory of raw data
         dirname = exdata['taken_in_hst_at'].values[0].split(" ")[0]
-    
+
+        # get filname
         fileName = f'/data/raw/{dirname}/mcs/PFSC{frameId:0>8}.fits'
         
         # load image
+        cmd.inform('text="loading image {fileName}"')
 
-        image = fits.getdata(fileName)
+        try:
+            image = fits.getdata(fileName)
+        except:
+            cmd.fail('text="No file at {fileName}"')
+            
         cmd.inform('text="successfully loaded image {fileName}"')
 
         # retrieve mcsData
@@ -1752,7 +1780,7 @@ class McsCmd(object):
             
         cmd.inform('text="retrieved {len(mcsData} spots from mcs_data"')
         # do photometry        
-        flux, fluxerr = mcsTools.doPhot(mcsData[''],mcsData[''],centParms)
+        flux, fluxerr = mcsTools.mcsPhotometry(image, mcsData['mcs_center_x_pix'],mcsData['mcs_center_y_pix'],centParms)
         cmd.inform('text="photometry finished"')
     
         for i in range(len(flux)):
@@ -1763,4 +1791,3 @@ class McsCmd(object):
 
         db.close()    
                 
-        cmd.inform('text="database updated"')
