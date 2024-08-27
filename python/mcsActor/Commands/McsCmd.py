@@ -1785,7 +1785,7 @@ class McsCmd(object):
     
         for i in range(len(flux)):
             if(mcsData['spot_id'] != -1):
-                sql = f"update mcs_data set (flux,ferr) to ({flux[i]},{fluxerr[i]}) where mcs_frame_id={frameId} and spot_id = {mcsData['spot_id'].values[0]}"
+                sql = f"update mcs_data set flux = {flux[i]}, fluxerr = {fluxerr[i]} where mcs_frame_id={frameId} and spot_id = {mcsData['spot_id'].values[0]}"
                 db.session.execute(sqlText(sql))
         cmd.inform('text="mcs_data updated"')
 
