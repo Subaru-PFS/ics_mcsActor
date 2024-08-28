@@ -1555,9 +1555,9 @@ class McsCmd(object):
             
             buf.write(line)
         
-        line = line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%d\n' % (frameId, -1, np.nan, 
+        line = line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f\n' % (frameId, -1, np.nan,
                                         np.nan, np.nan, np.nan, 
-                                                           np.nan, np.nan, np.nan, 0)
+                                                           np.nan, np.nan, np.nan, 0, np.nan, np.nan)
         buf.write(line)
         buf.seek(0, 0)
 
