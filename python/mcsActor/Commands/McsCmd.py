@@ -1797,4 +1797,5 @@ class McsCmd(object):
         cmd.inform('text="mcs_data updated"')
 
         db.close()    
-                
+        
+        cmd.finish('text="mcs_data updated"')
