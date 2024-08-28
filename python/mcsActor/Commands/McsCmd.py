@@ -107,7 +107,7 @@ class McsCmd(object):
             ('expose', '@(bias|test) [<frameId>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose',
-                'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot] '
+                'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@noPhot] [@simDot] '
                 '[@newField] [<rerunFrameId>]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
@@ -123,7 +123,6 @@ class McsCmd(object):
             ('switchFMethod', '<fMethod>', self.switchFMethod),
             ('resetGeometry', '', self.resetGeometry),
             ('resetGeometryFile', '<geomFile>', self.resetGeometryFile),
-            ('doPhotometry', '<frameId>', self.doPhotometry),
             ('setDb', '[<hostname>] [<username>] [<port>] [<db>]', self.setDb)
         ]
 
@@ -704,6 +703,13 @@ class McsCmd(object):
         else:
             doCentroid = True
 
+        
+        noPhotArg = 'noPhot' in cmdKeys
+        if noPhotArg:
+            self.doPhot = False
+        else:
+            self.doPhot = True
+
         doFibreID = 'doFibreID' in cmdKeys
         newField = 'newField' in cmdKeys
 
@@ -713,7 +719,7 @@ class McsCmd(object):
         else:
             dotmask = None
 
-        cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID}')
+        cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID} doPhot = {self.doPhot}')
 
         if 'rerunFrameId' in cmdKeys:
             if self.dbOverride is None:
@@ -1469,18 +1475,23 @@ class McsCmd(object):
 
         # increased number of columns to give room for photometry results
         
-        points = np.empty((nSpots, 8))
-
+        points = np.empty((nSpots, 10))
+        
         # ADD A PLUS 1 TO MATCH THE OTHER CENTROIDING AND STOP CAUSING INDEXING ERRORS
         points[:, 0] = np.arange(nSpots)+1
-        points[:, 1:] = centroids[:, 0:]
-
-        points[:,-1]=np.repeat(self.avBack,len(points))
-
+        points[:, 1:8] = centroids[:, 0:]
+        points[:, 8] = np.repeat(np.nan,nSpots)
+        points[:, 9] = np.repeat(np.nan, nSpots)
+        points[:,7]=np.repeat(self.avBack,len(points))
+    
+        if self.doPhot:
+            flux, fluxerr = mcsTools.mcsPhotometry(image.astype('<i4'), centroids[:,0], centroids[:,1], self.centParms)
+            points[:,8]= flux
+            points[:,9]= fluxerr
         # Swap last two fields
         #points[:,[-2,-3]] = points[:,[-3,-2]]
-        points[:,[-1,-2]] = points[:,[-2,-1]]
-        points[:,[-1,-3]] = points[:,[-3,-1]]
+        points[:,[-3,-4]] = points[:,[-4,-3]]
+        points[:,[-3,-5]] = points[:,[-5,-3]]
 
         self.centroids = points
 
@@ -1602,7 +1613,8 @@ class McsCmd(object):
         for l_i in range(nItems):
             line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f\n' % (frameId, l_i+1, centArr[l_i,1], 
                                         centArr[l_i,2], centArr[l_i,3], centArr[l_i,4], 
-                                                     centArr[l_i,5], centArr[l_i,6], centArr[l_i,7],0, np.nan, np.nan)
+                                                              centArr[l_i,5], centArr[l_i,6], centArr[l_i,7],0, centArr[l_i,8], centArr[l_i,9])
+
             
             buf.write(line)
         
