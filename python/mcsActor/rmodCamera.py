@@ -107,7 +107,7 @@ class rmodCamera(Camera):
         image = f[0].data
         t3 = time.time()
 
-        # Reset exposure time to default after exposure.
+        # Reset exposure time to default after readout.
         self.setExposureTime(cmd, self.expTime)
 
         cmd.inform('text="Time for exposure = %f." ' % ((t2-t1)/1.))
