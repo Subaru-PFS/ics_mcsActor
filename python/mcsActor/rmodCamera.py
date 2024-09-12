@@ -18,7 +18,8 @@ class rmodCamera(Camera):
         self.biasLevel = 100
         self.readNoise = 5.0
         self.name = 'RMOD_71M'
-        self.expTime = 100  # ms
+        self.expTimeDefault = 800  # ms
+        self.expTime = 800  # ms
         self.coaddDir = '/tmp'
 
     def _readoutTime(self):
@@ -68,6 +69,7 @@ class rmodCamera(Camera):
         Keys:
            exposureState
         """
+        self.setExposureTime(cmd, expTime)
 
         if not expType:
             expType = 'test'
@@ -107,10 +109,13 @@ class rmodCamera(Camera):
         image = f[0].data
         t3 = time.time()
 
-        # Reset exposure time to default after readout.
-        self.setExposureTime(cmd, self.expTime)
-
+        
         cmd.inform('text="Time for exposure = %f." ' % ((t2-t1)/1.))
         cmd.inform('text="Time for image loading= %f." ' % ((t3-t2)/1.))
+
+        # Reset exposure time to default after readout.
+        if self.expTime > self.expTimeDefault:
+            self.setExposureTime(cmd, self.expTimeDefault)
+            cmd.inform('text="Set to a default exposure time = %f." ' % (self.expTimeDefault))
 
         return image
