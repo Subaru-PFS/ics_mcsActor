@@ -949,7 +949,7 @@ class McsCmd(object):
         cmd.inform(f'text="camera name: {self.actor.cameraName} rotation = {insrot}"')
 
        
-        self.logger.info(f'Calcuating transofmtaion using FF at outter region')
+        self.logger.info(f'Calcuating transformation using FF at outer region')
         # these values are now read via mcsToolds.readFiducialMasks
 
         # set the good fiducials and outer ring fiducials if not yet set
@@ -957,23 +957,32 @@ class McsCmd(object):
         # self.fidsOuterRing, self.fidsGood = mcsTools.readFiducialMasks(fids)
         self.fidsGood = fids[fids.goodMask]
         self.fidsOuterRing = fids[fids.goodMask & fids.outerRingMask]
+
+        nFidsGood = len(self.fidsGood)
+        nFidsOuterGood = len(self.fidsOuterRing)
+
         
         #outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
         #fidsOuterRing = fids[fids.fiducialId.isin(outerRingIds)]
         #badFids = [1,32,34,61,68,75,88,89,2,4,33,36,37,65,66,67,68,69]
         #goodFids = list(set(fids['fiducialId'].values)-set(badFids))
         #fidsGood = fids[fids.fiducialId.isin(goodFids)]
-        
-        pfiTransform.updateTransform(mcsData, self.fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
+
+        ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
+        nMatch = len(np.where(ffid > 0)[0])
+
+        self.logger.info(f'Matched {nMatch} of {nFidsOuterGood} outer ring fiducial fibres')
 
         nsigma = 0
         pfiTransform.nsigma = nsigma
         pfiTransform.alphaRot = 0
 
-        self.logger.info(f'Re-calcuating transofmtaion using ALL FFs.')
+        self.logger.info(f'Re-calcuating transformation using ALL FFs.')
         for i in range(2):
             ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=4.2,nMatchMin=0.1)
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
+        nMatch = len(np.where(ffid > 0)[0])
+        self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres')
 
         self.logger.info(f'Writing transformation coefficients to DB.')
         db = self.connectToDB(cmd)
