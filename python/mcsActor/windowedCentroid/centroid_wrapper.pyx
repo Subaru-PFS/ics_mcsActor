@@ -38,7 +38,7 @@ cdef extern from "centroid_types.h" nogil:
     
 
 cdef extern from "centroid.h" nogil:
-     centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh2, double fwhmx, double fwhmy,int boxFind, int boxCent,int *np, int nmin, int maxIt, int verbose)
+     centroids *centroid(int *image, int n_x, int n_y, int thresh1, int thresh2, double fwhmx, double fwhmy,int boxFind, int boxCent,int *npoints, int nmin, int maxIt, int verbose)
 
 def centroid_only(np.ndarray[int, ndim=2, mode="c"] image, double fwhmx, double fwhmy, int thresh1, int thresh2, int boxFind, int boxCent, int nmin, int maxIt,int verbose):
 
