@@ -894,8 +894,11 @@ class McsCmd(object):
             cmd.inform('text="geometry is already set"')
             return
 
+        # read boresight from YAML
+        boresight = self.butler.get("mcsBoresight")
+        self.rotCent = [boresight['xCenter'],boresight['yCenter']]
+        
         # boresight centre in pixels
-        self.rotCent = dbTools.loadBoresightFromDB(db, int(self.visitId))
         cmd.inform(f'text="boresight={self.rotCent[0]},{self.rotCent[1]}"')
 
         # read xmlFile
