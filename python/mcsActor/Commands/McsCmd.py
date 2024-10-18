@@ -107,7 +107,7 @@ class McsCmd(object):
             ('expose', '@(bias|test) [<frameId>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose',
-                'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@noPhot] [@simDot] '
+                'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@doPhot] [@simDot] '
                 '[@newField] [<rerunFrameId>]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
@@ -704,11 +704,11 @@ class McsCmd(object):
             doCentroid = True
 
         
-        noPhotArg = 'noPhot' in cmdKeys
-        if noPhotArg:
-            self.doPhot = False
-        else:
+        doPhotArg = 'doPhot' in cmdKeys
+        if doPhotArg:
             self.doPhot = True
+        else:
+            self.doPhot = False
 
         doFibreID = 'doFibreID' in cmdKeys
         newField = 'newField' in cmdKeys
