@@ -107,7 +107,7 @@ class McsCmd(object):
             ('expose', '@(bias|test) [<frameId>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose',
-                'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@simDot] '
+                'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@doPhot] [@simDot] '
                 '[@newField] [<rerunFrameId>]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
@@ -115,6 +115,7 @@ class McsCmd(object):
             ('resetThreshold', '', self.resetThreshold),
             ('setCentroidParams', '[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<maxIt>] [<centSigma>] [<findSigma>]',
              self.setCentroidParams),
+            ('setApertureParams', '[<aperture>] [<innerRad>] [<outerRad>]', self.setApertureParams),
             ('calcThresh', '[<threshSigma>] [<threshFact>]', self.calcThresh),
             ('simulate', '<path>', self.simulateOn),
             ('simulate', 'off', self.simulateOff),
@@ -162,6 +163,9 @@ class McsCmd(object):
                                                  help="method for centroiding (of 'win', 'cent', default 'win')"),
                                         keys.Key("fMethod", types.String(),
                                                  help="method for fibreId (of 'target', 'previous', default 'target')"),
+                                        keys.Key("aperture", types.Float(), help="Aperture for photometery"),
+                                        keys.Key("innerRad", types.Float(), help="Inner radius for photometry background"),
+                                        keys.Key("outerRad", types.Float(), help="Outer radius for photometry background"),
                                         keys.Key("hostname", types.String(), help="DB hostname"),
                                         keys.Key("username", types.String(), help="DB name"),
                                         keys.Key("db", types.String(), help="DB name"),
@@ -699,6 +703,13 @@ class McsCmd(object):
         else:
             doCentroid = True
 
+        
+        doPhotArg = 'doPhot' in cmdKeys
+        if doPhotArg:
+            self.doPhot = True
+        else:
+            self.doPhot = False
+
         doFibreID = 'doFibreID' in cmdKeys
         newField = 'newField' in cmdKeys
 
@@ -708,7 +719,7 @@ class McsCmd(object):
         else:
             dotmask = None
 
-        cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID}')
+        cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID} doPhot = {self.doPhot}')
 
         if 'rerunFrameId' in cmdKeys:
             if self.dbOverride is None:
@@ -876,6 +887,19 @@ class McsCmd(object):
         self.cMethod = cmdKeys['cMethod'].values[0]
         cmd.inform(f'text="cMethod = {self.cMethod}"')
         cmd.finish('switchCMethod=done')
+
+    def setApertureParams(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+
+        if('aperture' in cmdKeys):
+            self.centParms['aperture'] = cmdKeys['aperture'].values[0]
+        if('innerRad' in cmdKeys):
+            self.centParms['innerRad'] = cmdKeys['innerRad'].values[0]
+        if('outerRad' in cmdKeys):
+            self.centParms['outerRad'] = cmdKeys['outerRad'].values[0]
+
+        cmd.inform(f'text="setting aperture parameters to  = {self.centParms["aperture"]},  {self.centParms["innerRad"]},  {self.centParms["outerRad"]}"')
+        cmd.finish('setApertureParams=done')
 
     def resetGeometry(self):
         """
@@ -1162,8 +1186,14 @@ class McsCmd(object):
         # do the identification
         cmd.inform(f'text="Starting Fiber ID"')
         t0 = time.time()
-        cobraMatch, unaPoints = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
+        cobraMatch, unaPoints, flag = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
                                       self.fids, self.dotPos, self.goodIdx, self.adjacentCobras)
+
+        # this flag will catch a failure in fibre identification due to very unexpected input (like targets outside the
+        # patrol region)
+        if(flag > 0):
+            cmd.fail('text="Failure in cobra matching, {flag} matches unsuccessful.  An underlying assumption has probably been violated."')
+            
         t1 = time.time()
         cmd.inform(f'text="Fiber ID finished in {t1-t0:0.2f}s"')
 
@@ -1433,18 +1463,35 @@ class McsCmd(object):
         #centroids=centroids[ind].squeeze()
 
         nSpots = centroids.shape[0]
-        points = np.empty((nSpots, 8))
 
+        # check for no illumination
+        if(nSpots == 0):
+            cmd.fail('text="No spots detected; check the illuminator and light path"')
+
+        maxSize = (centroids[:,3] * centroids[:,2]).max()
+        if(maxSize > 1000):
+            cmd.warn('text="Anomalous spot sizes detected; check for scattered light"')
+
+
+        # increased number of columns to give room for photometry results
+        
+        points = np.empty((nSpots, 10))
+        
         # ADD A PLUS 1 TO MATCH THE OTHER CENTROIDING AND STOP CAUSING INDEXING ERRORS
         points[:, 0] = np.arange(nSpots)+1
-        points[:, 1:] = centroids[:, 0:]
-
-        points[:,-1]=np.repeat(self.avBack,len(points))
-
+        points[:, 1:8] = centroids[:, 0:]
+        points[:, 8] = np.repeat(np.nan,nSpots)
+        points[:, 9] = np.repeat(np.nan, nSpots)
+        points[:,7]=np.repeat(self.avBack,len(points))
+    
+        if self.doPhot:
+            flux, fluxerr = mcsTools.mcsPhotometry(image.astype('<i4'), centroids[:,0], centroids[:,1], self.centParms)
+            points[:,8]= flux
+            points[:,9]= fluxerr
         # Swap last two fields
         #points[:,[-2,-3]] = points[:,[-3,-2]]
-        points[:,[-1,-2]] = points[:,[-2,-1]]
-        points[:,[-1,-3]] = points[:,[-3,-1]]
+        points[:,[-3,-4]] = points[:,[-4,-3]]
+        points[:,[-3,-5]] = points[:,[-5,-3]]
 
         self.centroids = points
 
@@ -1564,9 +1611,10 @@ class McsCmd(object):
             
         buf = io.StringIO()
         for l_i in range(nItems):
-            line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f\n' % (frameId, l_i+1, centArr[l_i,1],
+            line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f\n' % (frameId, l_i+1, centArr[l_i,1], 
                                         centArr[l_i,2], centArr[l_i,3], centArr[l_i,4], 
-                                                     centArr[l_i,5], centArr[l_i,6], centArr[l_i,7],0, np.nan, np.nan)
+                                                              centArr[l_i,5], centArr[l_i,6], centArr[l_i,7],0, centArr[l_i,8], centArr[l_i,9])
+
             
             buf.write(line)
         
@@ -1685,9 +1733,81 @@ class McsCmd(object):
 
         for i in range(len(pfi_x)):
             line = '%d,%d,%d,%d, %f,%f,%f,%f,%d,%d,%d,%f,%d,%d,%d,%f,%d\n'%(frameId/100, 1, i+1, 99, pfi_x[i], pfi_y[i],
-                                                                            pfi_x[i], pfi_y[i], 1, 1, 99, 99, 1, 1, 99, 99, 0)
+                                                                            pfi_x[i], pfi_y[i], 1, 1, 99, 99, 1, 1, 99, 99, 0, np.nan, np.nan)
             buf.write(line)
         buf.seek(0, 0)
 
         self._writeData('cobra_target', realcolnames, buf)
         buf.seek(0, 0)
+
+    def doPhotometry(self, cmd):
+        """
+            perform photometry on previously taken MCS images
+             - read mcs_exposure, mcs_data tables
+             - load image from disk
+             - calculate photometry
+             - update table
+        """
+    
+        cmdKeys = cmd.cmd.keywords
+
+        # get frame id
+
+        frameId = cmdKeys['frameId'].values[0]
+        cmd.inform('text="Starting MCS Photometry on frameID = {frameId} "')
+
+        db = self.connectToDB(cmd)
+        cmd.inform('text="Starting MCS Photometry on frameID = {frameId} "')
+        # retrieve exposure data and obtain file name
+      
+        #exData = db.bulkSelect('mcs_exposure',f'select * from mcs_exposure where mcs_frame_id = {frameId}')
+        res = db.session.execute(f"select taken_in_hst_at from mcs_exposure where mcs_frame_id = {frameId}")
+        dt = [row[0] for row in res]
+
+        if(len(dt) == 0):
+            cmd.fail('text="No mcs_frameId = {frameId}"')
+        dt = dt[0]
+        dirname = f"{dt.year}-{dt.month:02}-{dt.day:02}"
+        #if(len(data) == 0):
+        #    cmd.fail('text="No mcs_frameId = {frameId}"')
+
+        cmd.inform('text="loaded exposure data"')
+        # get directory of raw data
+        #dirname = exdata['taken_in_hst_at'].values[0].strftime("%Y-%m-%d")
+        #t = exdata['taken_in_hst_at'][0]
+        #dirname = exData['taken_in_hst_at'].values[0].split(" ")[0]
+        #dirname = f"{t.year}-{t.month:02}-{t.day:02}"
+        # get filname
+        fileName = f'/data/raw/{dirname}/mcs/PFSC{frameId:0>8}.fits'
+        
+        # load image
+        cmd.inform('text="loading image {fileName}"')
+
+        try:
+            image = pyfits.getdata(fileName)
+        except:
+            cmd.fail('text="No file at {fileName}"')
+            
+        cmd.inform('text="successfully loaded image {fileName}"')
+
+        # retrieve mcsData
+        mcsData = db.bulkSelect('mcs_data',sqlText('select * from mcs_data where '
+                    f'mcs_frame_id = {frameId}')).sort_values(by=['spot_id'])
+    
+        if(len(mcsData)==0):
+            cmd.fail('text="No MCS data for frameID={frameId}"')
+            
+        cmd.inform('text="retrieved {len(mcsData} spots from mcs_data"')
+        # do photometry        
+        flux, fluxerr = mcsTools.mcsPhotometry(image, mcsData['mcs_center_x_pix'],mcsData['mcs_center_y_pix'],self.centParms)
+        cmd.inform('text="photometry finished"')
+        
+        for i in range(len(flux)):
+            if(mcsData['spot_id'][i] != -1):
+                sql = f"update mcs_data set flux = {flux[i]}, fluxerr = {fluxerr[i]} where mcs_frame_id={frameId} and spot_id = {mcsData['spot_id'].values[i]}"
+                db.session.execute(sqlText(sql))
+        cmd.inform('text="mcs_data updated"')
+
+        db.close()    
+        
+        cmd.finish('text="mcs_data updated"')
