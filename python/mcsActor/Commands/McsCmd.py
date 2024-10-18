@@ -424,13 +424,9 @@ class McsCmd(object):
 
         return pycards
 
-    def _constructHeader(self, cmd, filename, expType, expTime, expStart):
+    def _constructHeader(self, cmd, filename, expType, expTime, expStart, frameId):
         if expType == 'bias':
             expTime = 0.0
-
-        # Subaru rules
-        if expType == 'object':
-            expType = 'acquisition'
 
         hdr = pyfits.Header()
 
@@ -449,6 +445,12 @@ class McsCmd(object):
             detectorId = 'MCS cam#1'
             gain = 2.24
 
+        visit = frameId // 100
+        hdr.append(('DATA-TYP', expType, 'Subaru-style exposure type'))
+        hdr.append(('FRAMEID', f'PFSC{frameId:08d}', 'Sequence number in archive'))
+        hdr.append(('EXP-ID', f'PFSE{visit:08d}', 'PFS exposure visit number'))
+        hdr.append(('FILTER01', 'BP635-58', 'Filter name'))
+        
         hdr.append(('DETECTOR', detectorId, 'Name of the detector/CCD'))
         hdr.append(('GAIN', gain, '[e-/ADU] AD conversion factor'))
         hdr.append(('DET-TMP', detectorTemp, '[degC] Detector temperature'))
@@ -509,6 +511,7 @@ class McsCmd(object):
         hdr = None
         wcs, sip = pfsWcs.WCSParameters('mcs_pfi', imageCenter, rot, alt, az)
         hdr = wcs.to_header()
+        hdr.append(('WCS-ORIG', 'PFS ics_utils', 'Origin of WCS values'))
 
         return hdr
 
@@ -638,7 +641,7 @@ class McsCmd(object):
             os.makedirs(pathdir, 0o755, exist_ok=True)
         cmd.inform(f'text="newpath={filename}"')
 
-        hdr = self._constructHeader(cmd, filename, expType, expTime, expStart)
+        hdr = self._constructHeader(cmd, filename, expType, expTime, expStart, frameId)
         cmd.diag(f'text="hdr done: {len(hdr)}"')
 
         # Now, after getting the filename, get predicted locations
