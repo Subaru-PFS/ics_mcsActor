@@ -895,7 +895,7 @@ class McsCmd(object):
             return
 
         # read boresight from YAML
-        boresight = bbutler.get("mcsBoresight")
+        boresight = self.butler.get("mcsBoresight")
         self.rotCent = [boresight['xCenter'],boresight['yCenter']]
         
         # boresight centre in pixels
