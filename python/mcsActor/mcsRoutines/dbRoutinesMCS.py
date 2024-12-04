@@ -38,6 +38,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text as sqlText
 
+from ics.utils.opdb import opDB
+
 
 def connectToDB(hostname='', port='', dbname='opdb', username='pfs'):
 
@@ -131,6 +133,17 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
     """
     write transformation coefficients to database
     """
+    pfs_visit_id = frameId // 100
+    iteration = frameId % 100
+
+    # just recording mcs_boresight for the first iteration.
+    if iteration == 0:
+        opDB.insert('mcs_boresight',
+                    pfs_visit_id=pfs_visit_id,
+                    mcs_boresight_x_pix=pfiTransform.mcs_boresight_x_pix,
+                    mcs_boresight_y_pix=pfiTransform.mcs_boresight_y_pix,
+                    calculated_at='now')
+
     trans=pfiTransform.mcsDistort.getArgs()
     res = db.session.execute(sqlText('select * FROM "mcs_pfi_transformation" where false'))
     colnames = tuple(res.keys())
