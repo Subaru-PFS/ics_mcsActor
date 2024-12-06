@@ -450,7 +450,7 @@ class McsCmd(object):
             gain = 2.24
 
         visit = frameId // 100
-        hdr.append(('DATA-TYP', expType, 'Subaru-style exposure type'))
+        hdr.append(('DATA-TYP', expType.upper(), 'Subaru-style exposure type'))
         hdr.append(('FRAMEID', f'PFSC{frameId:08d}', 'Sequence number in archive'))
         hdr.append(('EXP-ID', f'PFSE{visit:08d}', 'PFS exposure visit number'))
         hdr.append(('FILTER01', 'BP635-58', 'Filter name'))
@@ -571,7 +571,7 @@ class McsCmd(object):
         imgHdr.append(('BUNIT', 'ADU', 'Unit of original pixel values'))
         imgHdr.append(('BLANK', 32767, 'Value used for NULL pixels'))  # 12-bit camera
         imgHdr.append(('BIN-FCT1', 1, '[pixel] Binning factor of X axis'))
-        imgHdr.append(('BIN-FCT2', 1, '[pixel] Binning factor of X axis'))
+        imgHdr.append(('BIN-FCT2', 1, '[pixel] Binning factor of Y axis'))
 
         # Slightly intricate dance:
         #  - we want the slow disk i/o to be in separate process
