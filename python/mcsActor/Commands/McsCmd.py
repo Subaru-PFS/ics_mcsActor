@@ -383,6 +383,7 @@ class McsCmd(object):
                 raise RuntimeError("getNextFilename failed getting a visit number in 15s!")
             visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
             subframeId = 0
+            frameId = visit * 100 + subframeId
             cmd.inform(f'text="gen2.getVisit = {visit}"')
         else:
             visit = frameId // 100
