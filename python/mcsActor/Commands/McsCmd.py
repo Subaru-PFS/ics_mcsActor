@@ -996,7 +996,11 @@ class McsCmd(object):
         #goodFids = list(set(fids['fiducialId'].values)-set(badFids))
         #fidsGood = fids[fids.fiducialId.isin(goodFids)]
 
-        ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
+        pfiTransformConfig = self.actor.actorConfig['pfiTransform']
+
+        ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing,
+                                                  matchRadius=pfiTransformConfig['matchRadiusOuterRing'],
+                                                  nMatchMin=pfiTransformConfig['nMatchMinOuterRing'])
         nMatch = len(np.where(ffid > 0)[0])
 
         self.logger.info(f'Matched {nMatch} of {nFidsOuterGood} outer ring fiducial fibres')
@@ -1007,7 +1011,9 @@ class McsCmd(object):
 
         self.logger.info(f'Re-calcuating transformation using ALL FFs.')
         for i in range(2):
-            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=4.2,nMatchMin=0.1)
+            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood,
+                                                      matchRadius=pfiTransformConfig['matchRadiusAll'],
+                                                      nMatchMin=pfiTransformConfig['nMatchMinAll'])
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
         nMatch = len(np.where(ffid > 0)[0])
         self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres')
