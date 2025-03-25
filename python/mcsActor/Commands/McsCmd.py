@@ -809,6 +809,9 @@ class McsCmd(object):
             #self.runCentroidSEPMP(cmd)
             self.runCentroid(cmd, self.centParms)
 
+            if not cmd.isAlive(): # command might have failed in runCentroid, so do not proceed further.
+                return
+
             t2 = time.time()
             cmd.inform(f'text="Centroids done in {t2-t1} second" ')
 
@@ -1468,6 +1471,7 @@ class McsCmd(object):
         # check for no illumination
         if(nSpots == 0):
             cmd.fail('text="No spots detected; check the illuminator and light path"')
+            return
 
         maxSize = (centroids[:,3] * centroids[:,2]).max()
         if(maxSize > 1000):
