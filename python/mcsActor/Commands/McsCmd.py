@@ -451,7 +451,7 @@ class McsCmd(object):
             gain = 2.24
 
         visit = frameId // 100
-        hdr.append(('DATA-TYP', expType.upper(), 'Subaru-style exposure type'))
+        hdr.append(('DATA-TYP', expType.upper(), 'Type / Characteristics of this data'))
         hdr.append(('FRAMEID', f'PFSC{frameId:08d}', 'Sequence number in archive'))
         hdr.append(('EXP-ID', f'PFSE{visit:08d}', 'PFS exposure visit number'))
         hdr.append(('FILTER01', 'BP635-58', 'Filter name'))
