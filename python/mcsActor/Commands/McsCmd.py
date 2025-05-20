@@ -959,7 +959,7 @@ class McsCmd(object):
             Get the sigma mask for the fiducial positions
         '''
 
-        fids = self.fids
+        fids = fiducials.Fiducials.read(butler.Butler())
         fids.rename(columns={'fiducialId':'fiducial_fiber_id',
                         'x_mm':'ff_center_on_pfi_x_mm',
                         'y_mm':'ff_center_on_pfi_y_mm'
