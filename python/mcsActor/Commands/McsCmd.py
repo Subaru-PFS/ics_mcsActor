@@ -53,6 +53,7 @@ import multiprocessing
 from pfs.utils import butler
 
 from opdb import opdb
+from sqlalchemy import create_engine
 
 from importlib import reload
 reload(dbTools)
@@ -952,6 +953,70 @@ class McsCmd(object):
         cmd.inform('text="cobra geometry read"')
         self.geometrySet = True
 
+
+    def getSigmaMask(self, visit, sigmaThres = 3):
+        '''
+            Get the sigma mask for the fiducial positions
+        '''
+
+        fids = self.fids
+        fids.rename(columns={'fiducialId':'fiducial_fiber_id',
+                        'x_mm':'ff_center_on_pfi_x_mm',
+                        'y_mm':'ff_center_on_pfi_y_mm'
+                        }, inplace=True)
+        
+        conn_str = "postgresql://pfs@db-ics/opdb"
+        engine = create_engine(conn_str)
+
+        with engine.connect() as conn:
+            ffMatch = pd.read_sql(f'''
+                SELECT DISTINCT 
+                    pfs_visit_id, iteration, fiducial_fiber_id, pfi_center_x_mm, \
+                    pfi_center_y_mm, fiducial_fiber_match.spot_id,\
+                    mcs_center_x_pix, mcs_center_y_pix
+                FROM 
+                    fiducial_fiber_match
+                JOIN 
+                    mcs_data 
+                ON mcs_data.spot_id=fiducial_fiber_match.spot_id 
+                    AND mcs_data.mcs_frame_id=fiducial_fiber_match.mcs_frame_id
+                WHERE
+                pfs_visit_id={visit}
+                ''', conn)
+            
+        itemax=np.max(ffMatch.iteration)
+        ffPos=ffMatch[ffMatch.iteration==itemax]
+        
+        ffPos = ffPos.merge(fids, on='fiducial_fiber_id')
+        ffPos['dx'] = ffPos.pfi_center_x_mm - ffPos.ff_center_on_pfi_x_mm
+        ffPos['dy'] = ffPos.pfi_center_y_mm - ffPos.ff_center_on_pfi_y_mm
+        ffPos['dr'] = np.hypot(ffPos['dx'], ffPos['dy'])
+        ffPos['good'] = 1
+
+        outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
+        
+        ffPos.loc[ffPos.fiducial_fiber_id.isin(outerRingIds), 'good'] = 2
+
+        # filter outliers : 3 sigma clip only upper side, 3 iteration
+        g = ffPos['good']
+        x = ffPos['dx']
+        y = ffPos['dy']
+        r = ffPos['dr']
+        for i in range(0,3):
+            mean = np.nanmean(r)
+            sigma = np.nanstd(r)
+            x = np.where(r<mean+sigmaThres*sigma, x, np.nan)
+            y = np.where(r<mean+sigmaThres*sigma, y, np.nan)
+            r = np.where(r<mean+sigmaThres*sigma, r, np.nan)
+            g = np.where(r<mean+sigmaThres*sigma, g, 0)
+        # set flag again
+        ffPos['good'] = g
+        
+        sigmaMask = g != 0
+        
+        return sigmaMask
+
+
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
         # Read fiducial and spot geometry
@@ -979,15 +1044,17 @@ class McsCmd(object):
         cmd.inform(f'text="camera name: {self.actor.cameraName} altitude = {altitude}"')
         cmd.inform(f'text="camera name: {self.actor.cameraName} rotation = {insrot}"')
 
-       
+        self.logger.info(f'Getting sigma mask for fiducials')
+        sigmaMask = self.getSigmaMask(self.visitId)
+
         self.logger.info(f'Calcuating transformation using FF at outer region')
         # these values are now read via mcsToolds.readFiducialMasks
 
         # set the good fiducials and outer ring fiducials if not yet set
         #if(self.fidsGood == None):
         # self.fidsOuterRing, self.fidsGood = mcsTools.readFiducialMasks(fids)
-        self.fidsGood = fids[fids.goodMask]
-        self.fidsOuterRing = fids[fids.goodMask & fids.outerRingMask]
+        self.fidsGood = fids[fids.goodMask & sigmaMask]
+        self.fidsOuterRing = fids[fids.goodMask & fids.outerRingMask & sigmaMask]
 
         nFidsGood = len(self.fidsGood)
         nFidsOuterGood = len(self.fidsOuterRing)
