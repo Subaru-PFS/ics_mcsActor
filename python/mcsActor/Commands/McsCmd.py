@@ -987,7 +987,6 @@ class McsCmd(object):
         itemax=np.max(ffMatch.iteration)
 
         if np.isnan(itemax) == True:
-            print(np.isnan(itemax))
             sigmaMask = np.ones(96, dtype=bool)
         else:
         
