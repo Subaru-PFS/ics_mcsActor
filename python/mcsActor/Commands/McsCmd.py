@@ -1067,7 +1067,7 @@ class McsCmd(object):
         #if(self.fidsGood == None):
         # self.fidsOuterRing, self.fidsGood = mcsTools.readFiducialMasks(fids)
         self.fidsGood = fids[fids.goodMask & sigmaMask]
-        self.fidsOuterRing = fids[fids.goodMask & fids.outerRingMask & sigmaMask]
+        self.fidsOuterRing = fids[(fids.goodMask & fids.outerRingMask) & sigmaMask]
 
         nFidsGood = len(self.fidsGood)
         nFidsOuterGood = len(self.fidsOuterRing)
