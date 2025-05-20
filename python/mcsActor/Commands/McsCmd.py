@@ -985,37 +985,50 @@ class McsCmd(object):
                 ''', conn)
             
         itemax=np.max(ffMatch.iteration)
-        ffPos=ffMatch[ffMatch.iteration==itemax]
-        
-        ffPos = ffPos.merge(fids, on='fiducial_fiber_id')
-        ffPos['dx'] = ffPos.pfi_center_x_mm - ffPos.ff_center_on_pfi_x_mm
-        ffPos['dy'] = ffPos.pfi_center_y_mm - ffPos.ff_center_on_pfi_y_mm
-        ffPos['dr'] = np.hypot(ffPos['dx'], ffPos['dy'])
-        ffPos['good'] = 1
 
-        outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
+        if np.isnan(itemax) == True:
+            print(np.isnan(itemax))
+            sigmaMask = np.ones(96, dtype=bool)
+        else:
         
-        ffPos.loc[ffPos.fiducial_fiber_id.isin(outerRingIds), 'good'] = 2
+            ffPos=ffMatch[ffMatch.iteration==itemax]
 
-        # filter outliers : 3 sigma clip only upper side, 3 iteration
-        g = ffPos['good']
-        x = ffPos['dx']
-        y = ffPos['dy']
-        r = ffPos['dr']
-        for i in range(0,3):
-            mean = np.nanmean(r)
-            sigma = np.nanstd(r)
-            x = np.where(r<mean+sigmaThres*sigma, x, np.nan)
-            y = np.where(r<mean+sigmaThres*sigma, y, np.nan)
-            r = np.where(r<mean+sigmaThres*sigma, r, np.nan)
-            g = np.where(r<mean+sigmaThres*sigma, g, 0)
-        # set flag again
-        ffPos['good'] = g
-        
-        sigmaMask = g != 0
+            ffPos = ffPos.merge(fids, on='fiducial_fiber_id')
+            ffPos['dx'] = ffPos.pfi_center_x_mm - ffPos.ff_center_on_pfi_x_mm
+            ffPos['dy'] = ffPos.pfi_center_y_mm - ffPos.ff_center_on_pfi_y_mm
+            ffPos['dr'] = np.hypot(ffPos['dx'], ffPos['dy'])
+            ffPos['good'] = 1
+
+            outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
+
+            ffPos.loc[ffPos.fiducial_fiber_id.isin(outerRingIds), 'good'] = 2
+
+            # filter outliers : 3 sigma clip only upper side, 3 iteration
+            g = ffPos['good']
+            x = ffPos['dx']
+            y = ffPos['dy']
+            r = ffPos['dr']
+            for i in range(0,3):
+                mean = np.nanmean(r)
+                sigma = np.nanstd(r)
+                x = np.where(r<mean+sigmaThres*sigma, x, np.nan)
+                y = np.where(r<mean+sigmaThres*sigma, y, np.nan)
+                r = np.where(r<mean+sigmaThres*sigma, r, np.nan)
+                g = np.where(r<mean+sigmaThres*sigma, g, 0)
+            # set flag again
+            ffPos['good'] = g
+            outliers = ffPos[ffPos['good'] == 0]
+            
+            # Extract fiducial_fiber_id values from the DataFrame
+            fiducial_ids = outliers['fiducial_fiber_id'].values
+
+            # Create a boolean array of 96 elements, initialized to True
+            sigmaMask = np.ones(96, dtype=bool)
+
+            # Set positions corresponding to fiducial_fiber_id to False (adjust for 0-based indexing)
+            sigmaMask[fiducial_ids - 1] = False
         
         return sigmaMask
-
 
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
