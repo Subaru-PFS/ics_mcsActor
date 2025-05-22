@@ -1005,6 +1005,10 @@ class McsCmd(object):
 
         ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
         nMatch = len(np.where(ffid > 0)[0])
+        ffdist = dist[np.where(ffid > 0)[0]]
+        q25, q75 = np.nanpercentile(ffdist, [25, 75])
+        std = 0.741*(q75 - q25) 
+        distThres=np.mean(ffdist)+3*std
 
         self.logger.info(f'Matched {nMatch} of {nFidsOuterGood} outer ring fiducial fibres')
 
@@ -1014,7 +1018,14 @@ class McsCmd(object):
 
         self.logger.info(f'Re-calcuating transformation using ALL FFs.')
         for i in range(2):
-            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=4.2,nMatchMin=0.1)
+            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=distThres,nMatchMin=0.1)
+            nMatch = len(np.where(ffid > 0)[0])
+            self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres with distance threshold {distThres}')
+            ffdist = dist[np.where(ffid > 0)[0]]
+            q25, q75 = np.nanpercentile(ffdist, [25, 75])
+            std = 0.741*(q75 - q25) 
+            distThres=np.mean(ffdist)+3*std
+
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
         nMatch = len(np.where(ffid > 0)[0])
         self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres')
