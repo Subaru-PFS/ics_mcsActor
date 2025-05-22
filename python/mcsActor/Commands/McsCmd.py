@@ -982,7 +982,7 @@ class McsCmd(object):
         cmd.inform(f'text="camera name: {self.actor.cameraName} rotation = {insrot}"')
 
         self.logger.info(f'Getting sigma mask for fiducials')
-        sigmaMask = self.getSigmaMask(self.visitId)
+        #sigmaMask = self.getSigmaMask(self.visitId)
 
         self.logger.info(f'Calcuating transformation using FF at outer region')
         # these values are now read via mcsToolds.readFiducialMasks
