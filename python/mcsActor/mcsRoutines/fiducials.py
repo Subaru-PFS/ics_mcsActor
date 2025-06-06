@@ -26,7 +26,6 @@ class Fiducials(pd.DataFrame):
     BROKEN = 1
     BAD = 2
     OUTER_RING = 4
-    SIGMACLIP = 8
 
     @classmethod
     def read(cls, butler):
