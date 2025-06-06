@@ -988,15 +988,16 @@ class McsCmd(object):
         # these values are now read via mcsToolds.readFiducialMasks
 
         # set the good fiducials and outer ring fiducials if not yet set
-        #if(self.fidsGood == None):
-        # self.fidsOuterRing, self.fidsGood = mcsTools.readFiducialMasks(fids)
+ 
+        fidMask = np.zeros(len(self.fids), dtype=int)
+        
+        # set the good fiducials and outer ring fiducials if not yet set
         self.fidsGood = fids[fids.goodMask]
         self.fidsOuterRing = fids[fids.goodMask & fids.outerRingMask]
 
         nFidsGood = len(self.fidsGood)
         nFidsOuterGood = len(self.fidsOuterRing)
 
-        
         #outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
         #fidsOuterRing = fids[fids.fiducialId.isin(outerRingIds)]
         #badFids = [1,32,34,61,68,75,88,89,2,4,33,36,37,65,66,67,68,69]
@@ -1009,6 +1010,7 @@ class McsCmd(object):
         q25, q75 = np.nanpercentile(ffdist, [25, 75])
         std = 0.741*(q75 - q25) 
         distThres=np.mean(ffdist)+3*std
+        fidMask[ffid[ffid > 0] - 1] |= 1
 
         self.logger.info(f'Matched {nMatch} of {nFidsOuterGood} outer ring fiducial fibres')
 
@@ -1025,6 +1027,7 @@ class McsCmd(object):
             q25, q75 = np.nanpercentile(ffdist, [25, 75])
             std = 0.741*(q75 - q25) 
             distThres=np.mean(ffdist)+3*std
+            fidMask[ffid[ffid > 0] - 1] |= 2*(i + 1)
 
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
         nMatch = len(np.where(ffid > 0)[0])
@@ -1042,8 +1045,10 @@ class McsCmd(object):
         mcsData['pfi_center_x_mm'] = x_mm.astype(np.float32)
         mcsData['pfi_center_y_mm'] = y_mm.astype(np.float32)
 
+        fids['match_mask']=fidMask
+        
         db = self.connectToDB(cmd)
-        dbTools.writeFidToDB(db, ffid, mcsData, frameID)
+        dbTools.writeFidToDB(db, ffid, mcsData, frameID, fids)
         cmd.inform(f'text="wrote matched FF to opdb."')
         
         self.pfiTrans = pfiTransform
