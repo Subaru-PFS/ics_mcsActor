@@ -1252,6 +1252,7 @@ class McsCmd(object):
             adc_type, adc_pa = gen2Model['tel_adc'].getValue()
 
             dome_humidity, dome_pressure, dome_temperature, dome_wind = gen2Model['dome_env'].getValue()
+            outside_humidity, outside_pressure, outside_temperature, outside_wind = gen2Model['outside_env'].getValue()
 
             startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
@@ -1297,7 +1298,12 @@ class McsCmd(object):
                          'dome_humidity': dome_humidity,
                          'dome_pressure': dome_pressure,
                          'dome_temperature': dome_temperature,
-                         'dome_wind': dome_wind}                     
+                         'dome_wind': dome_wind,
+                         'outside_humidity': outside_humidity,
+                         'outside_pressure': outside_pressure,
+                         'outside_temperature': outside_temperature,
+                         'outside_wind': outside_wind
+                         }                     
 
         self._writeTelescopeInfo(cmd, telescopeInfo)
 
@@ -1548,9 +1554,9 @@ class McsCmd(object):
         dome_temperature = telescopeInfo['dome_temperature']
         dome_pressure = telescopeInfo['dome_pressure']
         dome_humidity = telescopeInfo['dome_humidity']
-        outside_temperature = 5
-        outside_pressure = 101
-        outside_humidity = 0.3
+        outside_temperature = telescopeInfo['outside_temperature']
+        outside_pressure = telescopeInfo['outside_pressure']
+        outside_humidity = telescopeInfo['outside_humidity']
         mcs_cover_temperature = 5
         mcs_m1_temperature = 6
         taken_at = "'"+telescopeInfo['starttime']+"'"
