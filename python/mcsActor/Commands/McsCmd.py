@@ -1253,6 +1253,9 @@ class McsCmd(object):
 
             dome_humidity, dome_pressure, dome_temperature, dome_wind = gen2Model['dome_env'].getValue()
             outside_humidity, outside_pressure, outside_temperature, outside_wind = gen2Model['outside_env'].getValue()
+            
+            mebModel = self.actor.models['meb'].keyVarDict
+            _,_,m1_temperature, m1_cover_temperature, _, _, _ = mebModel['temps'].getValue()
 
             startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
@@ -1302,7 +1305,9 @@ class McsCmd(object):
                          'outside_humidity': outside_humidity,
                          'outside_pressure': outside_pressure,
                          'outside_temperature': outside_temperature,
-                         'outside_wind': outside_wind
+                         'outside_wind': outside_wind,
+                         'mcs_m1_temperature': m1_temperature,
+                         'mcs_cover_temperature': m1_cover_temperature,
                          }                     
 
         self._writeTelescopeInfo(cmd, telescopeInfo)
@@ -1557,8 +1562,8 @@ class McsCmd(object):
         outside_temperature = telescopeInfo['outside_temperature']
         outside_pressure = telescopeInfo['outside_pressure']
         outside_humidity = telescopeInfo['outside_humidity']
-        mcs_cover_temperature = 5
-        mcs_m1_temperature = 6
+        mcs_cover_temperature = telescopeInfo['mcs_cover_temperature']
+        mcs_m1_temperature = telescopeInfo['mcs_m1_temperature']
         taken_at = "'"+telescopeInfo['starttime']+"'"
         taken_in_hst_at = "'"+telescopeInfo['starttime']+"'"
         if self.actor.cameraName == 'canon_50m':
