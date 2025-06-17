@@ -1249,6 +1249,14 @@ class McsCmd(object):
 
             rot = gen2Model['tel_rot'].getValue()
             posAngle, instrot = rot
+            adc_type, adc_pa = gen2Model['tel_adc'].getValue()
+
+            dome_humidity, dome_pressure, dome_temperature, dome_wind = gen2Model['dome_env'].getValue()
+            outside_humidity, outside_pressure, outside_temperature, outside_wind = gen2Model['outside_env'].getValue()
+            
+            mebModel = self.actor.models['meb'].keyVarDict
+            _,_,m1_temperature, m1_cover_temperature, _, _, _ = mebModel['temps'].getValue()
+
             startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
 
@@ -1280,7 +1288,7 @@ class McsCmd(object):
                 cmd.warn(f'text="no start card in {simPath}, using file date: {startTime}"')
 
         visitId = frameId // 100
-        cmd.inform(f'text="frame={frameId} visit={visitId} az={az} alt={alt} instrot={instrot}"')
+        cmd.inform(f'text="frame={frameId} visit={visitId} az={az} alt={alt} instrot={instrot} adc_pa={adc_pa}"')
         # Packing information into data structure
         telescopeInfo = {'frameid': frameId,
                          'visitid': visitId,
@@ -1288,7 +1296,19 @@ class McsCmd(object):
                          'exptime': expTime,
                          'altitude': alt,
                          'azimuth': az,
-                         'instrot': instrot}
+                         'instrot': instrot,
+                         'adc_pa': adc_pa,
+                         'dome_humidity': dome_humidity,
+                         'dome_pressure': dome_pressure,
+                         'dome_temperature': dome_temperature,
+                         'dome_wind': dome_wind,
+                         'outside_humidity': outside_humidity,
+                         'outside_pressure': outside_pressure,
+                         'outside_temperature': outside_temperature,
+                         'outside_wind': outside_wind,
+                         'mcs_m1_temperature': m1_temperature,
+                         'mcs_cover_temperature': m1_cover_temperature,
+                         }                     
 
         self._writeTelescopeInfo(cmd, telescopeInfo)
 
@@ -1535,15 +1555,15 @@ class McsCmd(object):
         """
           TODO: Those are the fake values for making PFI to work now, adding actual code later
         """
-        adc_pa = 0
-        dome_temperature = 5
-        dome_pressure = 101
-        dome_humidity = 0.3
-        outside_temperature = 5
-        outside_pressure = 101
-        outside_humidity = 0.3
-        mcs_cover_temperature = 5
-        mcs_m1_temperature = 6
+        adc_pa = telescopeInfo['adc_pa']
+        dome_temperature = telescopeInfo['dome_temperature']
+        dome_pressure = telescopeInfo['dome_pressure']
+        dome_humidity = telescopeInfo['dome_humidity']
+        outside_temperature = telescopeInfo['outside_temperature']
+        outside_pressure = telescopeInfo['outside_pressure']
+        outside_humidity = telescopeInfo['outside_humidity']
+        mcs_cover_temperature = telescopeInfo['mcs_cover_temperature']
+        mcs_m1_temperature = telescopeInfo['mcs_m1_temperature']
         taken_at = "'"+telescopeInfo['starttime']+"'"
         taken_in_hst_at = "'"+telescopeInfo['starttime']+"'"
         if self.actor.cameraName == 'canon_50m':
