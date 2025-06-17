@@ -1004,7 +1004,7 @@ class McsCmd(object):
         #goodFids = list(set(fids['fiducialId'].values)-set(badFids))
         #fidsGood = fids[fids.fiducialId.isin(goodFids)]
 
-        ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
+        ffid, dist, x_fid_mm, y_fid_mm = pfiTransform.updateTransform(mcsData, self.fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
         nMatch = len(np.where(ffid > 0)[0])
         ffdist = dist[np.where(ffid > 0)[0]]
         q25, q75 = np.nanpercentile(ffdist, [25, 75])
@@ -1020,7 +1020,7 @@ class McsCmd(object):
 
         self.logger.info(f'Re-calcuating transformation using ALL FFs.')
         for i in range(2):
-            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=distThres,nMatchMin=0.1)
+            ffid, dist, x_fid_mm, y_fid_mm = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=distThres,nMatchMin=0.1)
             nMatch = len(np.where(ffid > 0)[0])
             self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres with distance threshold {distThres}')
             ffdist = dist[np.where(ffid > 0)[0]]
