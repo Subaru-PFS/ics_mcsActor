@@ -409,36 +409,78 @@ def writeAffineToDB(db, afCoeff, frameId):
                       yd], 'x_scale': [sx], 'y_scale': [sy], 'angle': [rotation]})
     db.insert('mcs_pfi_transformation', df)
 
-def writeFidToDB(db, ffid, mcsData,  mcs_frame_id):
+# def writeFidToDB(db, ffid, mcsData,  mcs_frame_id):
 
-    """
-    write the fiducial fibre matches to db.
+#     """
+#     write the fiducial fibre matches to db.
 
-    only writes fibres with matches
-    """
+#     only writes fibres with matches
+#     """
 
-    # get indices of matched FF
-    ind=np.where(ffid != -1)
-    ffids=ffid[ind]
+#     # get indices of matched FF
+#     ind=np.where(ffid != -1)
+#     ffids=ffid[ind]
 
-    # generate the dataframe
+#     # generate the dataframe
     
+#     pfs_visit_id = mcs_frame_id // 100
+#     iteration = mcs_frame_id % 100
+#     sz = len(ffids)
+#     frame = np.zeros((sz, 8))
+#     frame[:,0] = np.repeat(pfs_visit_id,sz)
+#     frame[:,1] = np.repeat(iteration,sz)
+#     frame[:,2] = np.repeat(mcs_frame_id,sz)
+#     frame[:,3] = ffids
+#     frame[:,4] = mcsData['spot_id'][ind[0]].values
+#     frame[:,5] = np.repeat(0,sz)
+#     frame[:,6] = mcsData['pfi_center_x_mm'][ind[0]].values
+#     frame[:,7] = mcsData['pfi_center_y_mm'][ind[0]].values
+#     columns = ['pfs_visit_id','iteration','mcs_frame_id', 
+#                'fiducial_fiber_id', 'spot_id', 'flags',
+#                'pfi_center_x_mm','pfi_center_y_mm']
+
+#     df = pd.DataFrame(frame, columns=columns)
+
+#     db.insert("fiducial_fiber_match", df)
+
+def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
+    """
+    Write the fiducial table to DB, combining with matched MCS data.
+    Each fiducial will have its matched spot info if available.
+    """
+    
+
+    # Prepare output columns
+    nFids = len(fids)
     pfs_visit_id = mcs_frame_id // 100
     iteration = mcs_frame_id % 100
-    sz = len(ffids)
-    frame = np.zeros((sz, 8))
-    frame[:,0] = np.repeat(pfs_visit_id,sz)
-    frame[:,1] = np.repeat(iteration,sz)
-    frame[:,2] = np.repeat(mcs_frame_id,sz)
-    frame[:,3] = ffids
-    frame[:,4] = mcsData['spot_id'][ind[0]].values
-    frame[:,5] = np.repeat(0,sz)
-    frame[:,6] = mcsData['pfi_center_x_mm'][ind[0]].values
-    frame[:,7] = mcsData['pfi_center_y_mm'][ind[0]].values
-    columns = ['pfs_visit_id','iteration','mcs_frame_id', 
-               'fiducial_fiber_id', 'spot_id', 'flags',
-               'pfi_center_x_mm','pfi_center_y_mm']
 
-    df = pd.DataFrame(frame, columns=columns)
+    # Prepare arrays for matched data
+    spot_id = np.full(nFids, -1, dtype=int)
+    pfi_center_x_mm = np.full(nFids, np.nan)
+    pfi_center_y_mm = np.full(nFids, np.nan)
+
+    # For each fiducial, check if it was matched in ffid
+    for i, fid in enumerate(fids['fiducial_fiber_id']):
+        # Find the index in ffid where this fiducial was matched
+        idx = np.where(ffid == fid)[0]
+        if len(idx) > 0:
+            # Take the first match (or handle multiple matches as needed)
+            spot_id[i] = mcsData['spot_id'].iloc[idx[0]]
+            pfi_center_x_mm[i] = mcsData['pfi_center_x_mm'].iloc[idx[0]]
+            pfi_center_y_mm[i] = mcsData['pfi_center_y_mm'].iloc[idx[0]]
+
+    # Build DataFrame for DB insertion
+    df = pd.DataFrame({
+        'pfs_visit_id': np.repeat(pfs_visit_id, nFids),
+        'iteration': np.repeat(iteration, nFids),
+        'mcs_frame_id': np.repeat(mcs_frame_id, nFids),
+        'fiducial_fiber_id': fids['fiducial_fiber_id'],
+        'spot_id': spot_id,
+        'flags': np.repeat(0, nFids),  # or use your own flags
+        'pfi_center_x_mm': pfi_center_x_mm,
+        'pfi_center_y_mm': pfi_center_y_mm,
+        'match_mask': fids['match_mask'] if 'match_mask' in fids.columns else np.repeat(0, nFids)
+    })
 
     db.insert("fiducial_fiber_match", df)

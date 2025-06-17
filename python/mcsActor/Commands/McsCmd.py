@@ -53,6 +53,7 @@ import multiprocessing
 from pfs.utils import butler
 
 from opdb import opdb
+from sqlalchemy import create_engine
 
 from importlib import reload
 reload(dbTools)
@@ -952,6 +953,7 @@ class McsCmd(object):
         cmd.inform('text="cobra geometry read"')
         self.geometrySet = True
 
+
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
         # Read fiducial and spot geometry
@@ -979,20 +981,23 @@ class McsCmd(object):
         cmd.inform(f'text="camera name: {self.actor.cameraName} altitude = {altitude}"')
         cmd.inform(f'text="camera name: {self.actor.cameraName} rotation = {insrot}"')
 
-       
+        self.logger.info(f'Getting sigma mask for fiducials')
+        #sigmaMask = self.getSigmaMask(self.visitId)
+
         self.logger.info(f'Calcuating transformation using FF at outer region')
         # these values are now read via mcsToolds.readFiducialMasks
 
         # set the good fiducials and outer ring fiducials if not yet set
-        #if(self.fidsGood == None):
-        # self.fidsOuterRing, self.fidsGood = mcsTools.readFiducialMasks(fids)
+ 
+        fidMask = np.zeros(len(self.fids), dtype=int)
+        
+        # set the good fiducials and outer ring fiducials if not yet set
         self.fidsGood = fids[fids.goodMask]
         self.fidsOuterRing = fids[fids.goodMask & fids.outerRingMask]
 
         nFidsGood = len(self.fidsGood)
         nFidsOuterGood = len(self.fidsOuterRing)
 
-        
         #outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
         #fidsOuterRing = fids[fids.fiducialId.isin(outerRingIds)]
         #badFids = [1,32,34,61,68,75,88,89,2,4,33,36,37,65,66,67,68,69]
@@ -1001,6 +1006,11 @@ class McsCmd(object):
 
         ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
         nMatch = len(np.where(ffid > 0)[0])
+        ffdist = dist[np.where(ffid > 0)[0]]
+        q25, q75 = np.nanpercentile(ffdist, [25, 75])
+        std = 0.741*(q75 - q25) 
+        distThres=np.mean(ffdist)+3*std
+        fidMask[ffid[ffid > 0] - 1] |= 1
 
         self.logger.info(f'Matched {nMatch} of {nFidsOuterGood} outer ring fiducial fibres')
 
@@ -1010,7 +1020,15 @@ class McsCmd(object):
 
         self.logger.info(f'Re-calcuating transformation using ALL FFs.')
         for i in range(2):
-            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=4.2,nMatchMin=0.1)
+            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=distThres,nMatchMin=0.1)
+            nMatch = len(np.where(ffid > 0)[0])
+            self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres with distance threshold {distThres}')
+            ffdist = dist[np.where(ffid > 0)[0]]
+            q25, q75 = np.nanpercentile(ffdist, [25, 75])
+            std = 0.741*(q75 - q25) 
+            distThres=np.mean(ffdist)+3*std
+            fidMask[ffid[ffid > 0] - 1] |= 2*(i + 1)
+
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
         nMatch = len(np.where(ffid > 0)[0])
         self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres')
@@ -1027,8 +1045,10 @@ class McsCmd(object):
         mcsData['pfi_center_x_mm'] = x_mm.astype(np.float32)
         mcsData['pfi_center_y_mm'] = y_mm.astype(np.float32)
 
+        fids['match_mask']=fidMask
+        
         db = self.connectToDB(cmd)
-        dbTools.writeFidToDB(db, ffid, mcsData, frameID)
+        dbTools.writeFidToDB(db, ffid, mcsData, frameID, fids)
         cmd.inform(f'text="wrote matched FF to opdb."')
         
         self.pfiTrans = pfiTransform
