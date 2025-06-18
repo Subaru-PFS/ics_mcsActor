@@ -461,7 +461,7 @@ def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
     pfi_center_y_mm = np.full(nFids, np.nan)
 
     # For each fiducial, check if it was matched in ffid
-    for i, fid in enumerate(fids['fiducial_fiber_id']):
+    for i, fid in enumerate(fids['fiducialId']):
         # Find the index in ffid where this fiducial was matched
         idx = np.where(ffid == fid)[0]
         if len(idx) > 0:
@@ -475,7 +475,7 @@ def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
         'pfs_visit_id': np.repeat(pfs_visit_id, nFids),
         'iteration': np.repeat(iteration, nFids),
         'mcs_frame_id': np.repeat(mcs_frame_id, nFids),
-        'fiducial_fiber_id': fids['fiducial_fiber_id'],
+        'fiducial_fiber_id': fids['fiducialId'],
         'spot_id': spot_id,
         'flags': np.repeat(0, nFids),  # or use your own flags
         'pfi_center_x_mm': pfi_center_x_mm,
