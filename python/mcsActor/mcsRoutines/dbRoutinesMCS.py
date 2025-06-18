@@ -480,9 +480,9 @@ def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
         'flags': np.repeat(0, nFids),  # or use your own flags
         'pfi_center_x_mm': pfi_center_x_mm,
         'pfi_center_y_mm': pfi_center_y_mm,
-        'fiducial_tweaked_x_mm': fids['fiducial_tweaked_x_mm'].values,
-        'fiducial_tweaked_y_mm': fids['fiducial_tweaked_x_mm'].values,
-        'match_mask': fids['match_mask'] if 'match_mask' in fids.columns else np.repeat(0, nFids)
+        'match_mask': fids['match_mask'] if 'match_mask' in fids.columns else np.repeat(0, nFids),
+        'fiducial_tweaked_x_mm': fids.fiducial_tweaked_x_mm.to_numpy() if 'fiducial_tweaked_x_mm' in fids.columns else np.repeat(0, nFids),
+        'fiducial_tweaked_y_mm': fids.fiducial_tweaked_y_mm.to_numpy() if 'fiducial_tweaked_y_mm' in fids.columns else np.repeat(0, nFids)
     })
 
     db.insert("fiducial_fiber_match", df)

@@ -1050,6 +1050,7 @@ class McsCmd(object):
         fids['match_mask']=fidMask
         x_fid_mm , y_fid_mm = tweakFiducials(fids.x_mm.to_numpy(), fids.y_mm.to_numpy(), 
                                      inr=insrot, za=90.-altitude)
+        cmd.inform(f'text="tweaked fiducials: {len(x_fid_mm)}, {len(y_fid_mm)}"')
         fids['fiducial_tweaked_x_mm'] = x_fid_mm
         fids['fiducial_tweaked_y_mm'] = y_fid_mm
 
