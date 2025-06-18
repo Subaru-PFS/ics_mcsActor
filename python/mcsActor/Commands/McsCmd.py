@@ -33,6 +33,7 @@ from ics.utils.fits import timecards
 from opscore.utility.qstr import qstr
 
 import pfs.utils.coordinates.transform as transformUtils
+from pfs.utils.coordinates.CoordTransp import tweakFiducials
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
 from scipy.spatial import cKDTree
 
@@ -1004,7 +1005,7 @@ class McsCmd(object):
         #goodFids = list(set(fids['fiducialId'].values)-set(badFids))
         #fidsGood = fids[fids.fiducialId.isin(goodFids)]
 
-        ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
+        ffid, dist, _ , _ = pfiTransform.updateTransform(mcsData, self.fidsOuterRing, matchRadius=8.0, nMatchMin=0.1)
         nMatch = len(np.where(ffid > 0)[0])
         ffdist = dist[np.where(ffid > 0)[0]]
         q25, q75 = np.nanpercentile(ffdist, [25, 75])
@@ -1020,7 +1021,7 @@ class McsCmd(object):
 
         self.logger.info(f'Re-calcuating transformation using ALL FFs.')
         for i in range(2):
-            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=distThres,nMatchMin=0.1)
+            ffid, dist, _, _ = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=distThres,nMatchMin=0.1)
             nMatch = len(np.where(ffid > 0)[0])
             self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres with distance threshold {distThres}')
             ffdist = dist[np.where(ffid > 0)[0]]
@@ -1045,8 +1046,14 @@ class McsCmd(object):
         mcsData['pfi_center_x_mm'] = x_mm.astype(np.float32)
         mcsData['pfi_center_y_mm'] = y_mm.astype(np.float32)
 
+        # Preparing fids for writing to DB
         fids['match_mask']=fidMask
-        
+        x_fid_mm , y_fid_mm = tweakFiducials(fids.x_mm.to_numpy(), fids.y_mm.to_numpy(), 
+                                     inr=insrot, za=90.-altitude)
+        cmd.inform(f'text="tweaked fiducials: {len(x_fid_mm)}, {len(y_fid_mm)}"')
+        fids['fiducial_tweaked_x_mm'] = x_fid_mm
+        fids['fiducial_tweaked_y_mm'] = y_fid_mm
+
         db = self.connectToDB(cmd)
         dbTools.writeFidToDB(db, ffid, mcsData, frameID, fids)
         cmd.inform(f'text="wrote matched FF to opdb."')

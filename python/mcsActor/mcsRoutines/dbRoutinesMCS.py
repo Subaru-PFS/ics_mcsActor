@@ -39,7 +39,12 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text as sqlText
 
 from ics.utils.opdb import opDB
+from pfs.utils.coordinates.CoordTransp import tweakFiducials
 
+logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
+                            datefmt="%Y-%m-%dT%H:%M:%S")
+logger = logging.getLogger('mcscmd')
+logger.setLevel(logging.INFO)
 
 def connectToDB(hostname='', port='', dbname='opdb', username='pfs'):
 
@@ -470,6 +475,8 @@ def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
             pfi_center_x_mm[i] = mcsData['pfi_center_x_mm'].iloc[idx[0]]
             pfi_center_y_mm[i] = mcsData['pfi_center_y_mm'].iloc[idx[0]]
 
+    logging.info(f"Writing {len(fids)} fiducials to DB for frame {mcs_frame_id}")
+    
     # Build DataFrame for DB insertion
     df = pd.DataFrame({
         'pfs_visit_id': np.repeat(pfs_visit_id, nFids),
@@ -480,7 +487,12 @@ def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
         'flags': np.repeat(0, nFids),  # or use your own flags
         'pfi_center_x_mm': pfi_center_x_mm,
         'pfi_center_y_mm': pfi_center_y_mm,
-        'match_mask': fids['match_mask'] if 'match_mask' in fids.columns else np.repeat(0, nFids)
+        'match_mask': fids['match_mask'] if 'match_mask' in fids.columns else np.repeat(0, nFids),
+        'fiducial_tweaked_x_mm': fids['fiducial_tweaked_x_mm'] if 'fiducial_tweaked_x_mm' in fids.columns else np.repeat(np.nan, nFids),
+        'fiducial_tweaked_y_mm': fids['fiducial_tweaked_y_mm'] if 'fiducial_tweaked_y_mm' in fids.columns else np.repeat(np.nan, nFids)
     })
-
+    logging.info(f"fiducial_fiber_match DataFrame shape: {df.shape}")
+    logging.info(f"fiducial_tweaked_x_mm: {df['fiducial_tweaked_x_mm'].values}")
+    logging.info(f"fiducial_tweaked_y_mm: {df['fiducial_tweaked_y_mm'].values}")
+    
     db.insert("fiducial_fiber_match", df)
