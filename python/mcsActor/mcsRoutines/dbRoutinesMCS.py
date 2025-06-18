@@ -480,6 +480,8 @@ def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
         'flags': np.repeat(0, nFids),  # or use your own flags
         'pfi_center_x_mm': pfi_center_x_mm,
         'pfi_center_y_mm': pfi_center_y_mm,
+        'fiducial_tweaked_x_mm': fids['tweaked_x_mm'].values,
+        'fiducial_tweaked_y_mm': fids['tweaked_y_mm'].values,
         'match_mask': fids['match_mask'] if 'match_mask' in fids.columns else np.repeat(0, nFids)
     })
 
