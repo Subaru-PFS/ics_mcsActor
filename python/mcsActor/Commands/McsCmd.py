@@ -33,6 +33,7 @@ from ics.utils.fits import timecards
 from opscore.utility.qstr import qstr
 
 import pfs.utils.coordinates.transform as transformUtils
+from pfs.utils.coordinates.CoordTransp import tweakFiducials
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
 from scipy.spatial import cKDTree
 
@@ -53,6 +54,7 @@ import multiprocessing
 from pfs.utils import butler
 
 from opdb import opdb
+from sqlalchemy import create_engine
 
 from importlib import reload
 reload(dbTools)
@@ -451,7 +453,7 @@ class McsCmd(object):
             gain = 2.24
 
         visit = frameId // 100
-        hdr.append(('DATA-TYP', expType.upper(), 'Subaru-style exposure type'))
+        hdr.append(('DATA-TYP', expType.upper(), 'Type / Characteristics of this data'))
         hdr.append(('FRAMEID', f'PFSC{frameId:08d}', 'Sequence number in archive'))
         hdr.append(('EXP-ID', f'PFSE{visit:08d}', 'PFS exposure visit number'))
         hdr.append(('FILTER01', 'BP635-58', 'Filter name'))
@@ -809,6 +811,9 @@ class McsCmd(object):
             #self.runCentroidSEPMP(cmd)
             self.runCentroid(cmd, self.centParms)
 
+            if not cmd.isAlive(): # command might have failed in runCentroid, so do not proceed further.
+                return
+
             t2 = time.time()
             cmd.inform(f'text="Centroids done in {t2-t1} second" ')
 
@@ -949,6 +954,7 @@ class McsCmd(object):
         cmd.inform('text="cobra geometry read"')
         self.geometrySet = True
 
+
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
         # Read fiducial and spot geometry
@@ -976,20 +982,23 @@ class McsCmd(object):
         cmd.inform(f'text="camera name: {self.actor.cameraName} altitude = {altitude}"')
         cmd.inform(f'text="camera name: {self.actor.cameraName} rotation = {insrot}"')
 
-       
+        self.logger.info(f'Getting sigma mask for fiducials')
+        #sigmaMask = self.getSigmaMask(self.visitId)
+
         self.logger.info(f'Calcuating transformation using FF at outer region')
         # these values are now read via mcsToolds.readFiducialMasks
 
         # set the good fiducials and outer ring fiducials if not yet set
-        #if(self.fidsGood == None):
-        # self.fidsOuterRing, self.fidsGood = mcsTools.readFiducialMasks(fids)
+ 
+        fidMask = np.zeros(len(self.fids), dtype=int)
+        
+        # set the good fiducials and outer ring fiducials if not yet set
         self.fidsGood = fids[fids.goodMask]
         self.fidsOuterRing = fids[fids.goodMask & fids.outerRingMask]
 
         nFidsGood = len(self.fidsGood)
         nFidsOuterGood = len(self.fidsOuterRing)
 
-        
         #outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
         #fidsOuterRing = fids[fids.fiducialId.isin(outerRingIds)]
         #badFids = [1,32,34,61,68,75,88,89,2,4,33,36,37,65,66,67,68,69]
@@ -998,10 +1007,15 @@ class McsCmd(object):
 
         pfiTransformConfig = self.actor.actorConfig['pfiTransform']
 
-        ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing,
+        ffid, dist, _, _ = pfiTransform.updateTransform(mcsData, self.fidsOuterRing,
                                                   matchRadius=pfiTransformConfig['matchRadiusOuterRing'],
                                                   nMatchMin=pfiTransformConfig['nMatchMinOuterRing'])
         nMatch = len(np.where(ffid > 0)[0])
+        ffdist = dist[np.where(ffid > 0)[0]]
+        q25, q75 = np.nanpercentile(ffdist, [25, 75])
+        std = 0.741*(q75 - q25) 
+        distThres=np.mean(ffdist)+3*std
+        fidMask[ffid[ffid > 0] - 1] |= 1
 
         self.logger.info(f'Matched {nMatch} of {nFidsOuterGood} outer ring fiducial fibres')
 
@@ -1011,9 +1025,17 @@ class McsCmd(object):
 
         self.logger.info(f'Re-calcuating transformation using ALL FFs.')
         for i in range(2):
-            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood,
-                                                      matchRadius=pfiTransformConfig['matchRadiusAll'],
+            ffid, dist, _, _  = pfiTransform.updateTransform(mcsData, self.fidsGood,
+                                                      matchRadius=distThres,
                                                       nMatchMin=pfiTransformConfig['nMatchMinAll'])
+            nMatch = len(np.where(ffid > 0)[0])
+            self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres with distance threshold {distThres}')
+            ffdist = dist[np.where(ffid > 0)[0]]
+            q25, q75 = np.nanpercentile(ffdist, [25, 75])
+            std = 0.741*(q75 - q25) 
+            distThres=np.mean(ffdist)+3*std
+            fidMask[ffid[ffid > 0] - 1] |= 2*(i + 1)
+
         #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
         nMatch = len(np.where(ffid > 0)[0])
         self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres')
@@ -1030,8 +1052,16 @@ class McsCmd(object):
         mcsData['pfi_center_x_mm'] = x_mm.astype(np.float32)
         mcsData['pfi_center_y_mm'] = y_mm.astype(np.float32)
 
+        # Preparing fids for writing to DB
+        fids['match_mask']=fidMask
+        x_fid_mm , y_fid_mm = tweakFiducials(fids.x_mm.to_numpy(), fids.y_mm.to_numpy(), 
+                                     inr=insrot, za=90.-altitude)
+        cmd.inform(f'text="tweaked fiducials: {len(x_fid_mm)}, {len(y_fid_mm)}"')
+        fids['fiducial_tweaked_x_mm'] = x_fid_mm
+        fids['fiducial_tweaked_y_mm'] = y_fid_mm
+
         db = self.connectToDB(cmd)
-        dbTools.writeFidToDB(db, ffid, mcsData, frameID)
+        dbTools.writeFidToDB(db, ffid, mcsData, frameID, fids)
         cmd.inform(f'text="wrote matched FF to opdb."')
         
         self.pfiTrans = pfiTransform
@@ -1232,6 +1262,14 @@ class McsCmd(object):
 
             rot = gen2Model['tel_rot'].getValue()
             posAngle, instrot = rot
+            adc_type, adc_pa = gen2Model['tel_adc'].getValue()
+
+            dome_humidity, dome_pressure, dome_temperature, dome_wind = gen2Model['dome_env'].getValue()
+            outside_humidity, outside_pressure, outside_temperature, outside_wind = gen2Model['outside_env'].getValue()
+            
+            mebModel = self.actor.models['meb'].keyVarDict
+            _,_,m1_temperature, m1_cover_temperature, _, _, _ = mebModel['temps'].getValue()
+
             startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
 
@@ -1263,7 +1301,7 @@ class McsCmd(object):
                 cmd.warn(f'text="no start card in {simPath}, using file date: {startTime}"')
 
         visitId = frameId // 100
-        cmd.inform(f'text="frame={frameId} visit={visitId} az={az} alt={alt} instrot={instrot}"')
+        cmd.inform(f'text="frame={frameId} visit={visitId} az={az} alt={alt} instrot={instrot} adc_pa={adc_pa}"')
         # Packing information into data structure
         telescopeInfo = {'frameid': frameId,
                          'visitid': visitId,
@@ -1271,7 +1309,19 @@ class McsCmd(object):
                          'exptime': expTime,
                          'altitude': alt,
                          'azimuth': az,
-                         'instrot': instrot}
+                         'instrot': instrot,
+                         'adc_pa': adc_pa,
+                         'dome_humidity': dome_humidity,
+                         'dome_pressure': dome_pressure,
+                         'dome_temperature': dome_temperature,
+                         'dome_wind': dome_wind,
+                         'outside_humidity': outside_humidity,
+                         'outside_pressure': outside_pressure,
+                         'outside_temperature': outside_temperature,
+                         'outside_wind': outside_wind,
+                         'mcs_m1_temperature': m1_temperature,
+                         'mcs_cover_temperature': m1_cover_temperature,
+                         }                     
 
         self._writeTelescopeInfo(cmd, telescopeInfo)
 
@@ -1474,6 +1524,7 @@ class McsCmd(object):
         # check for no illumination
         if(nSpots == 0):
             cmd.fail('text="No spots detected; check the illuminator and light path"')
+            return
 
         maxSize = (centroids[:,3] * centroids[:,2]).max()
         if(maxSize > 1000):
@@ -1517,15 +1568,15 @@ class McsCmd(object):
         """
           TODO: Those are the fake values for making PFI to work now, adding actual code later
         """
-        adc_pa = 0
-        dome_temperature = 5
-        dome_pressure = 101
-        dome_humidity = 0.3
-        outside_temperature = 5
-        outside_pressure = 101
-        outside_humidity = 0.3
-        mcs_cover_temperature = 5
-        mcs_m1_temperature = 6
+        adc_pa = telescopeInfo['adc_pa']
+        dome_temperature = telescopeInfo['dome_temperature']
+        dome_pressure = telescopeInfo['dome_pressure']
+        dome_humidity = telescopeInfo['dome_humidity']
+        outside_temperature = telescopeInfo['outside_temperature']
+        outside_pressure = telescopeInfo['outside_pressure']
+        outside_humidity = telescopeInfo['outside_humidity']
+        mcs_cover_temperature = telescopeInfo['mcs_cover_temperature']
+        mcs_m1_temperature = telescopeInfo['mcs_m1_temperature']
         taken_at = "'"+telescopeInfo['starttime']+"'"
         taken_in_hst_at = "'"+telescopeInfo['starttime']+"'"
         if self.actor.cameraName == 'canon_50m':
