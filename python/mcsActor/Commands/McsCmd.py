@@ -1,47 +1,43 @@
 #!/usr/bin/env python
 
-import cv2
+import os
 import logging
-import numpy as np
-from pfs.utils.coordinates import CoordTransp
-from pfs.utils import coordinates
-import pandas as pd
 import time
 import datetime
 import io
 import pathlib
-import queue
-import threading
-import sep
-import sys
+import glob
 import copy
 
-import os
+import numpy as np
+import pandas as pd
+
 import astropy.io.fits as pyfits
 import astropy
 import fitsio
+import sep
+
+import cv2
+import threading
+import multiprocessing
+import queue
+
+from sqlalchemy import text as sqlText
+from opdb import opdb
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
-
-#from actorcore.utility import fits as fitsUtils
-#from actorcore.utility import timecards
+from opscore.utility.qstr import qstr
 
 from ics.utils.fits import mhs as fitsUtils
 from ics.utils.fits import timecards
 
-from opscore.utility.qstr import qstr
-
 import pfs.utils.coordinates.transform as transformUtils
 from pfs.utils.coordinates.CoordTransp import tweakFiducials
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
-from scipy.spatial import cKDTree
+from pfs.utils.coordinates import CoordTransp
+from pfs.utils import butler
 
-import psycopg2
-import psycopg2.extras
-from sqlalchemy import text as sqlText
-
-from xml.etree.ElementTree import dump
 from ics.cobraCharmer.cobraCoach import calculation
 
 import mcsActor.windowedCentroid.centroid as centroid
@@ -49,19 +45,15 @@ import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 import mcsActor.mcsRoutines.fiducials as fiducials
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
 import mcsActor.mcsRoutines.speedCentroid as speedCentriod
-import multiprocessing
 
-from pfs.utils import butler
 
-from opdb import opdb
-from sqlalchemy import create_engine
 
+#???
 from importlib import reload
 reload(dbTools)
 reload(mcsTools)
 reload(fiducials)
 reload(opdb)
-
 reload(CoordTransp)
 
 class McsCmd(object):
@@ -308,7 +300,6 @@ class McsCmd(object):
         cmd.finish('text="set simulation path to %s"' % str(self.simulationPath))
 
     def getNextSimulationImage(self, cmd):
-        import glob
 
         path, idx, lastname = self.simulationPath
         cmd.inform('text="frameIds1 = %s." '%{path})
@@ -1361,7 +1352,6 @@ class McsCmd(object):
 
         cmd.debug('text="newTable value = %s"' % (self.newTable))
 
-        #image = copy.deepcopy(self.actor.image)
 
         cmd.inform(f'state="measuring cached image: {self.actor.image.shape}"')
         t0 = time.time()
@@ -1402,7 +1392,6 @@ class McsCmd(object):
 
         cmd.debug('text="newTable value = %s"' % (self.newTable))
 
-        #image = copy.deepcopy(self.actor.image)
 
         cmd.inform(f'state="measuring cached image: {self.actor.image.shape}"')
         t0 = time.time()

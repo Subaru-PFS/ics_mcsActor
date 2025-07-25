@@ -19,27 +19,15 @@ fiducial_fiber (must be populated)
 
 
 """
-import os
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import pathlib
-import sys
 import io 
 import logging
 
-import pandas as pd
-from scipy.stats import sigmaclip
-import copy
 from opdb import opdb
 from datetime import datetime, timezone
-import psycopg2
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text as sqlText
 
-from ics.utils.opdb import opDB
-from pfs.utils.coordinates.CoordTransp import tweakFiducials
 
 logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
                             datefmt="%Y-%m-%dT%H:%M:%S")

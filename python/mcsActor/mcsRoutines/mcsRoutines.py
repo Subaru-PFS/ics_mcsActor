@@ -1,18 +1,7 @@
 import os
 import numpy as np
-import matplotlib.pyplot as plt
-import pathlib
-from importlib import reload
-import sys
-from pfs.utils import coordinates
-import pickle
 
-from pfs.utils import coordinates
-from pfs.utils.coordinates import CoordTransp
-
-import pandas as pd
 from scipy.stats import sigmaclip
-import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
 import sep
 
@@ -22,13 +11,9 @@ from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist
 import cv2
 import copy
-import os
 import yaml
 from scipy import optimize
-import time
 
-from ics.cobraCharmer import pfiDesign
-import time
 
 def getCentroidParams(cmd, configuredCentParms):
     """Given the default configuration from pfs_instdata, update with any parameters in the command."""
