@@ -1179,37 +1179,6 @@ class McsCmd(object):
             cmd.inform(f'text="Writing minimal information to target database."')
 
             tarPos = self.prevPos
-        
-        # if the method is target, load from database, otherwise the target = previous position
-        #if(self.fMethod == 'target'):
-            # load target positions
-        #    tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
-        #    db.close()
-            
-        #    cmd.inform(f'text="loaded {len(tarPos)} targets from DB"')
-        #    if(len(tarPos)==0):
-        #        db = self.connectToDB(cmd)
-        #        dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
-                #dbTools.writeFakeMoveToDB(db, int(frameId))
-
-        #        db.close()
-
-        #        visitId = frameId // 100
-        #        iteration = frameId % 100
-        #        cmd.inform(f'text="Fall back using cobra centers as target." ')
-        #        cmd.inform(f'text="Writing minimal information to target database."')
-
-        #        tarPos = self.prevPos
-        #else:
-        #    db.close()
-            
-        #    tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
-        #    if(len(tarPos)==0):
-        #        db = self.connectToDB(cmd)
-        #        dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
-                #dbTools.writeFakeMoveToDB(db, int(frameId))
-        #        db.close()
-        #    tarPos = self.prevPos
             
         # do the identification
         cmd.inform(f'text="Starting Fiber ID"')
@@ -1613,14 +1582,6 @@ class McsCmd(object):
         columns = ','.join('"{}"'.format(k) for k in columnNames)
         sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(
             tableName, columns)
-
-        #try:
-        #    db = self.connectToDB(None)
-        #    with db.engine.connect() as conn:
-        #        with conn.connection.cursor() as cursor:
-        #            cursor.copy_expert(sql, dataBuf)
-        #except Exception as e:
-        #    self.logger.warn(f"failed to write with {sql}: {e}")
         
         try:
             db = self.connectToDB(None)

@@ -9,14 +9,16 @@ import sep
 
 from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist
-import cv2
 import copy
-import yaml
 from scipy import optimize
 
 
 def getCentroidParams(cmd, configuredCentParms):
-    """Given the default configuration from pfs_instdata, update with any parameters in the command."""
+    
+    """
+    Given the default configuration from pfs_instdata, update with any parameters in the command.
+    """
+    
     try:
         cmdKeys = cmd.cmd.keywords
     except:
@@ -25,6 +27,9 @@ def getCentroidParams(cmd, configuredCentParms):
     # returns just the values dictionary
     centParms = configuredCentParms.copy()
 
+    # run through the potential keywords, and update if necessary.
+    # if a new keyword is added, update this part
+    
     if('fwhmx' in cmdKeys):
         centParms['fwhmx'] = cmd.cmd.keywords["fwhmx"].values[0]
     if('fwhmy' in cmdKeys):
@@ -55,67 +60,47 @@ def getCentroidParams(cmd, configuredCentParms):
         centParms['outerRad'] = cmd.cmd.keywords["outerRad"].values[0]
 
     return centParms
-
-def readFiducialMasks(fids):
-
-    """
-    read good/bad/outer ring fiducial information from yaml file
-    """
-
-    instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
-
-    fidFile = os.path.join(instPath,"data/pfi/fiducials/fiducialFiberFlags.yaml")
-    with open(fidFile, 'r') as inFile:
-        fiducialFlags = yaml.safe_load(inFile)
-
-    fidsOuterRing = fids[fids.fiducialId.isin(fiducialFlags['outerRingIds'])]
-    badFids = fiducialFlags['badFidIds']
-    goodFids = list(set(fids['fiducialId'].values)-set(badFids))
-    fidsGood = fids[fids.fiducialId.isin(goodFids)]
-
-    return fidsOuterRing, fidsGood
     
 def readCobraGeometry(des,dotData):
     """
-    read cobra geometry from configuration file/inst_config
+    Given the cobra geometry object and dot information,  create the 
+    variables used by fibreID. 
 
-    dot positions from CSVfile at the moment, this will change
-
-    The results will be return in whatever unit the input XML file is in
+    Each variabe is a numpy array, rather than a pandas variable, 
+    for computational speed
     """
 
-    # first figure out the good cobras (bad positions are set to 0)
-    centersAll = des.centers
-
     #get the list of good cobras
+    
     cobs = des.findCobraByCobraIndex(np.arange(0, 2394))
     goodIdx = []
-    #cycle through the indices, get the module/cobra number, and check its status
+    # cycle through the indices, get the module/cobra number, and check its status
     for i in range(2394):
         cob = des.findCobraByCobraIndex([i])
         status = des.cobraStatus(cob[0][1], cob[0][0])
         if(status == 1):
             goodIdx.append(i)
+            
     #return a numpy array for ease of later use
     goodIdx = np.array(goodIdx).astype('int')
 
-    
-    # then extract the parameters for good fibres only
-    #centrePos = np.array([goodIdx+1, centersAll[goodIdx].real, centersAll[goodIdx].imag]).T
-    #armLength = (des.L1[goodIdx]+des.L2[goodIdx])
-
     # get the centres and armlengths
+    centersAll = des.centers
     centrePos = np.array([np.arange(0,2394), centersAll.real,centersAll.imag]).T
     armLength = (des.L1 + des.L2)
 
-    # find bad arm lengths and put fake values in it
+    # find bad arm lengths and put fake values in them
     ind=np.where(np.any([armLength < 3.5,armLength > 6.5],axis=0))
     armLength[ind]=4.5
 
+    # this is a bit kludgy, but is kept for compatibility with the fibre identificaion code.
+    # !!todo fix this, but after unit tests written
     goodIdx = np.arange(2394)
     
-    # number of cobras
     nCobras = len(armLength)
+
+    # and the dot positions and sizes
+    
     dotPos = np.zeros((len(goodIdx), 4))
 
     dotPos[:, 0] = dotData['spotId'].values[goodIdx]
@@ -126,63 +111,9 @@ def readCobraGeometry(des,dotData):
 
     return centrePos, armLength, dotPos, goodIdx, des
 
-def calcAffineTransform(pos1, pos2):
-    """
-
-    given two sets of registered points, estimate the rigid transformation
-    this is a wrapper for the cv2 routine
-    Returns transformation matrix and extracted parameters (rotation, translation, scale)
-
-    input:
-    pos1 input positions in nx3 shape, first column is an id number, next two coordinates
-    xx, yy: transformed positions
-    getVales: if == 1, return parameters too
-
-    output: 
-    transformation: matrix 
-    xd, yd: translations
-    sx, sy: scalings
-    rotation: rotation (radians)
-
-    """
-
-    sz = pos1.shape[0]
-    # turn data into right form
-    pts1 = np.zeros((1, sz, 2))
-    pts2 = np.zeros((1, sz, 2))
-
-    pts1[0, :, 0] = pos1[:, 1]
-    pts1[0, :, 1] = pos1[:, 2]
-
-    pts2[0, :, 0] = pos2[:, 1]
-    pts2[0, :, 1] = pos2[:, 2]
-
-    #float32 is needed
-    pts1 = np.float32(pts1)
-    pts2 = np.float32(pts2)
-
-    # calculate the transformation
-    #transformation = cv2.estimateRigidTransform(pts1, pts2, False)
-
-    afCoeff, inlier = cv2.estimateAffinePartial2D(pts1, pts2)
-
-    # extract the parameters
-
-    sx = np.sqrt(afCoeff[0, 0]**2+afCoeff[0, 1]**2)
-    sy = np.sqrt(afCoeff[1, 0]**2+afCoeff[1, 1]**2)
-
-    xd = afCoeff[0, 2]
-    yd = afCoeff[1, 2]
-
-    rotation = np.arctan2(afCoeff[1, 0]/np.sqrt(afCoeff[0, 0]**2+afCoeff[0, 1]**2), 
-                          afCoeff[1, 1]/np.sqrt(afCoeff[1, 0]**2+afCoeff[1, 1]**2))
-
-    return afCoeff, xd, yd, sx, sy, rotation
-
 
 def makeAdjacentList(ff, armLength):
     """
-
     construct the list of adjacent cobras. This is used for fibre identifications
 
     input
@@ -196,26 +127,23 @@ def makeAdjacentList(ff, armLength):
     adjacent = []
 
     # use cKDTree for faster distances
-    # temproary fix for system issues, change back!!!
 
     cobraTree = cKDTree(np.ascontiguousarray(ff), copy_data = True)
     for i in range(len(ff[:, 0])):
-        # list of adjacent centers
         dd = np.sqrt((ff[i, 1]-ff[:, 1])**2+(ff[i, 2]-ff[:, 2])**2)
         ind1 = np.where(np.all([dd > 0, dd < armLength[i]*2.2], axis = 0))
         adjacent.append(ind1)
         # factor of 2.2 pads in case of variation in arm length from measurement to measurement
-        #ind1 = cobraTree.query_ball_point(ff[i, 1:3], armLength[i]*3)
-        ##remove the central value
-        #ind2 = cobraTree.query_ball_point(ff[i, 1:3], 1)
-        #ind1.remove(ind2[0])
-        #adjacent.append(ind1)
         
     return(adjacent)
 
 
 def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adjacentCobras):
 
+    """
+    Main routine for fibre identification. 
+    Sets up the variables, calls the sub-routines, sets flags, formats the results.
+    """
     
     centers = centrePos
     points = centroids
@@ -227,9 +155,6 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
     anyChange = 0
     targets = tarPos
 
-
-    
-    # these are the effective number of cobras (ie, goodIdx)
     nPoints = points.shape[0]
     nCobras = targets.shape[0]
 
@@ -308,7 +233,8 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
 def nearestNeighbourMatching(points, targets):
     
     """
-    simple matching for fiducial fibres, for use in home position
+    simple matching for fiducial fibres, for use in home position. 
+    Not currently used, but is occasionally useful for debugging, so left in. 
 
     input
        points: set to match (nx3)
@@ -327,30 +253,6 @@ def nearestNeighbourMatching(points, targets):
         dd, ii = pointTree.query(targets[i, 1:3], k = 1)
         ii = np.argmin(dd)
         matchPoint[i] = points[ii]
-
-    return matchPoint
-
-def nearestNeighbourMatchingBore(points, targets, unrot):
-    
-    """
-    simple matching for fiducial fibres, for use in home position
-
-    input
-       points: set to match (nx3)
-       targets: set to match to (nx3)
-       nTarg: length of targets
-
-    """
-
-    nTarg = points.shape[0]
-
-    # use cKDTree for speed
-    pointTree = cKDTree(points[:, 1:3])
-    matchPoint = np.zeros((len(targets), 3))
-    
-    for i in range(len(targets)):
-        dd, ii = pointTree.query(targets[i, 1:3], k = 1)
-        matchPoint[i] = unrot[ii]
 
     return matchPoint
 
@@ -376,7 +278,8 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
     potCobraMatch: nPoint long list of list of cobras which could potentially match with each point
     potPointMatch: nCobra long list of list of points which could potentially match with each cobra
 
-    Note that we can't assume the same arm lenght for all points (which would allow fo faster calculation methods)
+    Note that we can't assume the same arm length for all points 
+    (which would allow fo faster calculation methods)
     as there is enough variation to amke a difference
 
     """
@@ -406,23 +309,17 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
     D = cdist(fidPos[:,1:3],points[:,1:3])
     for i in range(len(fidPos)):
         ind = np.where(D[i, :] < 1)
-        #print("Fid Match", i, ind, len(ind[0]))
         if len(ind[0]) > 0:
             unaPoints.remove(ind[0][0])
             bPoints.append(ind[0][0])
 
     #and the same for stuck but illuminated cobras. This is currently a bit of a cludge, based
     #on empirical averages of positions
+    
     fileName = os.path.join(os.environ['ICS_MCSACTOR_DIR'],  'etc',  'stuck.txt')
     stuckPos = np.loadtxt(fileName)
 
-    #D = cdist(stuckPos[:,1:3], points[:,1:3])
-    #for i in range(len(stuckPos)):
-    #    ind = np.where(D[i, :] < 1)
-    #    if len(ind[0]) > 0:
-    #        unaPoints.remove(ind[0][0])
-    #        bPoints.append(ind[0][0])
-    # get the distnace between cobras and points. cdist is pretty fast, check total time
+    # get the distnace between cobras and points. cdist is pretty fast
     D = cdist(points[:, 1:3], centers[:, 1:3])
 
     # find the cobras which are within arm length of each point and add to the list
@@ -522,7 +419,7 @@ def firstPass(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMat
 
 def secondPass(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras, assignMethod, anyChange):
     """
-    the second pass deals with things from the cobra's perpective. This is a little tricker due to dots;
+    the second pass deals with things from the cobra's perspective. This is a little tricker due to dots;
     if a point oly matchest with a single cobra, it is unique, but a cobra matched with a single point
     is only uniq if all the surrounding points are assigned.
 
@@ -592,6 +489,14 @@ def secondPass(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch,
 
 def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, prevPos, dFrom, assignMethod, anyChange, goodIdx):
 
+    """
+    A final pass to finish up. This is the routine that makes decisions for cobras that have more
+    than one possible match, that can't be distinguished by pure logic. 
+
+    The deicison is made based on which spot is closest to the targetted position, cycling through
+    the unassigned cobras globally from closest to most distant. 
+    """
+
     # temporary list of unassigned cobras, to keep track
     tempUnaCobras = copy.deepcopy(unaCobras)
     tempUnaPoints = copy.deepcopy(unaPoints)
@@ -641,9 +546,6 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     D = cdist(points[unaPoints, 1:3], targets[unaCobras, 1:3])
     ind = np.unravel_index(np.argsort(D, axis = None), D.shape)
     
-
-
-    nnn=0
     # turn inds in to lists so we can remove values. We crop the indices to the
     # 3* the number of unassigned points, which will give us all the points-cobras
     # distances that are w/i a patrol (one cobra can be in at most 3 patrol regions)
@@ -651,6 +553,7 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     ind1 = list(ind[0][0:3*len(unaPoints)])
     ind2 = list(ind[1][0:3*len(unaPoints)])
 
+    # cycle through until no more assignments are possible
     while(change == 1):
 
         change = 0
@@ -701,7 +604,7 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
 
                 
         #print()
-        #get singled points to not break things
+        #and assign newly singled points to not break things
         nchange = 1
  
         while(nchange == 1):
@@ -735,7 +638,16 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     return aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange
 
 def getThreshBench(image, boreSight, sigmaThresh, findSigma, centSigma):
-  
+
+    """
+    Threshold routine optimized for bench tests and the unit selector. 
+    The main difference is that the noise is very low in the unit selector, 
+    which can results in nonsense statistics when most of the background is 
+    zero.  If the image median is 0, we calculate thresholds based only on 
+    non zero pixels; otherwise the same as getThresh. 
+    """
+
+    
     mpx = boreSight[0]
     mpy = boreSight[1]
 
@@ -745,7 +657,7 @@ def getThreshBench(image, boreSight, sigmaThresh, findSigma, centSigma):
     xx, yy = np.meshgrid(np.arange(image.shape[0]), np.arange(image.shape[1]))
     dfromc = np.sqrt((xx-mpx)**2+(yy-mpy)**2)
     
-    # crop to a radius of 1500 for hte whole PFI, to select the illuminated region
+    # crop to a radius of 500 for hte whole PFI, to select the illuminated region
 
     ind = np.where(dfromc < 500)
     if(np.median(image[ind])==0):
@@ -763,7 +675,9 @@ def getThreshBench(image, boreSight, sigmaThresh, findSigma, centSigma):
 
 def getThresh(image, boreSight, sigmaThresh, findSigma, centSigma):
     """
-    wrapper for getting threshold
+    wrapper for getting threshold. It uses the central region of the
+    field of view, and calculates sigmaclipped means and standard 
+    deviations. 
 
     input: 
       image: image array
@@ -800,7 +714,7 @@ def getThresh(image, boreSight, sigmaThresh, findSigma, centSigma):
 
 def checkAdjacentCobras(iCobra, adjacentCobras, unaCobras):
     """
-    check if the cobras adjacent to the given cobra aer all assigned to spots
+    check if the cobras adjacent to the given cobra are all assigned to spots
 
     Input
        iCobra: cobra index
@@ -816,197 +730,6 @@ def checkAdjacentCobras(iCobra, adjacentCobras, unaCobras):
 
     return allAss
 
-def distancePointLine(p1, p2, p):
-    """ get closest distance from a line between two points and another point """
-
-    y1 = p1[1]
-    x1 = p1[0]
-    y2 = p2[1]
-    x2 = p2[0]
-    x = p[0]
-    y = p[1]
-
-    d = abs((y2-y1)*x+(x2-x1)*y+x2*y1-y2*x1)/np.sqrt((y2-y1)**2+(x2-x1)**2)
-
-    return p
-
-
-def extractRotCent(afCoeff):    
-    """extract centre of rotation from affine matrix"""
-        
-    #affine matrix is of the form
-    #alpha   beta   (1-alpha)*xc-beta*yc
-    #-beta   alpha  beta*xc-(1-alpha)*yc 
-    #so we solve for xc and yc
-    
-    A = 1-afCoeff[0, 0]
-    B = afCoeff[0, 1]
-
-    xd = afCoeff[0, 2]
-    yd = afCoeff[1, 2]
-
-    yc = (yd-B/A*xd)/(B**2/A+A)
-    xc = (xd+B*yc)/A
-
-    return xc, yc
-
-def f(c, x, y):
-    """
-    calculate the algebraic distance between the data points
-    and the mean circle centered at c=(xc, yc)
-    """
-    Ri = calc_R(x, y, *c)
-    return Ri - Ri.mean()
-
-
-def least_squares_circle(x, y):
-    """
-    Circle fit using least-squares solver.
-    Inputs:
-
-        - coords, list or numpy array with len>2 of the form:
-        [
-    [x_coord, y_coord],
-    ...,
-    [x_coord, y_coord]
-    ]
-
-    Outputs:
-
-        - xc : x-coordinate of solution center (float)
-        - yc : y-coordinate of solution center (float)
-        - R : Radius of solution (float)
-        - residu : MSE of solution against training data (float)
-    """
-
-    x_m = np.mean(x)
-    y_m = np.mean(y)
-    center_estimate = x_m, y_m
-    center, ier = optimize.leastsq(f, center_estimate, args=(x, y))
-    xc, yc = center
-    Ri = calc_R(x, y, *center)
-    R = Ri.mean()
-    residu = np.sum((Ri - R)**2)
-    return xc, yc, R, residu
-
-def calc_R(x, y, xc, yc):
-    
-    """
-    calculate the distance of each 2D points from the center (xc, yc)
-    """
-    return np.sqrt((x-xc)**2 + (y-yc)**2)
-
-def initialBoresight(db, frameIDs):
-
-    """ 
-    An initial approximation of the boresight from a sequence of spot measurements 
-
-    We calculate the mean position of the spots for each frame, and then fit a circle
-    to the sequence of means. As the rotation centre is slightly offset from the image centre,
-    the mean positions will trace a circle around the centre of rotation.
-
-    """
-    
-    xC = []
-    yC = []
-    #for each frame, pull the spots from database, and calculate mean position
-    for frameId in frameIDs:
-        # retrieve all spots
-        points = dbTools.loadCentroidsFromDB(db, frameId)
-
-        # get means
-        xC.append(np.nanmean(points[:, 1]))
-        yC.append(np.nanmean(points[:, 2]))
-
-    # do the fit
-    xCentre, yCentre, radius, residuals = least_squares_circle(xC, yC)
-    
-    return [xCentre, yCentre]
-
-def refineBoresight(db, frameId1, frameId2, boresightEstimate):
-    """
-    Refine the boresight measurement to subpixel accuracy.
-
-    - take two frames at different angles, 
-    - rotate using the estimated centre and angle,
-    - do nearest neighbour matching
-    - calculate the affine transform
-    - extract the centre of rotation
-
-    Input: 
-    frameId1, frameId2: mcs_frame_id for the two sets of points
-    boresightEstimate: [xC,yC] returned by initialBoresight
-    
-    """
-
-    # retrieve two sets of points
-    points = dbTools.loadCentroidsFromDB(db, frameId1)
-    points1 = dbTools.loadCentroidsFromDB(db, frameId2)
-
-    points=points[~np.isnan(points).any(axis=1)]
-    points1=points1[~np.isnan(points1).any(axis=1)]
-    
-    # and their instrumetn rotation
-    zenithAngle1, insRot1 = dbTools.loadTelescopeParametersFromDB(db, frameId1)
-    zenithAngle2, insRot2 = dbTools.loadTelescopeParametersFromDB(db, frameId2)
-
-    thetaDiff = (insRot1 - insRot2) * np.pi/180
-
-    x1 = points[:, 1]
-    y1 = points[:, 2]
-
-    # the estimated centre
-    x0 = boresightEstimate[0]
-    y0 = boresightEstimate[1]
-
-    # rotate to match the second set of point, using theta differnce
-    
-    x2 = (x1-x0) * np.cos(thetaDiff) - (y1-y0) * np.sin(thetaDiff) + x0
-    y2 = (x1-x0) * np.sin(thetaDiff) + (y1-y0) * np.cos(thetaDiff) + y0
-
-    # some bookkeeping for the format expected by nearestNeighbourMatching
-
-    #three sets of poitns, rotated, unrotated and target
-
-    unRot = points[:, 0:3]
-    source = np.array([x2, x2, y2]).T
-    target = points1[:, 0:3]
-
-    # do nearest neighbour matching on *transformed* values,
-    # and return the *untransformed* values matched to the first set
-
-    matchPoint = nearestNeighbourMatchingBore(source, target, unRot)
- 
-    #gethe affine transform
-    afCoeff, xd, yd, sx, sy, rotation = calcAffineTransform(target[:, 0:3], matchPoint[:, 0:3])
-
-    #and extract the centre of rotation from the matrix
-    xc, yc = extractRotCent(afCoeff)
-        
-    return [xc, yc]
-
-
-def calcBoresight(db, frameIds, pfsVisitId):
-
-    """
-    wrapper for boresight calculationg.
-
-    Input: 
-       db: database connection
-       frameIds: list of mcs_frame_ids for the data set
-
-    Output: 
-       returns boresight
-       write updated value to database
-
-    """
-
-    boresightEstimate = initialBoresight(db, frameIds)
-    boresight = refineBoresight(db, frameIds[0], frameIds[1], boresightEstimate)
-
-    dbTools.writeBoresightToDB(db, pfsVisitId, boresight)
-
-    return boresight
 
 def mcsPhotometry(image, xPos, yPos, centParms):
 
