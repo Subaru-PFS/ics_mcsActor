@@ -14,7 +14,7 @@ The database runs on a server which is running on one of the Hilo servers (` pfs
 
 For sanity, you will want something like the following in your `~/.pgpass`:
 
-  `pfsa-db01-gb.subaru.nao.ac.jp:5434:*:pfs:2394f4s3d`
+  `pfsa-db01-gb.subaru.nao.ac.jp:5434:*:pfs:PASSWORD`
 
 ### Set up the `mcsActor` and reprocess data
 
