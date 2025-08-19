@@ -59,6 +59,14 @@ reload(CoordTransp)
 class McsCmd(object):
 
     def __init__(self, actor):
+
+        # These variables are obsolute, and will be removed in the next
+        # set of updates, where unneeded if statements will be removed
+
+        self.simulationPath = None
+        self.dotFile = None
+        self.geometryFile = None
+        
         # This lets us access the rest of the actor.
         self.actor = actor
 
