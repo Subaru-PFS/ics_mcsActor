@@ -89,6 +89,8 @@ class McsCmd(object):
         self.geometrySet = False
         self.geomFile = None
         self.dotFile = None
+
+        self.fids = None
         self.fidsGood = None
         self.fidsOuterRing = None
 
@@ -957,11 +959,24 @@ class McsCmd(object):
 
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
-        # Read fiducial and spot geometry
-        fids = fiducials.Fiducials.read(self.butler)
+        if self.fids is None:
+            # Read fiducial and spot geometry
+            fids = fiducials.Fiducials.read(self.butler)
 
-        # need for fibreID later
-        self.fids = fids
+            # need for fibreID later
+            self.fids = fids
+            
+            # applying FF tweaks
+            x_fid_mm = self.fids.x_mm.to_numpy().copy()
+            y_fid_mm = self.fids.y_mm.to_numpy().copy()
+            x_fid_mm , y_fid_mm = tweakFiducials(x_fid_mm, y_fid_mm, inr=insrot, za=90.-altitude)
+            self.fids.x_mm = x_fid_mm
+            self.fids.y_mm = y_fid_mm
+            cmd.inform(f'text="tweaked fiducials: {len(x_fid_mm)}, {len(y_fid_mm)}"')
+            self.fids['fiducial_tweaked_x_mm'] = x_fid_mm
+            self.fids['fiducial_tweaked_y_mm'] = y_fid_mm
+            
+            
 
         db = self.connectToDB(cmd)
         mcsData = db.bulkSelect('mcs_data',f'select spot_id, mcs_center_x_pix, mcs_center_y_pix '
@@ -982,8 +997,6 @@ class McsCmd(object):
         cmd.inform(f'text="camera name: {self.actor.cameraName} altitude = {altitude}"')
         cmd.inform(f'text="camera name: {self.actor.cameraName} rotation = {insrot}"')
 
-        self.logger.info(f'Getting sigma mask for fiducials')
-        #sigmaMask = self.getSigmaMask(self.visitId)
 
         self.logger.info(f'Calcuating transformation using FF at outer region')
         # these values are now read via mcsToolds.readFiducialMasks
@@ -993,8 +1006,8 @@ class McsCmd(object):
         fidMask = np.zeros(len(self.fids), dtype=int)
         
         # set the good fiducials and outer ring fiducials if not yet set
-        self.fidsGood = fids[fids.goodMask]
-        self.fidsOuterRing = fids[fids.goodMask & fids.outerRingMask]
+        self.fidsGood = self.fids[fids.goodMask]
+        self.fidsOuterRing = self.fids[fids.goodMask & fids.outerRingMask]
 
         nFidsGood = len(self.fidsGood)
         nFidsOuterGood = len(self.fidsOuterRing)
@@ -1054,14 +1067,14 @@ class McsCmd(object):
 
         # Preparing fids for writing to DB
         fids['match_mask']=fidMask
-        x_fid_mm , y_fid_mm = tweakFiducials(fids.x_mm.to_numpy(), fids.y_mm.to_numpy(), 
-                                     inr=insrot, za=90.-altitude)
-        cmd.inform(f'text="tweaked fiducials: {len(x_fid_mm)}, {len(y_fid_mm)}"')
-        fids['fiducial_tweaked_x_mm'] = x_fid_mm
-        fids['fiducial_tweaked_y_mm'] = y_fid_mm
+        #x_fid_mm , y_fid_mm = tweakFiducials(fids.x_mm.to_numpy(), fids.y_mm.to_numpy(), 
+        #                             inr=insrot, za=90.-altitude)
+        #cmd.inform(f'text="tweaked fiducials: {len(x_fid_mm)}, {len(y_fid_mm)}"')
+        #fids['fiducial_tweaked_x_mm'] = x_fid_mm
+        #fids['fiducial_tweaked_y_mm'] = y_fid_mm
 
         db = self.connectToDB(cmd)
-        dbTools.writeFidToDB(db, ffid, mcsData, frameID, fids)
+        dbTools.writeFidToDB(db, ffid, mcsData, frameID, self.fids)
         cmd.inform(f'text="wrote matched FF to opdb."')
         
         self.pfiTrans = pfiTransform
