@@ -1058,7 +1058,7 @@ class McsCmd(object):
         t_frame,t_x0,t_y0,t_dscale,t_scale2,t_theta,t_alpha_rot,t_camera_name = dbTools.writeTransformToDB(db, frameID, pfiTransform, self.actor.cameraName)
         db.close()
         cmd.inform(f'text="wrote transform to DB"')
-        cmd.inform(f'text="paramters = {t_frame} {t_x0} {t_y0} {t_dscale} {t_scale2} {t_theta} {t_alpha_rot, t_camera_name}"')
+        cmd.inform(f'text="paramters = {t_frame} {t_x0} {t_y0} {t_dscale} {t_scale2} {t_theta} {t_alpha_rot} {t_camera_name}"')
         
         self.logger.info(f'Apply transformation to MCS data points.')
         x_mm, y_mm = pfiTransform.mcsToPfi(mcsData['mcs_center_x_pix'].values,mcsData['mcs_center_y_pix'].values)
@@ -1066,7 +1066,7 @@ class McsCmd(object):
         mcsData['pfi_center_y_mm'] = y_mm.astype(np.float32)
 
         # Preparing fids for writing to DB
-        fids['match_mask']=fidMask
+        self.fids['match_mask']=fidMask
         #x_fid_mm , y_fid_mm = tweakFiducials(fids.x_mm.to_numpy(), fids.y_mm.to_numpy(), 
         #                             inr=insrot, za=90.-altitude)
         #cmd.inform(f'text="tweaked fiducials: {len(x_fid_mm)}, {len(y_fid_mm)}"')
