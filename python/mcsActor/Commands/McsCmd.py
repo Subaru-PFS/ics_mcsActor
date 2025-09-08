@@ -969,7 +969,7 @@ class McsCmd(object):
             # applying FF tweaks
             x_fid_mm = self.fids.x_mm.to_numpy().copy()
             y_fid_mm = self.fids.y_mm.to_numpy().copy()
-            x_fid_mm , y_fid_mm = tweakFiducials(x_fid_mm, y_fid_mm, inr=insrot, za=90.-altitude)
+            #x_fid_mm , y_fid_mm = tweakFiducials(x_fid_mm, y_fid_mm, inr=insrot, za=90.-altitude)
             self.fids.x_mm = x_fid_mm
             self.fids.y_mm = y_fid_mm
             cmd.inform(f'text="tweaked fiducials: {len(x_fid_mm)}, {len(y_fid_mm)}"')
@@ -1014,7 +1014,12 @@ class McsCmd(object):
         except KeyError:
             raise RuntimeError("actorConfig['pfiTransform'] is missing")
 
-        ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing,
+        if 'rmod' in self.actor.cameraName.lower():
+            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing,
+                                                  matchRadius=8.0,
+                                                  nMatchMin=0.1)
+        else:
+            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing,
                                                   matchRadius=pfiTransformConfig['matchRadiusOuterRing'],
                                                   nMatchMin=pfiTransformConfig['nMatchMinOuterRing'])
         nMatch = len(np.where(ffid > 0)[0])
@@ -1032,7 +1037,12 @@ class McsCmd(object):
 
         self.logger.info(f'Re-calcuating transformation using ALL FFs.')
         for i in range(2):
-            ffid, dist= pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=distThres,
+            if 'rmod' in self.actor.cameraName.lower():
+                ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood,
+                                                  matchRadius=distThres,
+                                                  nMatchMin=0.1)
+            else:
+                ffid, dist= pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=distThres,
                                                             nMatchMin=pfiTransformConfig['nMatchMinAll'])
             nMatch = len(np.where(ffid > 0)[0])
             self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres with distance threshold {distThres}')
