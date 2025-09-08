@@ -34,12 +34,9 @@ import copy
 from opdb import opdb
 from datetime import datetime, timezone
 import psycopg2
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text as sqlText
 
 from ics.utils.opdb import opDB
-from pfs.utils.coordinates.CoordTransp import tweakFiducials
 
 logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
                             datefmt="%Y-%m-%dT%H:%M:%S")
