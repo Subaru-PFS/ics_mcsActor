@@ -975,15 +975,14 @@ class McsCmd(object):
             cmd.inform(f'text="tweaked fiducials: {len(x_fid_mm)}, {len(y_fid_mm)}"')
             self.fids['fiducial_tweaked_x_mm'] = x_fid_mm
             self.fids['fiducial_tweaked_y_mm'] = y_fid_mm
-            
-            
 
         db = self.connectToDB(cmd)
         mcsData = db.bulkSelect('mcs_data',f'select spot_id, mcs_center_x_pix, mcs_center_y_pix '
                 f'from mcs_data where mcs_frame_id = {frameID}')
-        
-        
+    
         self.logger.info(f'Initiating the transformation function')
+        
+        # make sure pfiTransform is defined
         if 'rmod' in self.actor.cameraName.lower():
             altitude = 90.0
             insrot = 0
@@ -999,29 +998,23 @@ class McsCmd(object):
 
 
         self.logger.info(f'Calcuating transformation using FF at outer region')
-        # these values are now read via mcsToolds.readFiducialMasks
-
-        # set the good fiducials and outer ring fiducials if not yet set
- 
+        
         fidMask = np.zeros(len(self.fids), dtype=int)
         
-        # set the good fiducials and outer ring fiducials if not yet set
-        self.fidsGood = self.fids[fids.goodMask]
-        self.fidsOuterRing = self.fids[fids.goodMask & fids.outerRingMask]
+        # 使用 self.fids 而不是 fids
+        self.fidsGood = self.fids[self.fids.goodMask]
+        self.fidsOuterRing = self.fids[self.fids.goodMask & self.fids.outerRingMask]
 
         nFidsGood = len(self.fidsGood)
         nFidsOuterGood = len(self.fidsOuterRing)
 
-        #outerRingIds = [29, 30, 31, 61, 62, 64, 93, 94, 95, 96]
-        #fidsOuterRing = fids[fids.fiducialId.isin(outerRingIds)]
-        #badFids = [1,32,34,61,68,75,88,89,2,4,33,36,37,65,66,67,68,69]
-        #goodFids = list(set(fids['fiducialId'].values)-set(badFids))
-        #fidsGood = fids[fids.fiducialId.isin(goodFids)]
+        # check the exsitence of pfiTransformConfig
+        try:
+            pfiTransformConfig = self.actor.actorConfig['pfiTransform']
+        except KeyError:
+            raise RuntimeError("actorConfig['pfiTransform'] is missing")
 
-
-        pfiTransformConfig = self.actor.actorConfig['pfiTransform']
-
-        ffid, dist,_,_ = pfiTransform.updateTransform(mcsData, self.fidsOuterRing,
+        ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing,
                                                   matchRadius=pfiTransformConfig['matchRadiusOuterRing'],
                                                   nMatchMin=pfiTransformConfig['nMatchMinOuterRing'])
         nMatch = len(np.where(ffid > 0)[0])
@@ -1039,7 +1032,7 @@ class McsCmd(object):
 
         self.logger.info(f'Re-calcuating transformation using ALL FFs.')
         for i in range(2):
-            ffid, dist, _, _ = pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=distThres,
+            ffid, dist= pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=distThres,
                                                             nMatchMin=pfiTransformConfig['nMatchMinAll'])
             nMatch = len(np.where(ffid > 0)[0])
             self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres with distance threshold {distThres}')
@@ -1049,7 +1042,6 @@ class McsCmd(object):
             distThres=np.mean(ffdist)+3*std
             fidMask[ffid[ffid > 0] - 1] |= 2*(i + 1)
 
-        #pfiTransform.updateTransform(mcsData, fids, matchRadius=2.0)
         nMatch = len(np.where(ffid > 0)[0])
         self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres')
 
@@ -1058,7 +1050,9 @@ class McsCmd(object):
         t_frame,t_x0,t_y0,t_dscale,t_scale2,t_theta,t_alpha_rot,t_camera_name = dbTools.writeTransformToDB(db, frameID, pfiTransform, self.actor.cameraName)
         db.close()
         cmd.inform(f'text="wrote transform to DB"')
-        cmd.inform(f'text="paramters = {t_frame} {t_x0} {t_y0} {t_dscale} {t_scale2} {t_theta} {t_alpha_rot} {t_camera_name}"')
+
+        # Fix the format to avoid too many digits
+        cmd.inform(f'text="parameters = {t_frame} {t_x0} {t_y0} {t_dscale} {t_scale2} {t_theta} {t_alpha_rot} {t_camera_name}"')
         
         self.logger.info(f'Apply transformation to MCS data points.')
         x_mm, y_mm = pfiTransform.mcsToPfi(mcsData['mcs_center_x_pix'].values,mcsData['mcs_center_y_pix'].values)
@@ -1067,16 +1061,12 @@ class McsCmd(object):
 
         # Preparing fids for writing to DB
         self.fids['match_mask']=fidMask
-        #x_fid_mm , y_fid_mm = tweakFiducials(fids.x_mm.to_numpy(), fids.y_mm.to_numpy(), 
-        #                             inr=insrot, za=90.-altitude)
-        #cmd.inform(f'text="tweaked fiducials: {len(x_fid_mm)}, {len(y_fid_mm)}"')
-        #fids['fiducial_tweaked_x_mm'] = x_fid_mm
-        #fids['fiducial_tweaked_y_mm'] = y_fid_mm
 
         db = self.connectToDB(cmd)
         dbTools.writeFidToDB(db, ffid, mcsData, frameID, self.fids)
         cmd.inform(f'text="wrote matched FF to opdb."')
         
+        # 重要：將 pfiTransform 存儲到實例變數中
         self.pfiTrans = pfiTransform
 
         cmd.inform(f'text="PFI transformation method built"')
@@ -1182,7 +1172,7 @@ class McsCmd(object):
             self.prevPos = self.centrePos
 
         self.mmCentroids = np.copy(self.centroids)
-        #transform the coordinates to mm in place
+        #transformthe coordinates to mm in place
         self.mmCentroids[:,1], self.mmCentroids[:,2] = self.pfiTrans.mcsToPfi(self.centroids[:,1],self.centroids[:,2])
 
         # load target positions
