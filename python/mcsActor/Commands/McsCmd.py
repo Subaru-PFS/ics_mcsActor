@@ -796,19 +796,8 @@ class McsCmd(object):
 
             # switch for different centroid methods. Call with switchCMethod
             t1 = time.time()
+        
             
-            #if self.actor.cameraName == 'rmod_71m':
-            #    self.cMethod = 'sep'
-            #s    cmd.inform(f'text="Bench camera RMOD-71M is used. Using SEP" ')
-
-            #if(self.cMethod == 'sep'):
-            #    cmd.inform(f'text="Using SExtractor for centroid" ')
-            #    self.runCentroidSEPMP(cmd)
-            #    self.runCentroid(cmd,self.centParms)
-            #else:
-            #    self.runCentroid(cmd, self.centParms)
-            
-
             # Use only one version of Centroid code.
             #self.runCentroidSEPMP(cmd)
             self.runCentroid(cmd, self.centParms)
@@ -956,6 +945,12 @@ class McsCmd(object):
         cmd.inform('text="cobra geometry read"')
         self.geometrySet = True
 
+    def _safe_unpack_transform_result(self, result):
+        """Unpack the result of updateTransform safely."""
+        if len(result) >= 2:
+            return result[0], result[1]  # ffid, dist
+        else:
+            raise RuntimeError(f"updateTransform returned unexpected number of values: {len(result)}")
 
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
@@ -1015,13 +1010,16 @@ class McsCmd(object):
             raise RuntimeError("actorConfig['pfiTransform'] is missing")
 
         if 'rmod' in self.actor.cameraName.lower():
-            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing,
-                                                  matchRadius=8.0,
-                                                  nMatchMin=0.1)
+            result = pfiTransform.updateTransform(mcsData, self.fidsOuterRing,
+                                                matchRadius=8.0,
+                                                nMatchMin=0.1)
+            ffid, dist = self._safe_unpack_transform_result(result)
         else:
-            ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsOuterRing,
-                                                  matchRadius=pfiTransformConfig['matchRadiusOuterRing'],
-                                                  nMatchMin=pfiTransformConfig['nMatchMinOuterRing'])
+            result = pfiTransform.updateTransform(mcsData, self.fidsOuterRing,
+                                                matchRadius=pfiTransformConfig['matchRadiusOuterRing'],
+                                                nMatchMin=pfiTransformConfig['nMatchMinOuterRing'])
+            ffid, dist = self._safe_unpack_transform_result(result)
+
         nMatch = len(np.where(ffid > 0)[0])
         ffdist = dist[np.where(ffid > 0)[0]]
         q25, q75 = np.nanpercentile(ffdist, [25, 75])
@@ -1038,12 +1036,16 @@ class McsCmd(object):
         self.logger.info(f'Re-calcuating transformation using ALL FFs.')
         for i in range(2):
             if 'rmod' in self.actor.cameraName.lower():
-                ffid, dist = pfiTransform.updateTransform(mcsData, self.fidsGood,
-                                                  matchRadius=distThres,
-                                                  nMatchMin=0.1)
+                result = pfiTransform.updateTransform(mcsData, self.fidsGood,
+                                                    matchRadius=distThres,
+                                                    nMatchMin=0.1)
             else:
-                ffid, dist= pfiTransform.updateTransform(mcsData, self.fidsGood, matchRadius=distThres,
-                                                            nMatchMin=pfiTransformConfig['nMatchMinAll'])
+                result = pfiTransform.updateTransform(mcsData, self.fidsGood, 
+                                                    matchRadius=distThres,
+                                                    nMatchMin=pfiTransformConfig['nMatchMinAll'])
+        
+            ffid, dist = self._safe_unpack_transform_result(result)
+            
             nMatch = len(np.where(ffid > 0)[0])
             self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres with distance threshold {distThres}')
             ffdist = dist[np.where(ffid > 0)[0]]
@@ -1076,7 +1078,7 @@ class McsCmd(object):
         dbTools.writeFidToDB(db, ffid, mcsData, frameID, self.fids)
         cmd.inform(f'text="wrote matched FF to opdb."')
         
-        # 重要：將 pfiTransform 存儲到實例變數中
+        # save pfiTransform to class attribute
         self.pfiTrans = pfiTransform
 
         cmd.inform(f'text="PFI transformation method built"')
@@ -1242,7 +1244,7 @@ class McsCmd(object):
         # this flag will catch a failure in fibre identification due to very unexpected input (like targets outside the
         # patrol region)
         if(flag > 0):
-            cmd.fail('text="Failure in cobra matching, {flag} matches unsuccessful.  An underlying assumption has probably been violated."')
+            cmd.fail(f'text="Failure in cobra matching, {flag} matches unsuccessful.  An underlying assumption has probably been violated."')
             
         t1 = time.time()
         cmd.inform(f'text="Fiber ID finished in {t1-t0:0.2f}s"')
