@@ -1089,7 +1089,7 @@ class McsCmd(object):
         dbTools.writeFidToDB(db, ffid, mcsData, frameID, self.fids)
         cmd.inform(f'text="wrote matched FF to opdb."')
         
-        # 重要：將 pfiTransform 存儲到實例變數中
+        # save pfiTransform to class attribute
         self.pfiTrans = pfiTransform
 
         cmd.inform(f'text="PFI transformation method built"')
