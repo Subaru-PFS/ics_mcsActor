@@ -1255,7 +1255,7 @@ class McsCmd(object):
         # this flag will catch a failure in fibre identification due to very unexpected input (like targets outside the
         # patrol region)
         if(flag > 0):
-            cmd.fail('text="Failure in cobra matching, {flag} matches unsuccessful.  An underlying assumption has probably been violated."')
+            cmd.fail(f'text="Failure in cobra matching, {flag} matches unsuccessful.  An underlying assumption has probably been violated."')
             
         t1 = time.time()
         cmd.inform(f'text="Fiber ID finished in {t1-t0:0.2f}s"')
