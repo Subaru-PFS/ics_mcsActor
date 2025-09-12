@@ -796,19 +796,8 @@ class McsCmd(object):
 
             # switch for different centroid methods. Call with switchCMethod
             t1 = time.time()
+        
             
-            #if self.actor.cameraName == 'rmod_71m':
-            #    self.cMethod = 'sep'
-            #s    cmd.inform(f'text="Bench camera RMOD-71M is used. Using SEP" ')
-
-            #if(self.cMethod == 'sep'):
-            #    cmd.inform(f'text="Using SExtractor for centroid" ')
-            #    self.runCentroidSEPMP(cmd)
-            #    self.runCentroid(cmd,self.centParms)
-            #else:
-            #    self.runCentroid(cmd, self.centParms)
-            
-
             # Use only one version of Centroid code.
             #self.runCentroidSEPMP(cmd)
             self.runCentroid(cmd, self.centParms)
