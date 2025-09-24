@@ -349,14 +349,14 @@ class McsCmd(object):
         return imagePath, image, targets
 
     def requestNextFileIds(self, cmd, frameId):
-        """ Return a queue which will eventually contain our fileIda. """
+        """ Return a queue which will eventually contain our fileIds. """
 
         q = queue.Queue()
         cmd.inform('text="frameIds = %s." '%{frameId})
 
         def worker(q=q, cmd=cmd):
-            filename = self.getNextFileIds(cmd, frameId)
-            q.put(filename)
+            fileIds = self.getNextFileIds(cmd, frameId)
+            q.put(fileIds)
             q.task_done()
 
         task = threading.Thread(target=worker,
@@ -384,7 +384,12 @@ class McsCmd(object):
         if frameId is None:
             ret = self.actor.cmdr.call(actor='gen2', cmdStr='getVisit caller=mcs', timeLim=15.0)
             if ret.didFail:
-                raise RuntimeError("getNextFilename failed getting a visit number in 15s!")
+                # It is possible that the getVisit got a visit from
+                # Gen2 but failed to insert into tel_status. That
+                # would be survivable but we can't distinguish it
+                # here. So we have to fail, grr.
+                self.logger.warn("getNextFilename failed getting a visit number in 15s!")
+                return None
             visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
             subframeId = 0
             frameId = visit * 100 + subframeId
@@ -394,9 +399,9 @@ class McsCmd(object):
             subframeId = frameId % 100
 
             t0 = time.time()
-            ret = self.actor.cmdr.call(actor='gen2', cmdStr='updateTelStatus caller=mcs', timeLim=5.0)
+            ret = self.actor.cmdr.call(actor='gen2', cmdStr='updateTelStatus caller=mcs', timeLim=10.0)
             if ret.didFail:
-                raise RuntimeError("getNextFilename failed updating telesceop status in 15s!")
+                self.logger.warn("getNextFileIds failed updating telescope status in 10s; ignoring error")
             t1 = time.time()
             if t1-t0 >= 2:
                 cmd.warn(f'text="it took {t1-t0:0.2f}s to update telescope status"')
@@ -637,10 +642,13 @@ class McsCmd(object):
         cmd.inform(f'text="done: image shape = {image.shape}"')
 
         try:
-            fileIds = fileIdsQ.get(timeout=15.0)
+            fileIds = fileIdsQ.get(timeout=20.0)
         except queue.Empty:
-            cmd.warn('text="failed to get a new filename in time"')
-
+            cmd.warn('text="failed to get fileIds in time"')
+        if fileIds is None:
+            # get out of this completely failed exposure.
+            raise RuntimeError("gen2Actor.getVisit took too long or failed")
+        
         frameId = fileIds['frameId']
         filename = self.butler.getPath('mcsFile', **fileIds)
         fileIds['filename'] = filename
@@ -757,7 +765,11 @@ class McsCmd(object):
             self.expTime = expTime
             
             cmd.inform('text="Exposure time now is %d ms." ' % (expTime))
-            fileIds, hdr, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
+            try:
+                fileIds, hdr, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
+            except Exception as e:
+                cmd.fail(f'text="failed to take exposure: {e}"')
+                return
             filename = fileIds['filename']
             
             if frameId is None:
