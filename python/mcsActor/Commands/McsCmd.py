@@ -536,7 +536,7 @@ class McsCmd(object):
             centroids = self.centroids
         except AttributeError:
             centroids = np.empty((0,3), dtype='f4')
-        nspots = min(5000, len(centroids))
+        nspots = min(4000, len(centroids))
 
         spots = [pyfits.Column(name='x', format='E', unit='mm', 
                                array=centroids[:nspots, 1]),
@@ -1553,6 +1553,10 @@ class McsCmd(object):
             cmd.fail('text="No spots detected; check the illuminator and light path"')
             return
 
+        if(nSpots > 4000):
+            cmd.fail('text="More than 4500 spots detected; something is likely wrong"')
+
+
         maxSize = (centroids[:,3] * centroids[:,2]).max()
         if(maxSize > 1000):
             cmd.warn('text="Anomalous spot sizes detected; check for scattered light"')
@@ -1688,11 +1692,11 @@ class McsCmd(object):
     def _writeCentroids(self, centArr, frameId, moveId, conn=None):
         """ Write all measurements for a given (frameId, moveId) """
 
-        # if too many centroids have been returned, only save the first 5000
+        # if too many centroids have been returned, only save the first 4000
 
         nItems = len(centArr)
-        if(nItems > 5000):
-            nItems = 5000
+        if(nItems > 4000):
+            nItems = 4000
             
         buf = io.StringIO()
         for l_i in range(nItems):
