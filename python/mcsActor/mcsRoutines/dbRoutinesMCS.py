@@ -180,10 +180,9 @@ def _writeData(db, tableName, columnNames, dataBuf):
         tableName, columns)
     try:
         session = db.session
-        with session.connection().connection.cursor() as cursor:
-            cursor.copy_expert(sql, dataBuf)
-            cursor.close()
-        session.execute('commit')
+        with session.begin():
+            with session.connection().connection.cursor() as cursor:
+                cursor.copy_expert(sql, dataBuf)
     except Exception as e:
         logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
                             datefmt="%Y-%m-%dT%H:%M:%S")
