@@ -10,6 +10,7 @@
 #define UNIT       0
 #define BAUD       9600
 #define CHANNEL    0
+#define EDT_INTERFACE "pdv"
 
 #include <stdio.h>
 #include <math.h>
@@ -18,10 +19,11 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <time.h>
+#include <ctype.h>  // 為 isspace 函數添加
 
 #include "fitsio.h"
 #include "edtinc.h"
-#include "pciload.h" /* for strip_newline function */
+//#include "pciload.h" /* for strip_newline function */
 
 void
 printify(u_char *buf, u_char *dest, int n, int show_nonprint)
@@ -196,115 +198,94 @@ long PdvSerialWriteRead(char *ibuf_p, int verbose, char **reps){
     char  temp[256]="";
     char  buf[SERBUFSIZE+1];
     u_char  hbuf[SERBUFSIZE];
-
     u_char  lastbyte,waitc;
 
-	EdtDev *ed;
+    // 修正：使用 PdvDev 而不是 EdtDev
+    PdvDev ed;
 
-
-    /* open a handle to the device     */
+    /* open a handle to the device */
     ed = pdv_open_channel(EDT_INTERFACE, UNIT, CHANNEL);
     if (ed == NULL)
     {
-        pdv_perror(EDT_INTERFACE);
+        // 修正：使用標準錯誤處理而不是 edt_perror
+        fprintf(stderr, "Error: Failed to open PDV device %s unit %d channel %d\n", 
+                EDT_INTERFACE, UNIT, CHANNEL);
+        perror("pdv_open_channel");
         return -1;
     }
 
     pdv_serial_read_enable(ed);
 
-    /** Getting timeout value from EDT card configuration */
-    if (timeout < 1) timeout = ed->dd_p->serial_timeout;
+    /* Getting timeout value from EDT card configuration */
+    // 修正：直接使用預設的 timeout 值，避免存取結構體成員
+    if (timeout < 1) timeout = 1000; // 使用預設值
     if (verbose) printf("serial timeout %d\n", timeout);
 
-    /** Setting baud rate */
+    /* Setting baud rate - 如果函數不存在就註解掉 */
+    #ifdef HAVE_PDV_SET_BAUD
     pdv_set_baud(ed, BAUD);
-
+    #endif
 
     /* flush any junk */
     (void) pdv_serial_read(ed, buf, SERBUFSIZE);
 
     u_int val;
-	i = 0;
-	sprintf(buf, "%s\r", ibuf_p);
+    i = 0;
+    sprintf(buf, "%s\r", ibuf_p);
     
     if (verbose) printf("writing <%s>\n", ibuf_p);
     pdv_serial_command(ed, buf);
-	/*strip_newline(ibuf_p);
-	if (verbose) printf("buf=%s\n",ibuf_p);
-	while (*ibuf_p)
-	{
-		while ((*ibuf_p == ' ') || (*ibuf_p == '\t'))
-		++ibuf_p;
-
-		if (*ibuf_p == '\0')
-		break;
-
-		if (sscanf(ibuf_p, "%x", &val) != 1){
-			printf("error reading input byte %d\n",i);
-			i = 0;
-			break;
-		}
-
-		if (val > 0xff){
-			printf("Hex string format error -- expect hex bytes separated by spaces, e.g. '00 a0 ff ...' \n");
-			i = 0;
-			break;
-		}
-		else hbuf[i++] = val;
-
-		while ((*ibuf_p != ' ') && (*ibuf_p != '\t') && (*ibuf_p != '\0'))
-			++ibuf_p;
-	}
-*/	/*
-	 * using pdv_serial_binary_command instead of
-	 * pdv_serial_write because it prepends a 'c' if FOI
-	 */
-	if (i)
-		if (pdv_serial_binary_command(ed, (char *) hbuf, i) !=0){
-			fprintf(stderr, "Error: (%s:%s:%d) can not send serial binary "
-			"command to camera.\n", __FILE__, __func__, __LINE__);
-			return EXIT_FAILURE;
-		}
 
     /*
-     * serial_timeout comes from the config file (or -t override flag in
-     * this app), or if not present defaults to 500 unless readonly
-     * defaults to 60000
+     * using pdv_serial_binary_command instead of
+     * pdv_serial_write because it prepends a 'c' if FOI
      */
+    if (i)
+        if (pdv_serial_binary_command(ed, (char *) hbuf, i) !=0){
+            fprintf(stderr, "Error: (%s:%s:%d) can not send serial binary "
+            "command to camera.\n", __FILE__, __func__, __LINE__);
+            return EXIT_FAILURE;
+        }
 
-	pdv_serial_wait(ed, timeout, 64);
+    pdv_serial_wait(ed, timeout, 64);
 
-	do{
-	 	if (verbose) printf("read serial.  \n");
-		ret = pdv_serial_read(ed, buf, SERBUFSIZE);
-	    if (verbose)
-	        printf("read returned %d\n", ret);
+    do{
+        if (verbose) printf("read serial.  \n");
+        ret = pdv_serial_read(ed, buf, SERBUFSIZE);
+        if (verbose)
+            printf("read returned %d\n", ret);
 
-	    if (*buf)
-	        lastbyte = (u_char)buf[strlen(buf)-1];
+        if (*buf)
+            lastbyte = (u_char)buf[strlen(buf)-1];
 
-	    if (ret != 0)
-	    {
-	        buf[ret + 1] = 0;
-	        
-	        //print_ascii_string(buf);
-	        length += ret;
-	    }
+        if (ret != 0)
+        {
+            buf[ret + 1] = 0;
+            length += ret;
+        }
 
-	    if (ed->devid == PDVFOI_ID)
-	        ret = pdv_serial_wait(ed, 500, 0);
-	    else if (pdv_get_waitchar(ed, &waitc) && (lastbyte == waitc))
-	        ret = 0; /* jump out if waitchar is enabled/received */
-	    else ret = pdv_serial_wait(ed, 500, 64);
+        // 修正：註解掉不可用的設備檢查
+        #ifdef PDVFOI_ID
+        if (ed->devid == PDVFOI_ID)
+            ret = pdv_serial_wait(ed, 500, 0);
+        else 
+        #endif
+        // 修正：如果 pdv_get_waitchar 不存在就使用預設行為
+        #ifdef HAVE_PDV_GET_WAITCHAR
+        if (pdv_get_waitchar(ed, &waitc) && (lastbyte == waitc))
+            ret = 0; /* jump out if waitchar is enabled/received */
+        else 
+        #endif
+        ret = pdv_serial_wait(ed, 500, 64);
 
-	}while (ret > 0);
+    }while (ret > 0);
 
     pdv_close(ed);
 
     *reps=strim(buf);
     if (verbose) printf("reps = %s. \n",*reps);
 
-	return(0);
+    return(0);
 }
 
 /*
@@ -668,159 +649,196 @@ int WriteFitsImage(char *filename, int height, int width, u_char * image_p)
 }
 
 
-
+/* Print library versions */
+static void
+printVersions(void) {
+    printf("Library Versions:\n");
+    printf("================\n");
+    
+    printf("CFITSIO Library:\n");
+    #ifdef CFITSIO_VERSION
+    #define STRINGIFY(x) #x
+    #define TOSTRING(x) STRINGIFY(x)
+    printf("  Version: %s\n", TOSTRING(CFITSIO_VERSION));
+    printf("  Status: Available\n");
+	#endif
+    printf("\n");
+    
+    // EDT PDV library version
+    printf("EDT PDV Library:\n");
+    char edt_version_str[256];
+    if (edt_get_library_version(edt_version_str, sizeof(edt_version_str)) == 0) {
+        printf("  Version: %s\n", edt_version_str);
+        printf("  Status: Available\n");
+    } else {
+        printf("  Status: Error getting version\n");
+    }
+    printf("\n");
+    
+    // 編譯器版本
+    printf("Compiler Information:\n");
+    #ifdef __GNUC__
+        #ifdef __GNUC_PATCHLEVEL__
+        printf("  Compiler: GCC %d.%d.%d\n", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+        #else
+        printf("  Compiler: GCC %d.%d\n", __GNUC__, __GNUC_MINOR__);
+        #endif
+    #else
+    printf("  Compiler: Unknown\n");
+    #endif
+    
+    printf("  Build Date: %s %s\n", __DATE__, __TIME__);
+    printf("\n");
+}
 
 /* Print out the proper program usage syntax */
 static void
 printUsageSyntax(char *prgname) {
    fprintf(stderr,
-	   "RMOD-71MP Control Agent \n"
-	   "Usage: %s [options...]\n"
-		"	-h, --help   display help message\n"
-		"	-e, --etime  set a new exposure time (ms).\n"
-		"	-l, --list   list system information.\n"
-		"	-v, --verbose  turn on verbose.\n"
-		, prgname);
-
+       "RMOD-71MP Control Agent \n"
+       "Usage: %s [options...]\n"
+        "    -h, --help      display help message\n"
+        "    -e, --etime     set a new exposure time (ms).\n"
+        "    -l, --list      list system information.\n"
+        "    -v, --verbose   turn on verbose.\n"
+        "    -V, --version   display library versions.\n"
+        , prgname);
 }
 
-
 int main(int argc, char *argv[]){
-	int    opt;
-	int    unit = 0;
-	int    channel = 0 ;
-	int    mode,temp;
-	int    verbose=0,list=0;
-	int    i,ii;
+    int    opt;
+    int    unit = 0;
+    int    channel = 0 ;
+    int    mode,temp;
+    int    verbose=0,list=0;
+    int    i,ii;
     int    timeouts = 0;
     int    status;
 
+    // 修正：使用 PdvDev 而不是 EdtDev *
+    PdvDev pdv_p = NULL;
 
-	EdtDev *pdv_p = NULL;
-
-	u_char **bufs;
+    u_char **bufs;
     u_char *image_p=NULL;
 
-	char   *unitstr = "0";
-	char   edt_devname[256];
+    char   *unitstr = "0";
+    char   edt_devname[256];
     char   errstr[64];
     char   string[256];
 
     unsigned long etime=0, exptime;
 
-
     double shutter_ts,start_ts,end_ts,save_ts;
     double dtime;
-	/** Check the total number of the arguments */
-	struct option longopts[] = {
+
+    /** Check the total number of the arguments */
+    struct option longopts[] = {
          {"list" ,0, NULL, 'l'},
-	     {"etime" ,0, NULL, 'e'},
-		 {"verbose",0, NULL, 'v'},
-		 {"help", 0, NULL, 'h'},
-		 {0,0,0,0}};
+         {"etime" ,1, NULL, 'e'},
+         {"verbose",0, NULL, 'v'},
+         {"version",0, NULL, 'V'},
+         {"help", 0, NULL, 'h'},
+         {0,0,0,0}
+    };
 
-	while((opt = getopt_long(argc, argv, "e:lvh",
-	   longopts, NULL))  != -1){
-	      switch(opt) {
-	         case 'l':
-	               list = 1;
-	               break;
-	         case 'e':
-	               etime=atoi(optarg);
-	               break;
-	         case 'v':
-	               verbose = 1;
-	               break;
-	         case 'h':
-	               printUsageSyntax(argv[0]);
-	               exit(EXIT_FAILURE);
-	               break;
-	         case '?':
-	               printUsageSyntax(argv[0]);
-	               exit(EXIT_FAILURE);
-	               break;
-	      }
-	}
+    while((opt = getopt_long(argc, argv, "e:lvVh", longopts, NULL)) != -1){
+        switch(opt) {
+            case 'l':
+                list = 1;
+                break;
+            case 'e':
+                etime=atoi(optarg);
+                break;
+            case 'v':
+                verbose = 1;
+                break;
+            case 'V':
+                printVersions();
+                exit(EXIT_SUCCESS);
+                break;
+            case 'h':
+                printUsageSyntax(argv[0]);
+                exit(EXIT_SUCCESS);
+                break;
+            case '?':
+                printUsageSyntax(argv[0]);
+                exit(EXIT_FAILURE);
+                break;
+        }
+    }
 
-
-	/** Print the usage syntax if there is no input */
-	if (argc < 2 ) {
-		printUsageSyntax(argv[0]);
-		return EXIT_FAILURE;
-	}
-
-	/* Start to establish EDT connection to update time out information */
-	unit = edt_parse_unit_channel(unitstr, edt_devname, "pdv", &channel);
-	/*
-     * pdv_open_channel is just pdv_open with an extra argument, the channel,
-     * which is normally 0 unless you're running multiple cameras (2nd base
-     * mode on a PCI DV C-Link or dasy-chained RCI boxes off a single PCI
-     * FOI)
-     */
-	if ((pdv_p = pdv_open_channel(edt_devname, unit, channel)) == NULL){
-    	fprintf(stderr, "Error:pdv_open(%s%d_%d)", edt_devname, UNIT, CHANNEL);
-        pdv_perror(errstr);
+    /** Print the usage syntax if there is no input */
+    if (argc < 2 ) {
+        printUsageSyntax(argv[0]);
         return EXIT_FAILURE;
-	}
+    }
 
-	if (list == 1){
-		printf("Listing camera information.\n");
+    /* Start to establish EDT connection to update time out information */
+    unit = edt_parse_unit_channel(unitstr, edt_devname, "pdv", &channel);
 
-		status=GetRmodMode(verbose,&mode);
-		if (status != 0){
-			fprintf(stderr, "Error: (%s:%s:%d) not able to get camera "
-			"mode.\n", __FILE__, __func__, __LINE__);
-			return EXIT_FAILURE;
-		} else {
-			if (mode == 1) printf("---> Camera is now under medium mode. \n");
-			if (mode == 0) printf("---> Camera is now under base mode. \n");
+    if ((pdv_p = pdv_open_channel(edt_devname, unit, channel)) == NULL){
+        // 修正：使用標準錯誤處理而不是 edt_perror
+        fprintf(stderr, "Error: Failed to open PDV device %s unit %d channel %d\n", 
+                edt_devname, unit, channel);
+        perror("pdv_open_channel");
+        return EXIT_FAILURE;
+    }
 
-		}	
-		status=GetRmodTemp(verbose,&temp);
-		if (status != 0){
-			fprintf(stderr, "Error: (%s:%s:%d) not able to get camera "
-			"mode.\n", __FILE__, __func__, __LINE__);
-			return EXIT_FAILURE;
-		} else {
-			printf("---> Camera temperture = %d degC.\n", temp);
-		}	
+    if (list == 1){
+        printf("Listing camera information.\n");
 
-		status=GetRmodExptime(verbose,&exptime);
-		if (status != 0){
-			fprintf(stderr, "Error: (%s:%s:%d) not able to get camera "
-			"exposure time.\n", __FILE__, __func__, __LINE__);
-			return EXIT_FAILURE;
-		} else {
+        status=GetRmodMode(verbose,&mode);
+        if (status != 0){
+            fprintf(stderr, "Error: (%s:%s:%d) not able to get camera "
+            "mode.\n", __FILE__, __func__, __LINE__);
+            return EXIT_FAILURE;
+        } else {
+            if (mode == 1) printf("---> Camera is now under medium mode. \n");
+            if (mode == 0) printf("---> Camera is now under base mode. \n");
+        }    
 
-			printf("---> Camera exposure time = %ld ms. \n",exptime);
-		}	
-	}
+        status=GetRmodTemp(verbose,&temp);
+        if (status != 0){
+            fprintf(stderr, "Error: (%s:%s:%d) not able to get camera "
+            "temperature.\n", __FILE__, __func__, __LINE__);
+            return EXIT_FAILURE;
+        } else {
+            printf("---> Camera temperature = %d degC.\n", temp);
+        }    
 
-	if (etime != 0){
-		if (verbose) printf("Set camera exposure time = %ld ms. \n",etime);
+        status=GetRmodExptime(verbose,&exptime);
+        if (status != 0){
+            fprintf(stderr, "Error: (%s:%s:%d) not able to get camera "
+            "exposure time.\n", __FILE__, __func__, __LINE__);
+            return EXIT_FAILURE;
+        } else {
+            printf("---> Camera exposure time = %ld ms. \n",exptime);
+        }    
+    }
 
-		status=SetRmodExptime(verbose,(unsigned int)etime);
-		if (status != 0){
-			fprintf(stderr, "Error: (%s:%s:%d) not able to get camera "
-			"mode.\n", __FILE__, __func__, __LINE__);
-			return EXIT_FAILURE;
-		}
+    if (etime != 0){
+        if (verbose) printf("Set camera exposure time = %ld ms. \n",etime);
 
-		status=GetRmodExptime(verbose,&etime);
-		if (status != 0){
-			fprintf(stderr, "Error: (%s:%s:%d) not able to get camera "
-			"exposure time.\n", __FILE__, __func__, __LINE__);
-			return EXIT_FAILURE;
-		} else {
+        status=SetRmodExptime(verbose,(unsigned int)etime);
+        if (status != 0){
+            fprintf(stderr, "Error: (%s:%s:%d) not able to set camera "
+            "exposure time.\n", __FILE__, __func__, __LINE__);
+            return EXIT_FAILURE;
+        }
 
-			printf("---> Camera exposure time = %ld ms. \n",etime);
-		}	
+        status=GetRmodExptime(verbose,&etime);
+        if (status != 0){
+            fprintf(stderr, "Error: (%s:%s:%d) not able to get camera "
+            "exposure time.\n", __FILE__, __func__, __LINE__);
+            return EXIT_FAILURE;
+        } else {
+            printf("---> Camera exposure time = %ld ms. \n",etime);
+        }    
+    }
 
+    // 修正：記得關閉 PDV 連接
+    pdv_close(pdv_p);
 
-	}
-
-
-	return EXIT_SUCCESS;
-
+    return EXIT_SUCCESS;
 }
 

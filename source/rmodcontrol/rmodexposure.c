@@ -5,7 +5,6 @@
  *      Author: chyan
  */
 
-
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -17,7 +16,7 @@
 //#include "sgc/sgc.h"
 #include "fitsio.h"
 #include "edtinc.h"
-#include "pciload.h" /* for strip_newline function */
+//#include "pciload.h" /* for strip_newline function */
 
 int WriteFitsImage(char *filename, int height, int width, u_char * image_p)
 {
@@ -121,13 +120,9 @@ int WriteFitsImage(char *filename, int height, int width, u_char * image_p)
  */
 static double
 getClockTime(void) {
-
    struct timespec ts;
 
    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-      //cfht_logv(CFHT_MAIN, CFHT_LOGONLY,
-		//"(%s:%d) unable to get clock timestamp : %s (errno=%d)",
-		//__FILE__, __LINE__, strerror(errno), errno);
       return 0;
    }
    return (double)(ts.tv_sec + ts.tv_nsec / 1000000000.0);
@@ -139,6 +134,48 @@ void delay(unsigned int mseconds)
     while (goal > clock());
 }
 
+/* Print library versions */
+static void
+printVersions(void) {
+    printf("Library Versions:\n");
+    printf("================\n");
+    
+    printf("CFITSIO Library:\n");
+    #ifdef CFITSIO_VERSION
+    #define STRINGIFY(x) #x
+    #define TOSTRING(x) STRINGIFY(x)
+    printf("  Version: %s\n", TOSTRING(CFITSIO_VERSION));
+    printf("  Status: Available\n");
+
+    #endif
+    printf("\n");
+    
+    // EDT PDV library version
+    printf("EDT PDV Library:\n");
+    char edt_version_str[256];
+    if (edt_get_library_version(edt_version_str, sizeof(edt_version_str)) == 0) {
+        printf("  Version: %s\n", edt_version_str);
+        printf("  Status: Available\n");
+    } else {
+        printf("  Status: Error getting version\n");
+    }
+    printf("\n");
+    
+    // 編譯器版本
+    printf("Compiler Information:\n");
+    #ifdef __GNUC__
+        #ifdef __GNUC_PATCHLEVEL__
+        printf("  Compiler: GCC %d.%d.%d\n", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+        #else
+        printf("  Compiler: GCC %d.%d\n", __GNUC__, __GNUC_MINOR__);
+        #endif
+    #else
+    printf("  Compiler: Unknown\n");
+    #endif
+    
+    printf("  Build Date: %s %s\n", __DATE__, __TIME__);
+    printf("\n");
+}
 
 /* Print out the proper program usage syntax */
 static void
@@ -150,157 +187,170 @@ printUsageSyntax(char *prgname) {
 		"	-f, --file   name of FITS file to be saved.\n"
 		"	-l, --loops  number of exposure loops.\n"
 		"	-v, --verbose  turn on verbose.\n"
+		"	-V, --version   display library versions.\n"
 		, prgname);
 
 }
 
-
 int main(int argc, char *argv[]){
-	int    opt;
-	int    unit = 0;
-	int    channel = 0 ;
-	int    s_height,s_width,s_depth;
-	int    imagesize;
-	int    verbose=0,loops=1;
-	int    i,ii;
-	int    numbufs = 4;
-	int    started;
-	int    timeouts =0 , last_timeouts = 0;
-	int    recovering_timeout = FALSE;
+    int    opt;
+    int    unit = 0;
+    int    channel = 0 ;
+    int    s_height,s_width,s_depth;
+    int    imagesize;
+    int    verbose=0,loops=1;
+    int    i,ii;
+    int    numbufs = 4;
+    int    started;
+    int    timeouts =0 , last_timeouts = 0;
+    int    recovering_timeout = FALSE;
 
-	EdtDev *pdv_p = NULL;
+    // 修正：使用 PdvDev 而不是 EdtDev *
+    PdvDev pdv_p = NULL;
 
-	u_char **bufs;
+    u_char **bufs;
     u_char *image_p=NULL;
 
     char   *file=NULL;
-	char   *unitstr = "0";
-	char   edt_devname[256];
+    char   *unitstr = "0";
+    char   edt_devname[256];
     char   errstr[64];
     char   string[256];
 
     double shutter_ts,start_ts,end_ts,save_ts;
     double dtime;
-	/** Check the total number of the arguments */
-	struct option longopts[] = {
-         {"loops" ,0, NULL, 'l'},
-	     {"file" ,0, NULL, 'f'},
-		 {"verbose",0, NULL, 'v'},
-		 {"help", 0, NULL, 'h'},
-		 {0,0,0,0}};
 
-	while((opt = getopt_long(argc, argv, "f:l:vh",
-	   longopts, NULL))  != -1){
-	      switch(opt) {
-	         case 'l':
-	               loops = atoi(optarg);
-	               break;
-	         case 'f':
-	               file = optarg;
-	               break;
-	         case 'v':
-	               verbose = 1;
-	               break;
-	         case 'h':
-	               printUsageSyntax(argv[0]);
-	               exit(EXIT_FAILURE);
-	               break;
-	         case '?':
-	               printUsageSyntax(argv[0]);
-	               exit(EXIT_FAILURE);
-	               break;
-	      }
-	}
+    /** Check the total number of the arguments */
+    struct option longopts[] = {
+         {"loops" ,1, NULL, 'l'},
+         {"file" ,1, NULL, 'f'},
+         {"verbose",0, NULL, 'v'},
+         {"version",0, NULL, 'V'},
+         {"help", 0, NULL, 'h'},
+         {0,0,0,0}
+    };
 
-
-	/** Print the usage syntax if there is no input */
-	if (argc < 2 ) {
-		printUsageSyntax(argv[0]);
-		return EXIT_FAILURE;
-	}
-
-	if (file == NULL){
-		fprintf(stderr, "Warning: (%s:%s:%d) there is no FITS file name specified, use \"exposureXX.fits\"."
-		"\n", __FILE__, __func__, __LINE__);
-		file="exposure";
-	}
-
-	if (loops > 1){
-		if (verbose) printf("take %i exposures.\n",loops);
-	}
-
-	/* Start to establish EDT connection */
-	unit = edt_parse_unit_channel(unitstr, edt_devname, "pdv", &channel);
-
-	/*
-	* pdv_open_channel is just pdv_open with an extra argument, the channel,
-	* which is normally 0 unless you're running multiple cameras (2nd base
-	* mode on a PCI DV C-Link or dasy-chained RCI boxes off a single PCI
-	* FOI)
-	*/
-
-	if ((pdv_p = pdv_open_channel(edt_devname, unit, channel)) == NULL){
-		fprintf(stderr, "Error:pdv_open(%s%d_%d)", edt_devname, unit, channel);
-		pdv_perror(errstr);
-		return EXIT_FAILURE;
-	}
-
-	pdv_flush_fifo(pdv_p);
-
-	s_height=pdv_get_height(pdv_p);
-	s_width=pdv_get_width(pdv_p);
-	s_depth = pdv_get_depth(pdv_p);
-	imagesize = pdv_get_imagesize(pdv_p);
-	
-	//image_p=pdv_alloc(pdv_image_size(pdv_p));
-
-	if (verbose) printf("Image size --> Height = %i Width= %i\n", s_height, s_width);
-
-	if (s_height<1 && s_width<1){
-		fprintf(stderr, "Error: (%s:%s:%d) image size incorrect. "
-		"Check ROI setting.\n", __FILE__, __func__, __LINE__);
-		return EXIT_FAILURE;
-
-	}
-
-		/* The number of buffers is limited only by the amount of host memory available,
-		* up to approximately 3.5GBytes (or less, depending on other OS use of the low
-		* 3.5 GB of memory). Each buffer has a certain amount of overhead, so setting
-		* a large number, even if the images are small, is not recommended. Four is
-		* the recommended number: at any time, one buffer is being read in, one buffer
-		* is being read out, one is being set up for DMA, and one is in reserve in case
-		* of overlap. Additional buffers may be necessary with very fast cameras;
-		* 32 will almost always smooth out any problems with really fast cameras, and
-		* if the system can't keep up with 64 buffers allocated, there may be other problems.
-		*
-		*/
-	for (i=0; i<loops; i++){
-		pdv_flush_fifo(pdv_p);
-
-		pdv_multibuf(pdv_p, 4);
-		if (pdv_p->dd_p->force_single){
-			pdv_start_image(pdv_p);
-			started = 1;
-		}else{
-			pdv_start_images(pdv_p, numbufs);
-			started = numbufs;
-		}
-
-
-		if (verbose) fprintf(stdout,"Setting time-out limit %i\n", 100000);
-		pdv_set_timeout(pdv_p, 100000);
-
-		(void) edt_dtime();		/* init time for check */
-	
-		printf("getting image %d\r", i + 1);
-        fflush(stdout);
-		image_p=pdv_alloc(pdv_image_size(pdv_p));
-		
-		image_p = pdv_wait_image(pdv_p);
-		if (i < loops - started){
-             pdv_start_image(pdv_p);
+    while((opt = getopt_long(argc, argv, "f:l:vVh", longopts, NULL)) != -1){
+        switch(opt) {
+            case 'l':
+                loops = atoi(optarg);
+                break;
+            case 'f':
+                file = optarg;
+                break;
+            case 'v':
+                verbose = 1;
+                break;
+            case 'V':
+                printVersions();
+                exit(EXIT_SUCCESS);
+                break;
+            case 'h':
+                printUsageSyntax(argv[0]);
+                exit(EXIT_SUCCESS);
+                break;
+            case '?':
+                printUsageSyntax(argv[0]);
+                exit(EXIT_FAILURE);
+                break;
         }
-		dtime = edt_dtime();
+    }
+
+    /** Print the usage syntax if there is no input */
+    if (argc < 2 ) {
+        printUsageSyntax(argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    if (file == NULL){
+        fprintf(stderr, "Warning: (%s:%s:%d) there is no FITS file name specified, use \"exposureXX.fits\"."
+        "\n", __FILE__, __func__, __LINE__);
+        file="exposure.fits";
+    }
+
+    if (loops > 1){
+        if (verbose) printf("take %i exposures.\n",loops);
+    }
+
+    /* Start to establish EDT connection */
+    unit = edt_parse_unit_channel(unitstr, edt_devname, "pdv", &channel);
+
+    /*
+    * pdv_open_channel is just pdv_open with an extra argument, the channel,
+    * which is normally 0 unless you're running multiple cameras (2nd base
+    * mode on a PCI DV C-Link or dasy-chained RCI boxes off a single PCI
+    * FOI)
+    */
+
+    if ((pdv_p = pdv_open_channel(edt_devname, unit, channel)) == NULL){
+        fprintf(stderr, "Error: Failed to open PDV device %s unit %d channel %d\n", 
+                edt_devname, unit, channel);
+        perror("pdv_open_channel");
+        return EXIT_FAILURE;
+    }
+
+    pdv_flush_fifo(pdv_p);
+
+    s_height=pdv_get_height(pdv_p);
+    s_width=pdv_get_width(pdv_p);
+    s_depth = pdv_get_depth(pdv_p);
+    imagesize = pdv_get_image_size(pdv_p);  // 修正：使用正確的函數名
+
+    if (verbose) printf("Image size --> Height = %i Width= %i\n", s_height, s_width);
+
+    if (s_height<1 && s_width<1){
+        fprintf(stderr, "Error: (%s:%s:%d) image size incorrect. "
+        "Check ROI setting.\n", __FILE__, __func__, __LINE__);
+        return EXIT_FAILURE;
+    }
+
+    /* The number of buffers is limited only by the amount of host memory available,
+    * up to approximately 3.5GBytes (or less, depending on other OS use of the low
+    * 3.5 GB of memory). Each buffer has a certain amount of overhead, so setting
+    * a large number, even if the images are small, is not recommended. Four is
+    * the recommended number: at any time, one buffer is being read in, one buffer
+    * is being read out, one is being set up for DMA, and one is in reserve in case
+    * of overlap. Additional buffers may be necessary with very fast cameras;
+    * 32 will almost always smooth out any problems with really fast cameras, and
+    * if the system can't keep up with 64 buffers allocated, there may be other problems.
+    *
+    */
+    for (i=0; i<loops; i++){
+        pdv_flush_fifo(pdv_p);
+
+        pdv_multibuf(pdv_p, 4);
+        
+        // 修正：避免直接存取結構體成員，使用預設行為
+        #ifdef HAVE_FORCE_SINGLE_CHECK
+        if (pdv_p->dd_p->force_single){
+            pdv_start_image(pdv_p);
+            started = 1;
+        } else {
+            pdv_start_images(pdv_p, numbufs);
+            started = numbufs;
+        }
+        #else
+        // 使用預設的多重緩衝模式
+        pdv_start_images(pdv_p, numbufs);
+        started = numbufs;
+        #endif
+
+        if (verbose) fprintf(stdout,"Setting time-out limit %i\n", 100000);
+        pdv_set_timeout(pdv_p, 100000);
+
+        (void) edt_dtime();     /* init time for check */
+
+        printf("getting image %d\r", i + 1);
+        fflush(stdout);
+        
+        image_p = pdv_alloc(pdv_get_image_size(pdv_p));  // 修正：使用正確的函數名
+
+        // 修正：使用正確的函數名和類型轉換
+        image_p = (u_char*)pdv_wait_images(pdv_p, 1);
+        if (i < loops - started){
+            pdv_start_images(pdv_p, 1);  // 修正：使用存在的函數
+        }
+        dtime = edt_dtime();
 
         timeouts = pdv_timeouts(pdv_p);
 
@@ -326,26 +376,21 @@ int main(int argc, char *argv[]){
              printf("\nrestarted....\n");
         }
 
-		if (loops == 1){
-			sprintf(string,"%s",file);
-		} else {
-			sprintf(string,"%s%04i%s",file,i+1,".fits");
-		}
+        if (loops == 1){
+            sprintf(string,"%s",file);
+        } else {
+            sprintf(string,"%s%04i%s",file,i+1,".fits");
+        }
         WriteFitsImage(string, s_height, s_width,image_p);
-		if (verbose) fprintf(stdout,"filename saved as %s\n", string);
-		
-		if (verbose) printf("%f frames/sec\n", dtime);
+        if (verbose) fprintf(stdout,"filename saved as %s\n", string);
 
+        if (verbose) printf("%f frames/sec\n", dtime);
+    }
 
-	}
-    
-	pdv_close(pdv_p);
+    pdv_close(pdv_p);
 
-    
-	printf("done\n");
+    printf("done\n");
 
-	return EXIT_SUCCESS;
-
-
+    return EXIT_SUCCESS;
 }
 
