@@ -938,17 +938,23 @@ class McsCmd(object):
         instPath = os.path.join(os.environ['PFS_INSTDATA_DIR'])
         #if(self.geomFile == None):
         #    self.geomFile = os.path.join(instPath, 'data/pfi/modules/ALL/ALL_final_20210920_mm.xml')
+        
+        if self.geomFile == None:
+            self.geomFile = self.butler.get("moduleXml", moduleName="ALL", version="")
+            pfi = self.geomFile
+        else:
+            pfi = self.geomFile
+        
         if(self.dotFile == None):
             self.dotFile = os.path.join(
                 instPath, "data/pfi/dot/black_dots_mm.csv")
 
-        pfi = self.butler.get("moduleXml", moduleName="ALL", version="")
+        #pfi = self.butler.get("moduleXml", moduleName="ALL", version="")
         dots = self.butler.get("black_dots", moduleName="ALL", version="")
 
         cmd.inform(f'text="loading XML from butler"')
         cmd.inform(f'text="loading DOT location from butler"')
-        self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.calibModel = mcsTools.readCobraGeometry(
-            pfi, dots)
+        self.centrePos, self.armLength, self.dotPos, self.goodIdx, self.calibModel = mcsTools.readCobraGeometry(pfi, dots)
 
         # not used anymore.
         # fids = self.butler.get('fiducials')
