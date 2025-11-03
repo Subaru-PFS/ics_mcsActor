@@ -157,25 +157,66 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
 
     return (df['mcs_frame_id'].values, df['x0'].values, df['y0'].values, df['dscale'].values,
             df['scale2'].values, df['theta'].values, df['alpha_rot'].values, df['camera_name'].values)
-    
-    
+
+
 def _writeData(db, tableName, columnNames, dataBuf):
-    """Wrap a direct COPY_FROM via sqlalchemy. """
-    columns = ','.join('"{}"'.format(k) for k in columnNames)
-    sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(
-        tableName, columns)
+    """
+    COPY FROM STDIN (CSV) into a table using the SQLAlchemy Session.
+
+    Parameters
+    ----------
+    db : opdb.opdb.OpDB
+        Handle exposing `db.session` (SQLAlchemy Session).
+    tableName : str
+        Target table name, optionally schema-qualified (e.g. 'schema.table').
+    columnNames : iterable[str]
+        Columns to load, in the exact order they appear in the CSV stream.
+    dataBuf : io.StringIO
+        Text file-like object positioned anywhere; will be rewound.
+
+    Behavior
+    --------
+    - Reuses an active transaction on the Session; otherwise opens one and commits.
+    - Rolls back on error and re-raises the exception.
+    - Does not close the Session; only the DBAPI cursor is context-managed.
+
+    Raises
+    ------
+    Exception
+        Any error from COPY or the database driver; the Session is rolled back.
+    """
+    columns = ','.join(f'"{c}"' for c in columnNames)
+    sql = f'COPY {tableName} ({columns}) FROM STDIN WITH CSV'
+    session = db.session
+    # make sure to rewind the buffer
+    dataBuf.seek(0)
+
+    def doCopy():
+        conn = session.connection()                 # SQLA Connection (bound to current txn)
+        raw = conn.connection                       # DBAPI connection (psycopg2)
+        with raw.cursor() as cur:
+            cur.copy_expert(sql, dataBuf)           # context manager closes cursor
+
     try:
-        session = db.session
-        with session.connection().connection.cursor() as cursor:
-            cursor.copy_expert(sql, dataBuf)
-            cursor.close()
-        session.execute('commit')
+        if session.in_transaction():
+            doCopy()                                # reuse caller's transaction
+        else:
+            with session.begin():
+                doCopy()                            # commit on success
+
+        return True
+
     except Exception as e:
+        if session.in_transaction():
+            session.rollback()
+
         logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
                             datefmt="%Y-%m-%dT%H:%M:%S")
         logger = logging.getLogger('mcscmd')
         logger.setLevel(logging.INFO)
-        logger.warn(f"failed to write with {sql}: {e}")
+        logger.warning(f"failed to write with {sql}: {e}")
+
+        return False
 
 def writeTargetToDB(db, frameId, target, mpos):
     visitId = frameId // 100
