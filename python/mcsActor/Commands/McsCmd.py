@@ -126,7 +126,8 @@ class McsCmd(object):
             ('switchCMethod', '<cMethod>', self.switchCMethod),
             ('switchFMethod', '<fMethod>', self.switchFMethod),
             ('resetGeometry', '', self.resetGeometry),
-            ('resetGeometryFile', '<geomFile>', self.resetGeometryFile),
+            ('resetGeometryFile', '', self.resetGeometryFile),
+            ('setGeometryFile', '<geomFile>', self.setGeometryFile),
             ('setDb', '[<hostname>] [<username>] [<port>] [<db>]', self.setDb)
         ]
 
@@ -941,15 +942,12 @@ class McsCmd(object):
         
         if self.geomFile == None:
             self.geomFile = self.butler.get("moduleXml", moduleName="ALL", version="")
-            pfi = self.geomFile
-        else:
-            pfi = self.geomFile
-        
+        pfi = self.geomFile
+
         if(self.dotFile == None):
             self.dotFile = os.path.join(
                 instPath, "data/pfi/dot/black_dots_mm.csv")
 
-        #pfi = self.butler.get("moduleXml", moduleName="ALL", version="")
         dots = self.butler.get("black_dots", moduleName="ALL", version="")
 
         cmd.inform(f'text="loading XML from butler"')
@@ -1110,12 +1108,16 @@ class McsCmd(object):
     def resetGeometryFile(self, cmd):
 
         self.geomFile = None
-        cmd.inform(f'text="geometry file set to {self.geomFile}"')
+        self.geometrySet = False
+        self.getGeometry(cmd)
+        cmd.finish(f'text="geometry file set to {self.geomFile}"')
 
     def setGeometryFile(self, cmd):
 
         self.geomFile = cmd.cmd.keywords["geomFile"].values[0]
-        cmd.inform(f'text="geometry file set to {self.geomFile}"')
+        self.geometrySet = False
+        self.getGeometry(cmd)
+        cmd.finish(f'text="geometry file set to {self.geomFile}"')
 
     def easyFiberID(self, cmd, frameId):
         reload(calculation)
