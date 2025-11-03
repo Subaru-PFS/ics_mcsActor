@@ -19,32 +19,22 @@ fiducial_fiber (must be populated)
 
 
 """
-import os
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import pathlib
-import sys
-import io 
+import io
 import logging
-
-import pandas as pd
-from scipy.stats import sigmaclip
-import copy
-from opdb import opdb
 from datetime import datetime, timezone
-import psycopg2
-from sqlalchemy import text as sqlText
 
+import numpy as np
+import pandas as pd
 from ics.utils.opdb import opDB
+from opdb import opdb
 
 logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
-                            datefmt="%Y-%m-%dT%H:%M:%S")
+                    datefmt="%Y-%m-%dT%H:%M:%S")
 logger = logging.getLogger('mcscmd')
 logger.setLevel(logging.INFO)
 
-def connectToDB(hostname='', port='', dbname='opdb', username='pfs'):
 
+def connectToDB(hostname='', port='', dbname='opdb', username='pfs'):
     db = opdb.OpDB(hostname=hostname, port=port,
                    dbname=dbname,
                    username=username)
@@ -62,44 +52,45 @@ def loadCobraMatchFromDB(db, frameId):
 
     df = db.fetch_query(sql)
 
-    positions = df['pfi_center_x_mm']+df['pfi_center_y_mm']*1j
+    positions = df['pfi_center_x_mm'] + df['pfi_center_y_mm'] * 1j
     flags = df['flags']
 
     return positions, flags
 
 
 def loadTelescopeParametersFromDB(db, frameId):
-
     sql = f'SELECT mcs_exposure.insrot,mcs_exposure.altitude FROM mcs_exposure WHERE mcs_exposure.mcs_frame_id={frameId}'
     df = db.fetch_query(sql)
 
     if df['altitude'][0] < -99:
         zenithAngle = 90
     else:
-        zenithAngle = 90-df['altitude'][0]
+        zenithAngle = 90 - df['altitude'][0]
 
     insRot = df['insrot'][0]
 
     return zenithAngle, insRot
-    
+
+
 def loadBoresightFromDB(db, pfsVisitId):
     """
     read boresight informatino from database
     table = mcs_boresight
     """
     sql = f'''SELECT * FROM mcs_boresight ORDER BY calculated_at DESC FETCH FIRST ROW ONLY'''
-    #sql=f'SELECT mcs_boresight.mcs_boresight_x_pix,mcs_boresight.mcs_boresight_y_pix from mcs_boresight where mcs_boresight.pfs_visit_id={pfsVisitId}'
+    # sql=f'SELECT mcs_boresight.mcs_boresight_x_pix,mcs_boresight.mcs_boresight_y_pix from mcs_boresight where mcs_boresight.pfs_visit_id={pfsVisitId}'
     df = db.fetch_query(sql)
     return [df['mcs_boresight_x_pix'][0], df['mcs_boresight_y_pix'][0]]
 
 
 def loadCentroidsFromDB(db, mcsFrameId):
     """ retrieve a set of centroids from database and return as a numpy array"""
-    
+
     sql = f'select mcs_data.spot_id, mcs_data.mcs_center_x_pix, mcs_data.mcs_center_y_pix from mcs_data where mcs_data.mcs_frame_id={mcsFrameId}'
     df = db.fetch_query(sql)
     return df.to_numpy()
-    
+
+
 def loadFiducialsFromDB(db):
     """
     load fiducial fibre positions from the DB
@@ -127,13 +118,14 @@ def loadTargetsFromDB(db, frameId):
     iteration = frameId % 100
 
     sql = f'SELECT cobra_target.cobra_id,cobra_target.pfi_target_x_mm,cobra_target.pfi_target_y_mm FROM cobra_target WHERE cobra_target.iteration={iteration} and cobra_target.pfs_visit_id={visitId}'
-    df = db.bulkSelect('cobra_target',sql)
+    df = db.bulkSelect('cobra_target', sql)
 
     return np.array([df['cobra_id'], df['pfi_target_x_mm'], df['pfi_target_y_mm']]).T
 
-def writeTransformToDB(db, frameId, pfiTransform, cameraName):
-    """
-    write transformation coefficients to database
+
+def writeTransformToDB(db, frameId, pfiTransform, cameraName, doCloseTransaction=False):
+    """Write [x0,y0,theta,dscale,scale2,alpha_rot,camera_name] for one frame into mcs_pfi_transformation.
+    If doCloseTransaction=True and a transaction is already active, commit here; else delegate to db.insert().
     """
     pfs_visit_id = frameId // 100
     iteration = frameId % 100
@@ -146,61 +138,95 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
                     mcs_boresight_y_pix=pfiTransform.mcs_boresight_y_pix,
                     calculated_at='now')
 
-    trans=pfiTransform.mcsDistort.getArgs()
-    res = db.session.execute(sqlText('select * FROM "mcs_pfi_transformation" where false'))
-    colnames = tuple(res.keys())
-    realcolnames = colnames[0:]
-    line = '%d,%f,%f,%f,%e,%e,%f,%s' % (frameId, trans[0].astype('float64'),
-           trans[1], trans[3], trans[4],trans[2],
-           pfiTransform.alphaRot, cameraName)
-                                                                        
-    buf = io.StringIO()
-    buf.write(line)
-    buf.seek(0, 0)
-    _writeData(db, 'mcs_pfi_transformation', realcolnames, buf)
+    mcsDistortCols = ['x0', 'y0', 'theta', 'dscale', 'scale2']
+
+    df = pd.DataFrame(pfiTransform.mcsDistort.getArgs().reshape(1, len(mcsDistortCols)), columns=mcsDistortCols)
+    df['mcs_frame_id'] = frameId
+    df['alpha_rot'] = float(pfiTransform.alphaRot)
+    df['camera_name'] = cameraName
+
+    if doCloseTransaction and db.session.in_transaction():
+        try:
+            db.bulk_insert_mappings('mcs_pfi_transformation', df)
+            db.session.commit()
+
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"failed to write mcs_pfi_transformation {str(df.squeeze().to_dict())}: {e}")
+
+    else:
+        db.insert('mcs_pfi_transformation', df)
+
+    return (df['mcs_frame_id'].values, df['x0'].values, df['y0'].values, df['dscale'].values,
+            df['scale2'].values, df['theta'].values, df['alpha_rot'].values, df['camera_name'].values)
 
 
-    data = {'mcs_frame_id': [frameId],
-            'x0': [trans[0]],
-            'y0': [trans[1]],
-            'dscale': [trans[2]],
-            'scale2': [trans[3]],
-            'theta': [trans[4]],
-            'alpha_rot': [pfiTransform.alphaRot],
-            'camera_name': [cameraName]}
-    df = pd.DataFrame(data=data)
-    return df['mcs_frame_id'].values,df['x0'].values,df['y0'].values,df['dscale'].values, \
-        df['scale2'].values,df['theta'].values,df['alpha_rot'].values,df['camera_name'].values
-    
-    
 def _writeData(db, tableName, columnNames, dataBuf):
-    """Wrap a direct COPY_FROM via sqlalchemy. """
-    columns = ','.join('"{}"'.format(k) for k in columnNames)
-    sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(
-        tableName, columns)
+    """
+    COPY FROM STDIN (CSV) into a table using the SQLAlchemy Session.
+
+    Parameters
+    ----------
+    db : opdb.opdb.OpDB
+        Handle exposing `db.session` (SQLAlchemy Session).
+    tableName : str
+        Target table name, optionally schema-qualified (e.g. 'schema.table').
+    columnNames : iterable[str]
+        Columns to load, in the exact order they appear in the CSV stream.
+    dataBuf : io.StringIO
+        Text file-like object positioned anywhere; will be rewound.
+
+    Behavior
+    --------
+    - Reuses an active transaction on the Session; otherwise opens one and commits.
+    - Rolls back on error and re-raises the exception.
+    - Does not close the Session; only the DBAPI cursor is context-managed.
+
+    Raises
+    ------
+    Exception
+        Any error from COPY or the database driver; the Session is rolled back.
+    """
+    columns = ','.join(f'"{c}"' for c in columnNames)
+    sql = f'COPY {tableName} ({columns}) FROM STDIN WITH CSV'
+    session = db.session
+    # make sure to rewind the buffer
+    dataBuf.seek(0)
+
+    def doCopy():
+        conn = session.connection()  # SQLA Connection (bound to current txn)
+        raw = conn.connection  # DBAPI connection (psycopg2)
+        with raw.cursor() as cur:
+            cur.copy_expert(sql, dataBuf)  # context manager closes cursor
+
     try:
-        session = db.session
-        with session.connection().connection.cursor() as cursor:
-            cursor.copy_expert(sql, dataBuf)
-            cursor.close()
-        session.execute('commit')
+        if session.in_transaction():
+            doCopy()  # reuse caller's transaction
+        else:
+            with session.begin():
+                doCopy()  # commit on success
+
+        return True
+
     except Exception as e:
-        logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
-                            datefmt="%Y-%m-%dT%H:%M:%S")
-        logger = logging.getLogger('mcscmd')
-        logger.setLevel(logging.INFO)
-        logger.warn(f"failed to write with {sql}: {e}")
+        if session.in_transaction():
+            session.rollback()
+
+        logger.warning(f"failed to write with {sql}: {e}")
+
+        return False
+
 
 def writeTargetToDB(db, frameId, target, mpos):
     visitId = frameId // 100
     iteration = frameId % 100
-    
+
     # To-Do here we need a better implementation.
-    data = {'pfs_visit_id': np.repeat(visitId,2394),     
-            'iteration' : np.repeat(iteration,2394),   
-            'cobra_id':np.arange(2394)+1,
-            
-    }
+    data = {'pfs_visit_id': np.repeat(visitId, 2394),
+            'iteration': np.repeat(iteration, 2394),
+            'cobra_id': np.arange(2394) + 1,
+
+            }
 
     df = pd.DataFrame(data=data)
     db.insert("cobra_target", df)
@@ -214,34 +240,32 @@ def writeFakeMoveToDB(db, frameId):
     iteration = frameId % 100
 
     nCob = 2394
-    
+
     # To-Do here we need a better implementation.
-    data = {'pfs_visit_id': np.repeat(visitId,nCob).astype('int'),
-            'iteration' : np.repeat(iteration,nCob).astype('int'),
-            'cobra_id':np.arange(2394).astype('int')+1,
-            #'pfs_config_id':np.repeat(0,2394).astype('int'),
-            #'pfi_nominal_x_mm':centers.real,
-            #'pfi_nominal_y_mm':centers.imag,
-            #'pfi_target_x_mm': centers.real,
-            #'pfi_target_y_mm':centers.imag,
-            'cobra_mortor_model_id_theta': np.repeat(0,2394).astype('int'),
-            'motor_target_theta':np.repeat(0,2394),
-            'motor_num_step_theta':np.repeat(0,2394),
-            'motor_on_time_theta':np.repeat(0,2394),
-            'cobra_mortor_model_id_phi': np.repeat(0,2394).astype('int'),
-            'motor_target_phi':np.repeat(0,2394),
-            'motor_num_step_phi':np.repeat(0,2394),
-            'motor_on_time_phi':np.repeat(0,2394),
-            'flags':np.repeat(0,2394).astype('int'),
-    }
+    data = {'pfs_visit_id': np.repeat(visitId, nCob).astype('int'),
+            'iteration': np.repeat(iteration, nCob).astype('int'),
+            'cobra_id': np.arange(2394).astype('int') + 1,
+            # 'pfs_config_id':np.repeat(0,2394).astype('int'),
+            # 'pfi_nominal_x_mm':centers.real,
+            # 'pfi_nominal_y_mm':centers.imag,
+            # 'pfi_target_x_mm': centers.real,
+            # 'pfi_target_y_mm':centers.imag,
+            'cobra_mortor_model_id_theta': np.repeat(0, 2394).astype('int'),
+            'motor_target_theta': np.repeat(0, 2394),
+            'motor_num_step_theta': np.repeat(0, 2394),
+            'motor_on_time_theta': np.repeat(0, 2394),
+            'cobra_mortor_model_id_phi': np.repeat(0, 2394).astype('int'),
+            'motor_target_phi': np.repeat(0, 2394),
+            'motor_num_step_phi': np.repeat(0, 2394),
+            'motor_on_time_phi': np.repeat(0, 2394),
+            'flags': np.repeat(0, 2394).astype('int'),
+            }
 
     df = pd.DataFrame(data=data)
     db.insert("cobra_move", df)
 
 
-
 def writeFakeTargetToDB(db, centers, frameId):
-
     """
     make sure there is a target value if the target d
     """
@@ -249,56 +273,59 @@ def writeFakeTargetToDB(db, centers, frameId):
     iteration = frameId % 100
 
     nCob = 2394
-    
+
     # To-Do here we need a better implementation.
-    data = {'pfs_visit_id': np.repeat(visitId,nCob).astype('int'),
-            'iteration' : np.repeat(iteration,nCob).astype('int'),
-            'cobra_id':np.arange(2394).astype('int')+1,
-            'pfs_config_id':np.repeat(0,2394).astype('int'),
-            'pfi_nominal_x_mm':centers.real,
-            'pfi_nominal_y_mm':centers.imag,
+    data = {'pfs_visit_id': np.repeat(visitId, nCob).astype('int'),
+            'iteration': np.repeat(iteration, nCob).astype('int'),
+            'cobra_id': np.arange(2394).astype('int') + 1,
+            'pfs_config_id': np.repeat(0, 2394).astype('int'),
+            'pfi_nominal_x_mm': centers.real,
+            'pfi_nominal_y_mm': centers.imag,
             'pfi_target_x_mm': centers.real,
-            'pfi_target_y_mm':centers.imag,
-            #'cobra_mortor_model_id_theta': np.repeat(0,2394).astype('int'),
-            #'motor_target_theta':np.repeat(0,2394),
-            #'motor_num_step_theta':np.repeat(0,2394),
-            #'motor_on_time_theta':np.repeat(0,2394),
-            #'cobra_mortor_model_id_phi': np.repeat(0,2394).astype('int'),
-            #'motor_target_phi':np.repeat(0,2394),
-            #'motor_num_step_phi':np.repeat(0,2394),
-            #'motor_on_time_phi':np.repeat(0,2394),
-            'flags':np.repeat(0,2394).astype('int')
-    }
+            'pfi_target_y_mm': centers.imag,
+            # 'cobra_mortor_model_id_theta': np.repeat(0,2394).astype('int'),
+            # 'motor_target_theta':np.repeat(0,2394),
+            # 'motor_num_step_theta':np.repeat(0,2394),
+            # 'motor_on_time_theta':np.repeat(0,2394),
+            # 'cobra_mortor_model_id_phi': np.repeat(0,2394).astype('int'),
+            # 'motor_target_phi':np.repeat(0,2394),
+            # 'motor_num_step_phi':np.repeat(0,2394),
+            # 'motor_on_time_phi':np.repeat(0,2394),
+            'flags': np.repeat(0, 2394).astype('int')
+            }
 
     df = pd.DataFrame(data=data)
     db.insert("cobra_target", df)
+
 
 def writeCobraCenterToDB(db, frameId, centers, mpos):
     visitId = frameId // 100
     iteration = frameId % 100
 
-    targetTable = {'pfs_visit_id':np.repeat(visitId,2394),
-                    'iteration':np.repeat(iteration,2394),
-                    'cobra_id':np.arange(2394)+1,
-                    'pfs_config_id':np.repeat(0,2394),
-                    'pfi_nominal_x_mm':centers.real,
-                    'pfi_nominal_y_mm':centers.imag,
-                    'pfi_target_x_mm': mpos.real,
-                    'pfi_target_y_mm':mpos.imag,
-                    'motor_target_theta':np.repeat(0,2394),
-                    'motor_target_phi':np.repeat(0,2394),
-            }
+    targetTable = {'pfs_visit_id': np.repeat(visitId, 2394),
+                   'iteration': np.repeat(iteration, 2394),
+                   'cobra_id': np.arange(2394) + 1,
+                   'pfs_config_id': np.repeat(0, 2394),
+                   'pfi_nominal_x_mm': centers.real,
+                   'pfi_nominal_y_mm': centers.imag,
+                   'pfi_target_x_mm': mpos.real,
+                   'pfi_target_y_mm': mpos.imag,
+                   'motor_target_theta': np.repeat(0, 2394),
+                   'motor_target_phi': np.repeat(0, 2394),
+                   }
 
     df = pd.DataFrame(data=targetTable)
     db.bulkInsert("cobra_target", df)
 
+
 def writeBoresightToDB(db, pfsVisitId, boresight):
     """ write boresight to database with current timestamp """
-    
+
     dt = datetime.now(timezone.utc)
-   
-    df = pd.DataFrame({'pfs_visit_id': [pfsVisitId], 'mcs_boresight_x_pix': [boresight[0]], 'mcs_boresight_y_pix': [boresight[1]],
-                       'calculated_at': [dt]})
+
+    df = pd.DataFrame(
+        {'pfs_visit_id': [pfsVisitId], 'mcs_boresight_x_pix': [boresight[0]], 'mcs_boresight_y_pix': [boresight[1]],
+         'calculated_at': [dt]})
     db.bulkInsert('mcs_boresight', df)
 
 
@@ -326,12 +353,11 @@ def writeCentroidsToDB(db, centroids, mcsFrameId):
 
     df = pd.DataFrame(frame, columns=columns)
     db.insert("mcs_data", df)
-    
+
 
 def readMatchFromDB(db, mcsFrameId):
-    
-    match = db.bulkSelect('cobra_match',f'select * from cobra_match where '
-                      'mcs_frame_id = {mcsFrameId}')
+    match = db.bulkSelect('cobra_match', f'select * from cobra_match where '
+                                         'mcs_frame_id = {mcsFrameId}')
     return match
 
 
@@ -344,7 +370,7 @@ def writeMatchesToDB(db, cobraMatch, mcsFrameId):
               mcs_second_moment_xy_pix,bgvalue,peakvalue
     """
 
-    #np.save("cobraMatch.npy", cobraMatch)
+    # np.save("cobraMatch.npy", cobraMatch)
     # get size of array
     sz = cobraMatch.shape
     # create array of frameIDs (same for all spots)
@@ -363,30 +389,30 @@ def writeMatchesToDB(db, cobraMatch, mcsFrameId):
 
     visitId = mcsFrameId // 100
     iteration = mcsFrameId % 100
-    targetTable = {'pfs_visit_id':np.repeat(visitId,2394).astype('int'),
-                    'iteration':np.repeat(iteration,2394).astype('int'),
-                    'cobra_id':cobraMatch[:,0].astype('int'),
-                    'mcs_frame_id':np.repeat(mcsFrameId,2394).astype('int'),
-                    'spot_id':cobraMatch[:,1].astype('int'),
-                    'pfi_center_x_mm':cobraMatch[:,2],
-                    'pfi_center_y_mm':cobraMatch[:,3],
-                    'flags':cobraMatch[:,4].astype('int')
+    targetTable = {'pfs_visit_id': np.repeat(visitId, 2394).astype('int'),
+                   'iteration': np.repeat(iteration, 2394).astype('int'),
+                   'cobra_id': cobraMatch[:, 0].astype('int'),
+                   'mcs_frame_id': np.repeat(mcsFrameId, 2394).astype('int'),
+                   'spot_id': cobraMatch[:, 1].astype('int'),
+                   'pfi_center_x_mm': cobraMatch[:, 2],
+                   'pfi_center_y_mm': cobraMatch[:, 3],
+                   'flags': cobraMatch[:, 4].astype('int')
                    }
-    df = pd.DataFrame(data=targetTable)                   
+    df = pd.DataFrame(data=targetTable)
     db.insert("cobra_match", df)
 
-    #ind = np.where(cobraMatch[:, 1] != -1)
-    #np.save("frame.npy", frame)
+    # ind = np.where(cobraMatch[:, 1] != -1)
+    # np.save("frame.npy", frame)
     # column names
-    #columns = ['pfs_visit_id', 'iteration', 'mcs_frame_id', 'cobra_id',
+    # columns = ['pfs_visit_id', 'iteration', 'mcs_frame_id', 'cobra_id',
     #           'spot_id', 'pfi_center_x_mm', 'pfi_center_y_mm', 'flags']
-    #df = pd.DataFrame(frame[ind[0], :], columns=columns)
-    #db.insert("cobra_match", df)
+    # df = pd.DataFrame(frame[ind[0], :], columns=columns)
+    # db.insert("cobra_match", df)
 
-    #columns = ['pfs_visit_id', 'iteration', 'mcs_frame_id',
+    # columns = ['pfs_visit_id', 'iteration', 'mcs_frame_id',
     #           'cobra_id', 'pfi_center_x_mm', 'pfi_center_y_mm', 'flags']
-    #ind = np.where(cobraMatch[:, 1] == -1)
-    #if(len(ind[0]) > 0):
+    # ind = np.where(cobraMatch[:, 1] == -1)
+    # if(len(ind[0]) > 0):
     #    ff = frame[ind[0], :]
     #    df = pd.DataFrame(ff[:, [0, 1, 2, 3, 5, 6, 7]], columns=columns)
 
@@ -398,18 +424,19 @@ def writeAffineToDB(db, afCoeff, frameId):
     write the affine transformation to DB
     """
 
-    sx = np.sqrt(afCoeff[0, 0]**2+afCoeff[0, 1]**2)
-    sy = np.sqrt(afCoeff[1, 0]**2+afCoeff[1, 1]**2)
+    sx = np.sqrt(afCoeff[0, 0] ** 2 + afCoeff[0, 1] ** 2)
+    sy = np.sqrt(afCoeff[1, 0] ** 2 + afCoeff[1, 1] ** 2)
 
     xd = afCoeff[0, 2]
     yd = afCoeff[1, 2]
 
-    rotation = np.arctan2(afCoeff[1, 0]/np.sqrt(afCoeff[0, 0]**2+afCoeff[0, 1]**2),
-                          afCoeff[1, 1]/np.sqrt(afCoeff[1, 0]**2+afCoeff[1, 1]**2))
+    rotation = np.arctan2(afCoeff[1, 0] / np.sqrt(afCoeff[0, 0] ** 2 + afCoeff[0, 1] ** 2),
+                          afCoeff[1, 1] / np.sqrt(afCoeff[1, 0] ** 2 + afCoeff[1, 1] ** 2))
 
     df = pd.DataFrame({'mcs_frame_id': [frameId], 'x_trans': [xd], 'y_trans': [
-                      yd], 'x_scale': [sx], 'y_scale': [sy], 'angle': [rotation]})
+        yd], 'x_scale': [sx], 'y_scale': [sy], 'angle': [rotation]})
     db.insert('mcs_pfi_transformation', df)
+
 
 # def writeFidToDB(db, ffid, mcsData,  mcs_frame_id):
 
@@ -424,7 +451,7 @@ def writeAffineToDB(db, afCoeff, frameId):
 #     ffids=ffid[ind]
 
 #     # generate the dataframe
-    
+
 #     pfs_visit_id = mcs_frame_id // 100
 #     iteration = mcs_frame_id % 100
 #     sz = len(ffids)
@@ -450,7 +477,6 @@ def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
     Write the fiducial table to DB, combining with matched MCS data.
     Each fiducial will have its matched spot info if available.
     """
-    
 
     # Prepare output columns
     nFids = len(fids)
@@ -473,7 +499,7 @@ def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
             pfi_center_y_mm[i] = mcsData['pfi_center_y_mm'].iloc[idx[0]]
 
     logging.info(f"Writing {len(fids)} fiducials to DB for frame {mcs_frame_id}")
-    
+
     # Build DataFrame for DB insertion
     df = pd.DataFrame({
         'pfs_visit_id': np.repeat(pfs_visit_id, nFids),
@@ -485,11 +511,13 @@ def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
         'pfi_center_x_mm': pfi_center_x_mm,
         'pfi_center_y_mm': pfi_center_y_mm,
         'match_mask': fids['match_mask'] if 'match_mask' in fids.columns else np.repeat(0, nFids),
-        'fiducial_tweaked_x_mm': fids['fiducial_tweaked_x_mm'] if 'fiducial_tweaked_x_mm' in fids.columns else np.repeat(np.nan, nFids),
-        'fiducial_tweaked_y_mm': fids['fiducial_tweaked_y_mm'] if 'fiducial_tweaked_y_mm' in fids.columns else np.repeat(np.nan, nFids)
+        'fiducial_tweaked_x_mm': fids[
+            'fiducial_tweaked_x_mm'] if 'fiducial_tweaked_x_mm' in fids.columns else np.repeat(np.nan, nFids),
+        'fiducial_tweaked_y_mm': fids[
+            'fiducial_tweaked_y_mm'] if 'fiducial_tweaked_y_mm' in fids.columns else np.repeat(np.nan, nFids)
     })
     logging.info(f"fiducial_fiber_match DataFrame shape: {df.shape}")
     logging.info(f"fiducial_tweaked_x_mm: {df['fiducial_tweaked_x_mm'].values}")
     logging.info(f"fiducial_tweaked_y_mm: {df['fiducial_tweaked_y_mm'].values}")
-    
+
     db.insert("fiducial_fiber_match", df)

@@ -1075,7 +1075,11 @@ class McsCmd(object):
 
         self.logger.info(f'Writing transformation coefficients to DB.')
         db = self.connectToDB(cmd)
-        t_frame,t_x0,t_y0,t_dscale,t_scale2,t_theta,t_alpha_rot,t_camera_name = dbTools.writeTransformToDB(db, frameID, pfiTransform, self.actor.cameraName)
+        t_frame,t_x0,t_y0,t_dscale,t_scale2,t_theta,t_alpha_rot,t_camera_name = dbTools.writeTransformToDB(db,
+                                                                                                           frameID,
+                                                                                                           pfiTransform,
+                                                                                                           self.actor.cameraName,
+                                                                                                           doCloseTransaction=True)
         db.close()
         cmd.inform(f'text="wrote transform to DB"')
 
