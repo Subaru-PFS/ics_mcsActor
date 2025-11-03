@@ -146,31 +146,17 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
                     mcs_boresight_y_pix=pfiTransform.mcs_boresight_y_pix,
                     calculated_at='now')
 
-    trans=pfiTransform.mcsDistort.getArgs()
-    res = db.session.execute(sqlText('select * FROM "mcs_pfi_transformation" where false'))
-    colnames = tuple(res.keys())
-    realcolnames = colnames[0:]
-    line = '%d,%f,%f,%f,%e,%e,%f,%s' % (frameId, trans[0].astype('float64'),
-           trans[1], trans[3], trans[4],trans[2],
-           pfiTransform.alphaRot, cameraName)
-                                                                        
-    buf = io.StringIO()
-    buf.write(line)
-    buf.seek(0, 0)
-    _writeData(db, 'mcs_pfi_transformation', realcolnames, buf)
+    mcsDistortCols = ['x0', 'y0', 'theta', 'dscale', 'scale2']
 
+    df = pd.DataFrame(pfiTransform.mcsDistort.getArgs().reshape(1, len(mcsDistortCols)), columns=mcsDistortCols)
+    df['mcs_frame_id'] = frameId
+    df['alpha_rot'] = float(pfiTransform.alphaRot)
+    df['camera_name'] = cameraName
 
-    data = {'mcs_frame_id': [frameId],
-            'x0': [trans[0]],
-            'y0': [trans[1]],
-            'dscale': [trans[2]],
-            'scale2': [trans[3]],
-            'theta': [trans[4]],
-            'alpha_rot': [pfiTransform.alphaRot],
-            'camera_name': [cameraName]}
-    df = pd.DataFrame(data=data)
-    return df['mcs_frame_id'].values,df['x0'].values,df['y0'].values,df['dscale'].values, \
-        df['scale2'].values,df['theta'].values,df['alpha_rot'].values,df['camera_name'].values
+    db.insert('mcs_pfi_transformation', df)
+
+    return (df['mcs_frame_id'].values, df['x0'].values, df['y0'].values, df['dscale'].values,
+            df['scale2'].values, df['theta'].values, df['alpha_rot'].values, df['camera_name'].values)
     
     
 def _writeData(db, tableName, columnNames, dataBuf):
