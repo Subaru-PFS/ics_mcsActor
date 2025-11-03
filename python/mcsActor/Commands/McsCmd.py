@@ -1113,8 +1113,10 @@ class McsCmd(object):
         cmd.finish(f'text="geometry file set to {self.geomFile}"')
 
     def setGeometryFile(self, cmd):
+        from ics.cobraCharmer import pfiDesign
 
-        self.geomFile = cmd.cmd.keywords["geomFile"].values[0]
+        geomFilename = pathlib.Path(cmd.cmd.keywords["geomFile"].values[0])
+        self.geomFile = pfiDesign.PFIDesign(geomFilename)
         self.geometrySet = False
         self.getGeometry(cmd)
         cmd.finish(f'text="geometry file set to {self.geomFile}"')
