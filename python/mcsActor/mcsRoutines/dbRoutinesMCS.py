@@ -123,9 +123,9 @@ def loadTargetsFromDB(db, frameId):
     return np.array([df['cobra_id'], df['pfi_target_x_mm'], df['pfi_target_y_mm']]).T
 
 
-def writeTransformToDB(db, frameId, pfiTransform, cameraName):
-    """
-    write transformation coefficients to database
+def writeTransformToDB(db, frameId, pfiTransform, cameraName, doCloseTransaction=False):
+    """Write [x0,y0,theta,dscale,scale2,alpha_rot,camera_name] for one frame into mcs_pfi_transformation.
+    If doCloseTransaction=True and a transaction is already active, commit here; else delegate to db.insert().
     """
     pfs_visit_id = frameId // 100
     iteration = frameId % 100
@@ -145,7 +145,17 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName):
     df['alpha_rot'] = float(pfiTransform.alphaRot)
     df['camera_name'] = cameraName
 
-    db.insert('mcs_pfi_transformation', df)
+    if doCloseTransaction and db.session.in_transaction():
+        try:
+            db.bulk_insert_mappings('mcs_pfi_transformation', df)
+            db.session.commit()
+
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"failed to write mcs_pfi_transformation {str(df.squeeze().to_dict())}: {e}")
+
+    else:
+        db.insert('mcs_pfi_transformation', df)
 
     return (df['mcs_frame_id'].values, df['x0'].values, df['y0'].values, df['dscale'].values,
             df['scale2'].values, df['theta'].values, df['alpha_rot'].values, df['camera_name'].values)
@@ -202,10 +212,6 @@ def _writeData(db, tableName, columnNames, dataBuf):
         if session.in_transaction():
             session.rollback()
 
-        logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
-                            datefmt="%Y-%m-%dT%H:%M:%S")
-        logger = logging.getLogger('mcscmd')
-        logger.setLevel(logging.INFO)
         logger.warning(f"failed to write with {sql}: {e}")
 
         return False
