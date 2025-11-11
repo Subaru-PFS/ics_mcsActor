@@ -1236,7 +1236,7 @@ class McsCmd(object):
             writeFakeCobraMove = True
             db.close()    
             db = self.connectToDB(cmd)
-            dbTools.writeFakeTargetToDB(db, tarPos, int(frameId))
+            dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
             db.close()
             cmd.inform(f'text="Fall back using previous as target." ')
             cmd.inform(f'text="Writing minimal information to target database."')
