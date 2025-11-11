@@ -1219,6 +1219,8 @@ class McsCmd(object):
         if (self.fMethod != 'target'):
             tarPos = self.prevPos
 
+        
+        # this is the case of fMethod = 'target' but no targets in DB
         if(len(tarPos)==0):
             writeFakeCobraMove = True
             db.close()    
@@ -1230,6 +1232,15 @@ class McsCmd(object):
 
             tarPos = self.prevPos
         
+        if self.fMethod == 'previous':
+            writeFakeCobraMove = True
+            db.close()    
+            db = self.connectToDB(cmd)
+            dbTools.writeFakeTargetToDB(db, tarPos, int(frameId))
+            db.close()
+            cmd.inform(f'text="Fall back using previous as target." ')
+            cmd.inform(f'text="Writing minimal information to target database."')
+
         # if the method is target, load from database, otherwise the target = previous position
         #if(self.fMethod == 'target'):
             # load target positions
