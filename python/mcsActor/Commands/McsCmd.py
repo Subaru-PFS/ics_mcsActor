@@ -127,6 +127,7 @@ class McsCmd(object):
             ('switchFMethod', '<fMethod>', self.switchFMethod),
             ('resetGeometry', '', self.resetGeometry),
             ('resetGeometryFile', '', self.resetGeometryFile),
+            ('resetPosition', '', self.resetPosition),
             ('setGeometryFile', '<geomFile>', self.setGeometryFile),
             ('setDb', '[<hostname>] [<username>] [<port>] [<db>]', self.setDb)
         ]
@@ -832,19 +833,10 @@ class McsCmd(object):
             cmd.inform('text="zenith angle=%s"'%(zenithAngle))
             cmd.inform('text="instrument rotation=%s"'%(insRot))
             
-            # Get last two degits of frameID
-            iterNum = frameId % 100
-            if iterNum == 0:
-                newField = True
-                cmd.inform(f'text="New field because iterNum = {iterNum} "')
-            else:
-                newField = False
-
             enableEasyID=False
 
             try:
                 if enableEasyID:
-                    #if newField:
                     self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
                     
                     self.easyFiberID(cmd, frameId)
@@ -1198,6 +1190,11 @@ class McsCmd(object):
         
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
 
+    def resetPosition(self, cmd):
+        """Declare that we do not know where the cobras are. """
+
+        self.prevPos = None
+        cmd.finish('text="cleared known position"')
 
     def fibreID(self, cmd, frameId, zenithAngle, insRot):
 
@@ -1205,23 +1202,20 @@ class McsCmd(object):
 
         db = self.connectToDB(cmd)
 
-        # if the iteration is the first, the previous position is the home position
-        if(frameId % 100 == 0):
-            self.prevPos = self.centrePos
-
         self.mmCentroids = np.copy(self.centroids)
         #transformthe coordinates to mm in place
-        self.mmCentroids[:,1], self.mmCentroids[:,2] = self.pfiTrans.mcsToPfi(self.centroids[:,1],self.centroids[:,2])
+        self.mmCentroids[:,1], self.mmCentroids[:,2] = self.pfiTrans.mcsToPfi(self.centroids[:,1],
+                                                                              self.centroids[:,2])
 
         # load target positions
-        tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
-        
         if (self.fMethod != 'target'):
             tarPos = self.prevPos
-
+        else:
+            tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
         
         # this is the case of fMethod = 'target' but no targets in DB
-        if(len(tarPos)==0):
+        # OR, fMethod = 'previous' and no previous positions recorded.
+        if tarPos is None or len(tarPos) == 0:
             writeFakeCobraMove = True
             db.close()    
             db = self.connectToDB(cmd)
@@ -1230,62 +1224,25 @@ class McsCmd(object):
             cmd.inform(f'text="Fall back using cobra centers as target." ')
             cmd.inform(f'text="Writing minimal information to target database."')
 
-            tarPos = self.prevPos
-        
-        if self.fMethod == 'previous':
-            writeFakeCobraMove = True
-            db.close()    
-            db = self.connectToDB(cmd)
-            dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
-            db.close()
-            cmd.inform(f'text="Fall back using previous as target." ')
-            cmd.inform(f'text="Writing minimal information to target database."')
+            tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
 
-        # if the method is target, load from database, otherwise the target = previous position
-        #if(self.fMethod == 'target'):
-            # load target positions
-        #    tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
-        #    db.close()
-            
-        #    cmd.inform(f'text="loaded {len(tarPos)} targets from DB"')
-        #    if(len(tarPos)==0):
-        #        db = self.connectToDB(cmd)
-        #        dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
-                #dbTools.writeFakeMoveToDB(db, int(frameId))
-
-        #        db.close()
-
-        #        visitId = frameId // 100
-        #        iteration = frameId % 100
-        #        cmd.inform(f'text="Fall back using cobra centers as target." ')
-        #        cmd.inform(f'text="Writing minimal information to target database."')
-
-        #        tarPos = self.prevPos
-        #else:
-        #    db.close()
-            
-        #    tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
-        #    if(len(tarPos)==0):
-        #        db = self.connectToDB(cmd)
-        #        dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
-                #dbTools.writeFakeMoveToDB(db, int(frameId))
-        #        db.close()
-        #    tarPos = self.prevPos
-            
-        # do the identification
+            # do the identification
         cmd.inform(f'text="Starting Fiber ID"')
         t0 = time.time()
-        cobraMatch, unaPoints, flag = mcsTools.fibreId(self.mmCentroids, self.centrePos, self.armLength, tarPos,
-                                      self.fids, self.dotPos, self.goodIdx, self.adjacentCobras)
+        cobraMatch, unaPoints, flag = mcsTools.fibreId(self.mmCentroids, self.centrePos,
+                                                       self.armLength, tarPos,
+                                                       self.fids, self.dotPos,
+                                                       self.goodIdx, self.adjacentCobras,
+                                                       self.fMethod)
 
-        # this flag will catch a failure in fibre identification due to very unexpected input (like targets outside the
-        # patrol region)
+        # this flag will catch a failure in fibre identification due
+        # to very unexpected input (like targets outside the patrol
+        # region)
         if(flag > 0):
             cmd.fail(f'text="Failure in cobra matching, {flag} matches unsuccessful.  An underlying assumption has probably been violated."')
             
         t1 = time.time()
         cmd.inform(f'text="Fiber ID finished in {t1-t0:0.2f}s"')
-
 
         db = self.connectToDB(cmd)
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))

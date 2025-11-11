@@ -229,9 +229,9 @@ def makeAdjacentList(ff, armLength):
     return(adjacent)
 
 
-def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adjacentCobras):
+def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos,
+            goodIdx, adjacentCobras, fMethod, targetSize=2.0):
 
-    
     centers = centrePos
     points = centroids
     nPoints = len(centroids)
@@ -241,8 +241,6 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
 
     anyChange = 0
     targets = tarPos
-
-
     
     # these are the effective number of cobras (ie, goodIdx)
     nPoints = points.shape[0]
@@ -250,8 +248,14 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos, goodIdx, adja
 
 
     # set up variables
+    if fMethod == 'previous':
+        prepTargets = targets
+    else:
+        prepTargets = None
+        targetSize = 0.0
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod = prepWork(
-        points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge=0.5)
+        points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge=0.1,
+        targets=prepTargets, targetSize=targetSize)
 
 
     # first pass - assign cobra/spot pairs based on the spots poiint of view
@@ -369,7 +373,8 @@ def nearestNeighbourMatchingBore(points, targets, unrot):
 
     return matchPoint
 
-def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge = 0.08):
+def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos,
+             armFudge=0.08, targets=None, targetSize=1.0):
     """
     Create initial list of potential cobra/pooint matches
     and assigned/unasigned cobras. 
@@ -409,27 +414,17 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
 
     bPoints = []  # non real points (fids, stuck fibres)
 
-    fileName = os.path.join(os.environ['ICS_MCSACTOR_DIR'],  'etc',  'stuck.txt')
-
-    stuckPos = np.loadtxt(fileName)
-
-    
     #first, quick positional matching to remove fiducial fibres from list of matchable points
     #note that the matching should return either 0 points (unilluminated fiducials) or
     #1 points (match) as the fiducial fibres don't have a patrol radius
 
     D = cdist(fidPos[:,1:3],points[:,1:3])
     for i in range(len(fidPos)):
-        ind = np.where(D[i, :] < 1)
+        ind = np.where(D[i, :] < 1) # 1mm seems big...
         #print("Fid Match", i, ind, len(ind[0]))
         if len(ind[0]) > 0:
             unaPoints.remove(ind[0][0])
             bPoints.append(ind[0][0])
-
-    #and the same for stuck but illuminated cobras. This is currently a bit of a cludge, based
-    #on empirical averages of positions
-    fileName = os.path.join(os.environ['ICS_MCSACTOR_DIR'],  'etc',  'stuck.txt')
-    stuckPos = np.loadtxt(fileName)
 
     #D = cdist(stuckPos[:,1:3], points[:,1:3])
     #for i in range(len(stuckPos)):
@@ -440,16 +435,28 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge 
     # get the distnace between cobras and points. cdist is pretty fast, check total time
     D = cdist(points[:, 1:3], centers[:, 1:3])
 
+    if targets is not None:
+        Dtarget = cdist(points[:, 1:3], targets[:, 1:3])
+
     # find the cobras which are within arm length of each point and add to the list
     
     for i in range(nPoints):
-        ind1 = np.where(D[i, :] < (arms+armFudge))
+        if targets is not None:
+            ind1 = np.where((D[i, :] < (arms+armFudge)) &
+                            (Dtarget[i, :] < targetSize))
+        else:
+            ind1 = np.where(D[i, :] < (arms+armFudge))
 
         potCobraMatch.append(list(ind1[0]))
 
     # now the mirror - find the points which are within arm length of each cobra and add to the list
     for i in range(nCobras):
-        ind1 = np.where(D[:, i] < (arms[i]+armFudge))
+        if targets is not None:
+            ind1 = np.where((D[:, i] < (arms[i]+armFudge)) &
+                            ((Dtarget[:, i] < targetSize)))
+        else:
+            ind1 = np.where(D[:, i] < (arms[i]+armFudge))
+
         potPointMatch.append(list(ind1[0]))
 
     # now remove the non cobra points
