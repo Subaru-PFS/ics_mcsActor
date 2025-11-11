@@ -1,3 +1,4 @@
+
 """
 Routines to read and write information to DB for ics_mcsActor
 
@@ -134,8 +135,8 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName, doCloseTransaction
     if iteration == 0:
         opDB.insert('mcs_boresight',
                     pfs_visit_id=pfs_visit_id,
-                    mcs_boresight_x_pix=pfiTransform.mcs_boresight_x_pix,
-                    mcs_boresight_y_pix=pfiTransform.mcs_boresight_y_pix,
+                    mcs_boresight_x_pix=float(pfiTransform.mcs_boresight_x_pix),
+                    mcs_boresight_y_pix=float(pfiTransform.mcs_boresight_y_pix),
                     calculated_at='now')
 
     mcsDistortCols = ['x0', 'y0', 'theta', 'dscale', 'scale2']
