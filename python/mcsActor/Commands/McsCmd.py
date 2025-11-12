@@ -93,6 +93,7 @@ class McsCmd(object):
         self.fids = None
         self.fidsGood = None
         self.fidsOuterRing = None
+        self.prevPos = None
 
         logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
                             datefmt="%Y-%m-%dT%H:%M:%S")
@@ -1206,27 +1207,30 @@ class McsCmd(object):
         #transformthe coordinates to mm in place
         self.mmCentroids[:,1], self.mmCentroids[:,2] = self.pfiTrans.mcsToPfi(self.centroids[:,1],
                                                                               self.centroids[:,2])
-
         # load target positions
-        if (self.fMethod != 'target'):
+        if (self.fMethod == 'previous'):
             tarPos = self.prevPos
         else:
             tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
-        
-        # this is the case of fMethod = 'target' but no targets in DB
-        # OR, fMethod = 'previous' and no previous positions recorded.
-        if tarPos is None or len(tarPos) == 0:
+
+        if tarPos is None or len(tarPos) == 0 :
+            # When fMethod = 'target' but no targets in DB
+            # OR, fMethod = 'previous' and we have no prevPos:
             writeFakeCobraMove = True
-            db.close()    
+            db.close()
             db = self.connectToDB(cmd)
             dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
+        elif self.fMethod == 'previous':
+            # use prevPos when we know it.
+            writeFakeCobraMove = True
             db.close()
-            cmd.inform(f'text="Fall back using cobra centers as target." ')
-            cmd.inform(f'text="Writing minimal information to target database."')
+            db = self.connectToDB(cmd)
+            dbTools.writeFakeTargetToDB(db, tarPos[:,1]+tarPos[:,2]*1j, int(frameId))
 
-            tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
+        # Always use whatever we inserted.
+        tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
 
-            # do the identification
+        # do the identification
         cmd.inform(f'text="Starting Fiber ID"')
         t0 = time.time()
         cobraMatch, unaPoints, flag = mcsTools.fibreId(self.mmCentroids, self.centrePos,
