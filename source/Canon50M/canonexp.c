@@ -221,6 +221,48 @@ void strupp(char* lower)
 	while (*lower = toupper(*lower)) lower++;
 }
 
+/* Print library versions */
+static void
+printVersions(void) {
+    printf("Library Versions:\n");
+    printf("================\n");
+    
+    printf("CFITSIO Library:\n");
+    #ifdef CFITSIO_VERSION
+    #define STRINGIFY(x) #x
+    #define TOSTRING(x) STRINGIFY(x)
+    printf("  Version: %s\n", TOSTRING(CFITSIO_VERSION));
+    printf("  Status: Available\n");
+
+    #endif
+    printf("\n");
+    
+    // EDT PDV library version
+    printf("EDT PDV Library:\n");
+    char edt_version_str[256];
+    if (edt_get_library_version(edt_version_str, sizeof(edt_version_str)) == 0) {
+        printf("  Version: %s\n", edt_version_str);
+        printf("  Status: Available\n");
+    } else {
+        printf("  Status: Error getting version\n");
+    }
+    printf("\n");
+    
+    // 編譯器版本
+    printf("Compiler Information:\n");
+    #ifdef __GNUC__
+        #ifdef __GNUC_PATCHLEVEL__
+        printf("  Compiler: GCC %d.%d.%d\n", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+        #else
+        printf("  Compiler: GCC %d.%d\n", __GNUC__, __GNUC_MINOR__);
+        #endif
+    #else
+    printf("  Compiler: Unknown\n");
+    #endif
+    
+    printf("  Build Date: %s %s\n", __DATE__, __TIME__);
+    printf("\n");
+}
 
 /* Print out the proper program usage syntax */
 static void
@@ -228,13 +270,14 @@ printUsageSyntax(char *prgname) {
    fprintf(stderr,
 	   "Canon 50M image acquisition sequence.\n"
 	   "Usage: %s <INPUT> <OUTPUT> [options...]\n"
-		"	-h, --help   display help message\n"
-		"	-f, --file   name of FITS file to be saved.\n"
-		"	-e, --etype  exposure type [flat|object|dark|object].\n"
-		"	-t, --exptime  shutter time.\n"
-		"	-c, --coadd  produce a co-added image.\n"
-		"	-n, --noheader  write to stdout without header.\n"
-		"	-v, --verbose  turn on verbose.\n"
+		"\t-h, --help   display help message\n"
+		"\t-f, --file   name of FITS file to be saved.\n"
+		"\t-e, --etype  exposure type [flat|object|dark|object].\n"
+		"\t-t, --exptime  shutter time.\n"
+		"\t-c, --coadd  produce a co-added image.\n"
+		"\t-n, --noheader  write to stdout without header.\n"
+		"\t-v, --verbose  turn on verbose.\n"
+		"\t-V, --version   display library versions.\n"
 		, prgname);
 
 }
@@ -255,7 +298,8 @@ int main(int argc, char *argv[]){
 	int    coadd = 0;
 	int    flag = 0;
 
-	EdtDev *pdv_p = NULL;
+	// 修正：使用 PdvDev 而不是 EdtDev *
+	PdvDev pdv_p = NULL;
 
 	u_char **bufs;
     u_char *image_p=NULL;
@@ -293,10 +337,11 @@ int main(int argc, char *argv[]){
 	     {"coadd" ,0, NULL, 'c'},
 	     {"noheader" ,0, NULL, 'n'},
 		 {"verbose",0, NULL, 'v'},
+		 {"version",0, NULL, 'V'},
 		 {"help", 0, NULL, 'h'},
 		 {0,0,0,0}};
 
-	while((opt = getopt_long(argc, argv, "ne:f:l:t:vhc",
+	while((opt = getopt_long(argc, argv, "ne:f:l:t:vVhc",
 	   longopts, NULL))  != -1){
 	      switch(opt) {
 	         case 'e':
@@ -311,6 +356,10 @@ int main(int argc, char *argv[]){
 	         case 'v':
 	               verbose = 1;
 	               break;
+	         case 'V':
+	               printVersions();
+	               exit(EXIT_SUCCESS);
+	               break;
 			 case 'c':
 	               coadd = 1;
 	               break;
@@ -319,7 +368,7 @@ int main(int argc, char *argv[]){
 	               break;
 	         case 'h':
 	               printUsageSyntax(argv[0]);
-	               exit(EXIT_FAILURE);
+	               exit(EXIT_SUCCESS);
 	               break;
 	         case '?':
 	               printUsageSyntax(argv[0]);
@@ -403,12 +452,12 @@ int main(int argc, char *argv[]){
 	s_height=pdv_get_height(pdv_p);
 	s_width=pdv_get_width(pdv_p);
     s_depth = pdv_get_depth(pdv_p);
-    imagesize = pdv_get_imagesize(pdv_p);
+    imagesize = pdv_get_image_size(pdv_p);  // 修正：使用正確的函數名
 	
-	image_p=pdv_alloc(pdv_image_size(pdv_p));
+	image_p=pdv_alloc(pdv_get_image_size(pdv_p));  // 修正：使用正確的函數名
 
 	if (verbose) printf("Image size --> Height = %i Width= %i\n", s_height, s_width);
-	if (verbose) printf("Total pixels = %i\n",pdv_image_size(pdv_p));
+	if (verbose) printf("Total pixels = %i\n",pdv_get_image_size(pdv_p));  // 修正：使用正確的函數名
 
 	if (s_height<1 && s_width<1){
 		fprintf(stderr, "Error: (%s:%s:%d) image size incorrect. "
