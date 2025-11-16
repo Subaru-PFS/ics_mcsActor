@@ -25,7 +25,7 @@
 
 #include "fitsio.h"
 #include "edtinc.h"
-#include "pciload.h" /* for strip_newline function */
+//#include "pciload.h" /* for strip_newline function */
 
 #define GP0_OUTPUT_ENABLE	_IOW(0x81,0,int)
 #define GP0_SET_VALUE		_IOW(0x81,1,int)
@@ -296,12 +296,12 @@ int main(int argc, char *argv[]){
 	int    exptime = 0;
 	int    ret, noheader = 0;
 	int    coadd = 0;
-	int    flag = 0;
+    int    flag = 0;
 
-	// 修正：使用 PdvDev 而不是 EdtDev *
-	PdvDev pdv_p = NULL;
+    // fix: PdvDev should be a pointer type
+    PdvDev *pdv_p = NULL;
 
-	u_char **bufs;
+    u_char **bufs;
     u_char *image_p=NULL;
 
 	float  *stddev_img = NULL;
@@ -445,19 +445,19 @@ int main(int argc, char *argv[]){
 
 	if ((pdv_p = pdv_open_channel(edt_devname, unit, channel)) == NULL){
     		fprintf(stderr, "Error:pdv_open(%s%d_%d)", edt_devname, unit, channel);
-        pdv_perror(errstr);
+        perror("pdv_open_channel");
         return EXIT_FAILURE;
 	}
 
 	s_height=pdv_get_height(pdv_p);
 	s_width=pdv_get_width(pdv_p);
     s_depth = pdv_get_depth(pdv_p);
-    imagesize = pdv_get_image_size(pdv_p);  // 修正：使用正確的函數名
+    imagesize = pdv_get_image_size(pdv_p);  // Use correct function name
 	
-	image_p=pdv_alloc(pdv_get_image_size(pdv_p));  // 修正：使用正確的函數名
+	image_p=pdv_alloc(pdv_get_image_size(pdv_p));  // Use correct function name
 
 	if (verbose) printf("Image size --> Height = %i Width= %i\n", s_height, s_width);
-	if (verbose) printf("Total pixels = %i\n",pdv_get_image_size(pdv_p));  // 修正：使用正確的函數名
+	if (verbose) printf("Total pixels = %i\n",pdv_get_image_size(pdv_p));  // Use correct function name
 
 	if (s_height<1 && s_width<1){
 		fprintf(stderr, "Error: (%s:%s:%d) image size incorrect. "
@@ -486,13 +486,6 @@ int main(int argc, char *argv[]){
 	stddev_img = (float *)malloc(100 * sizeof(float));
 	stddev_sec = (float *)malloc(100 * sizeof(float));
 
-    //for (i=0; i<loops; i++){
-	//	if ((bufs[i] = edt_alloc(imagesize)) == NULL){
-	//    	printf("buffer allocation FAILED (probably too many images specified)\n");
-	//    	exit(1);
-	//	}
-    //}
-
 	/* allocate the memory for coadding frames */
 	coaddframe = (u_char *)calloc(imagesize, sizeof(u_char));
 	coaddshorts= (u_short *)coaddframe;
@@ -513,30 +506,34 @@ int main(int argc, char *argv[]){
 	    	exit(1);
 		}
 			
-		image_p = pdv_wait_image(pdv_p);
-		
+		image_p = (u_char*)pdv_wait_images(pdv_p, 1);
+        if (!image_p) {
+            fprintf(stderr, "Error: pdv_wait_images returned NULL\n");
+            exit(EXIT_FAILURE);
+        }
+
 		/*   Try to detecting the image shifting by calculating the stand deviation of 
 		 *    the fisrt 100 pixel. 
 		 */
 		for (ii=0; ii<200; ii+=2){
-			stddev_sec[ii/2] = image_p[ii] | (image_p[ii+1] << 8);
-			stddev_img[ii/2] = image_p[200+ii] | (image_p[200+ii+1] << 8);
-		}
+            stddev_sec[ii/2] = image_p[ii] | (image_p[ii+1] << 8);
+            stddev_img[ii/2] = image_p[200+ii] | (image_p[200+ii+1] << 8);
+        }
 
 		if (getStddev(stddev_sec)/getStddev(stddev_img) > BADRATIO ){
 			fprintf(stderr, "Warning: (%s:%s:%d) Image shift detected. "
 				"Re-issue exposure command.\n", __FILE__, __func__, __LINE__);
-			image_p = pdv_wait_image(pdv_p);
+			image_p = (u_char*)pdv_wait_images(pdv_p, 1);
 		} 
 
 		memcpy(bufs[i], image_p, imagesize);
 
-		for (ii=0;ii<imagesize;ii+=2){
-			
-			pixel = bufs[i][ii] | (bufs[i][ii+1] << 8);
-			coaddshorts[ii/2] += pixel;
-		}
-	}
+        for (ii=0;ii<imagesize;ii+=2){
+            
+            pixel = bufs[i][ii] | (bufs[i][ii+1] << 8);
+            coaddshorts[ii/2] += pixel;
+        }
+    }
 
 	dtime = edt_dtime();
 	if (verbose){
@@ -578,27 +575,36 @@ int main(int argc, char *argv[]){
 			WriteFitsImage(string, s_height, s_width, coaddframe, exptime);
 		}
 	} else {
-		basename = strtok(file, ".");
-		//printf("%i\n",strcmp(file,"-"));
-		for (i=0; i<loops; i++){
-			start_ts = getClockTime();
+        // Safe handling of file names: do not use strtok on string literals
+        int write_to_stdout = (strcmp(file, "-") == 0);
+        char base[256];
 
-			if (strcmp(file,"-") == 0){
-				sprintf(string,"%s",file);
-			} else{
-				sprintf(string,"%s-%04i%s",basename,i+1,".fits");
-			}
-			
-			/*process and/or display image previously acquired here*/
-			WriteFitsImage(string, s_height, s_width, bufs[i], 800);
+        if (!write_to_stdout) {
+            snprintf(base, sizeof(base), "%s", file);
+            // 去除副檔名（若有）
+            char *dot = strrchr(base, '.');
+            if (dot) *dot = '\0';
+        }
 
-			if (verbose){
-				save_ts=getClockTime();;
-				fprintf(stdout,"%02i Image saving runtime = %f\n",i+1, save_ts-start_ts);
-			}
+        for (i=0; i<loops; i++){
+            start_ts = getClockTime();
 
-		}
-	}
+            if (write_to_stdout){
+                snprintf(string, sizeof(string), "%s", file);   // "-"
+            } else {
+                snprintf(string, sizeof(string), "%s-%04i%s", base, i+1, ".fits");
+            }
+
+            /* Write image */
+            WriteFitsImage(string, s_height, s_width, bufs[i], 800);
+
+            if (verbose){
+                save_ts=getClockTime();;
+                fprintf(stdout,"%02i Image saving runtime = %f\n",i+1, save_ts-start_ts);
+            }
+
+        }
+    }
 
 	dtime = edt_dtime();
 	if (verbose){
