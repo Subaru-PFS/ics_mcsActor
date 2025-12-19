@@ -3,8 +3,6 @@
 import cv2
 import logging
 import numpy as np
-from pfs.utils.coordinates import CoordTransp
-from pfs.utils import coordinates
 import pandas as pd
 import time
 import datetime
@@ -13,8 +11,6 @@ import pathlib
 import queue
 import threading
 import sep
-import sys
-import copy
 
 import os
 import astropy.io.fits as pyfits
@@ -24,8 +20,7 @@ import fitsio
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 
-#from actorcore.utility import fits as fitsUtils
-#from actorcore.utility import timecards
+from pfs.utils.database import opdb
 
 from ics.utils.fits import mhs as fitsUtils
 from ics.utils.fits import timecards
@@ -33,15 +28,10 @@ from ics.utils.fits import timecards
 from opscore.utility.qstr import qstr
 
 import pfs.utils.coordinates.transform as transformUtils
-from pfs.utils.coordinates.CoordTransp import tweakFiducials
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
-from scipy.spatial import cKDTree
 
-import psycopg2
-import psycopg2.extras
 from sqlalchemy import text as sqlText
 
-from xml.etree.ElementTree import dump
 from ics.cobraCharmer.cobraCoach import calculation
 
 import mcsActor.windowedCentroid.centroid as centroid
@@ -53,16 +43,10 @@ import multiprocessing
 
 from pfs.utils import butler
 
-from opdb import opdb
-from sqlalchemy import create_engine
-
 from importlib import reload
 reload(dbTools)
 reload(mcsTools)
 reload(fiducials)
-reload(opdb)
-
-reload(CoordTransp)
 
 class McsCmd(object):
 
@@ -73,8 +57,6 @@ class McsCmd(object):
         self.prevExpTime = 1000
         self.newTable = None
         self.simulationPath = None
-        self._connectionToDB = None
-        self._conn = None
         self._db = None
 
         self.centParms = self.actor.actorConfig['centroidParams']
@@ -252,10 +234,10 @@ class McsCmd(object):
 
         cmd.diag(f'text="connecting to db, {username}@{hostname}:{port}, db={dbname}"')
         try:
-            db = dbTools.connectToDB(hostname=hostname,
-                                     port=port,
-                                     dbname=dbname,
-                                     username=username)
+            db = opdb.OpDB(host=hostname,
+                           port=port,
+                           dbname=dbname,
+                           user=username)
         except Exception as e:
             raise RuntimeError(f"unable to connect to the database: {e}")
 
@@ -913,8 +895,6 @@ class McsCmd(object):
 
     def getGeometry(self, cmd):
 
-        db = self.connectToDB(cmd)
-
         cmd.inform(f'text="getting geometry"')
 
         if(self.geometrySet == True):
@@ -981,9 +961,9 @@ class McsCmd(object):
             self.fids['fiducial_tweaked_y_mm'] = y_fid_mm
 
         db = self.connectToDB(cmd)
-        mcsData = db.bulkSelect('mcs_data',f'select spot_id, mcs_center_x_pix, mcs_center_y_pix '
-                f'from mcs_data where mcs_frame_id = {frameID}')
-    
+        mcsData = db.query_dataframe(f'select spot_id, mcs_center_x_pix, mcs_center_y_pix '
+                                     f'from mcs_data where mcs_frame_id = {frameID}')
+
         self.logger.info(f'Initiating the transformation function')
         
         # make sure pfiTransform is defined
@@ -1073,7 +1053,6 @@ class McsCmd(object):
                                                                                                            pfiTransform,
                                                                                                            self.actor.cameraName,
                                                                                                            doCloseTransaction=True)
-        db.close()
         cmd.inform(f'text="wrote transform to DB"')
 
         # Fix the format to avoid too many digits
@@ -1173,9 +1152,8 @@ class McsCmd(object):
 
         visitId = frameId // 100
         iteration = frameId % 100
-        cobraTarget = db.bulkSelect('cobra_target','select pfs_visit_id from cobra_target where '
-            f'(pfs_visit_id = {visitId}) AND iteration = {iteration}').reset_index()
-        db.close()
+        cobraTarget = db.query_dataframe('select pfs_visit_id from cobra_target where '
+                                         f'(pfs_visit_id = {visitId}) AND iteration = {iteration}').reset_index()
 
         db = self.connectToDB(cmd)
         if len(cobraTarget) == 0:
@@ -1217,14 +1195,10 @@ class McsCmd(object):
             # When fMethod = 'target' but no targets in DB
             # OR, fMethod = 'previous' and we have no prevPos:
             writeFakeCobraMove = True
-            db.close()
-            db = self.connectToDB(cmd)
             dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
         elif self.fMethod == 'previous':
             # use prevPos when we know it.
             writeFakeCobraMove = True
-            db.close()
-            db = self.connectToDB(cmd)
             dbTools.writeFakeTargetToDB(db, tarPos[:,1]+tarPos[:,2]*1j, int(frameId))
 
         # Always use whatever we inserted.
@@ -1248,9 +1222,7 @@ class McsCmd(object):
         t1 = time.time()
         cmd.inform(f'text="Fiber ID finished in {t1-t0:0.2f}s"')
 
-        db = self.connectToDB(cmd)
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
-        db.close()
         cmd.inform(f'text="wrote matched cobras to database"')
 
         # save the values to the previous position
@@ -1258,11 +1230,8 @@ class McsCmd(object):
 
         # Handling the case of 0 target case
         if (writeFakeCobraMove):
-            db.close()
-            db = self.connectToDB(cmd)
             dbTools.writeFakeMoveToDB(db, int(frameId))
             cmd.inform(f'text="wrote fake cobra move to DB"')
-            db.close()
 
 
     def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
@@ -1319,7 +1288,7 @@ class McsCmd(object):
         telescopeInfo = {'frameid': frameId,
                          'visitid': visitId,
                          'starttime': startTime,
-                         'exptime': expTime,
+                         'exptime': expTime/1000,
                          'altitude': alt,
                          'azimuth': az,
                          'instrot': instrot,
@@ -1574,24 +1543,8 @@ class McsCmd(object):
 
         # Let the database handle the primary key
         db = self.connectToDB(cmd)
-        res = db.session.execute(sqlText('select * FROM "mcs_exposure" where false'))
-        colnames = tuple(res.keys())
-        realcolnames = colnames[0:]
 
-        """
-          TODO: Those are the fake values for making PFI to work now, adding actual code later
-        """
-        adc_pa = telescopeInfo['adc_pa']
-        dome_temperature = telescopeInfo['dome_temperature']
-        dome_pressure = telescopeInfo['dome_pressure']
-        dome_humidity = telescopeInfo['dome_humidity']
-        outside_temperature = telescopeInfo['outside_temperature']
-        outside_pressure = telescopeInfo['outside_pressure']
-        outside_humidity = telescopeInfo['outside_humidity']
-        mcs_cover_temperature = telescopeInfo['mcs_cover_temperature']
-        mcs_m1_temperature = telescopeInfo['mcs_m1_temperature']
         taken_at = "'"+telescopeInfo['starttime']+"'"
-        taken_in_hst_at = "'"+telescopeInfo['starttime']+"'"
         if self.actor.cameraName == 'canon_50m':
             mcs_camera_id = 0
         if self.actor.cameraName == 'rmod_71m':
@@ -1603,36 +1556,36 @@ class McsCmd(object):
         version_actor = '0'
         version_instdata = '0'
 
-        line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%s,%s,%d,%s,%s,%s' % (telescopeInfo['frameid'],
-                                                                       telescopeInfo['visitid'],
-                                                                       telescopeInfo['exptime']/1000.0,
-                                                                       telescopeInfo['altitude'],
-                                                                       telescopeInfo['azimuth'],
-                                                                       telescopeInfo['instrot'],
-                                                                       adc_pa, dome_temperature,
-                                                                       dome_pressure, dome_humidity,
-                                                                       outside_temperature, outside_pressure,
-                                                                       outside_humidity,
-                                                                       mcs_cover_temperature,mcs_m1_temperature,
-                                                                       taken_at, taken_in_hst_at,
-                                                                       mcs_camera_id,
-                                                                             measurement_algorithm,
-                                                                             version_actor, version_instdata)
-                                                                        
-
-        buf = io.StringIO()
-        buf.write(line)
-        buf.seek(0, 0)
-
-        self._writeData('mcs_exposure', realcolnames, buf)
-        buf.seek(0, 0)
+        db.insert_kw('mcs_exposure',
+                     mcs_frame_id=telescopeInfo['frameid'],
+                     pfs_visit_id=telescopeInfo['visitid'],
+                     mcs_exptime=telescopeInfo['exptime']/1000.0,
+                     altitude=telescopeInfo['altitude'],
+                     azimuth=telescopeInfo['azimuth'],
+                     insrot=telescopeInfo['instrot'],
+                     adc_pa=telescopeInfo['adc_pa'],
+                     dome_temperature=telescopeInfo['dome_temperature'],
+                     dome_pressure=telescopeInfo['dome_pressure'],
+                     dome_humidity=telescopeInfo['dome_humidity'],
+                     outside_temperature=telescopeInfo['outside_temperature'],
+                     outside_pressure=telescopeInfo['outside_pressure'],
+                     outside_humidity=telescopeInfo['outside_humidity'],
+                     mcs_cover_temperature=telescopeInfo['mcs_cover_temperature'],
+                     mcs_m1_temperature=telescopeInfo['mcs_m1_temperature'],
+                     taken_at=taken_at,
+                     taken_in_hst_at=taken_at,
+                     mcs_camera_id=mcs_camera_id,
+                     measurement_algorithm=measurement_algorithm,
+                     version_actor=version_actor,
+                     version_instdata=version_instdata,
+                     )
 
         cmd.inform('text="Telescope information for frame %s populated."' % (telescopeInfo['frameid']))
 
-        return buf
-
     def _writeData(self, tableName, columnNames, dataBuf):
         """Wrap a direct COPY_FROM via sqlalchemy. """
+
+        raise NotImplementedError()
 
         columns = ','.join('"{}"'.format(k) for k in columnNames)
         sql = 'COPY {} ({}) FROM STDIN WITH CSV'.format(
@@ -1659,6 +1612,8 @@ class McsCmd(object):
     def _readData(self, sql):
         """Wrap a direct COPY_TO via sqlalchemy. """
 
+        raise NotImplementedError()
+
         dataBuf = io.StringIO()
 
         try:
@@ -1679,36 +1634,31 @@ class McsCmd(object):
         nItems = len(centArr)
         if(nItems > 5000):
             nItems = 5000
-            
-        buf = io.StringIO()
-        for l_i in range(nItems):
-            line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f\n' % (frameId, l_i+1, centArr[l_i,1], 
-                                        centArr[l_i,2], centArr[l_i,3], centArr[l_i,4], 
-                                                              centArr[l_i,5], centArr[l_i,6], centArr[l_i,7],0, centArr[l_i,8], centArr[l_i,9])
+        centArr = centArr[:nItems]
 
-            
-            buf.write(line)
-        
-        line = line = '%d,%d,%f,%f,%f,%f,%f,%f,%f,%d,%f,%f\n' % (frameId, -1, np.nan,
-                                        np.nan, np.nan, np.nan, 
-                                                           np.nan, np.nan, np.nan, 0, np.nan, np.nan)
-        buf.write(line)
-        buf.seek(0, 0)
+        df = pd.DataFrame(dict(mcs_frame_id=frameId,
+                               spot_id=np.arange(nItems)+1,
+                               mcs_center_x_pix=centArr[:,1],
+                               mcs_center_y_pix=centArr[:,2],
+                               mcs_second_moment_x_pix=centArr[:,3],
+                               mcs_second_moment_y_pix=centArr[:,4],
+                               mcs_second_moment_xy_pix=centArr[:,5],
+                               bgvalue=centArr[:,6],
+                               peakvalue=centArr[:,7],
+                               flags=np.zeros(shape=(nItems), dtype='i4'),
+                               flux=centArr[:,8],
+                               fluxerr=centArr[:,9]))
 
+        # Deranged idiom for appending a row. In this case other callers expect there to be a spot_id = -1 row, ugh.
+        df.loc[len(df)] = (frameId, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 0, np.nan, np.nan)
 
-        # Let the database handle the primary key
         db = self.connectToDB(None)
-        colnames = db.session.execute(sqlText('select * FROM "mcs_data" where false'))
-        realcolnames = tuple(colnames.keys())[0:]
-
-
-        self._writeData('mcs_data', realcolnames, buf)
-        buf.seek(0, 0)
-        return buf
+        db.insert_dataframe('mcs_data', df)
 
     def _readCentroids(self, conn, frameId, moveId):
         """ Read all measurements for a given (frameId, moveId)"""
 
+        raise NotImplementedError()
         if conn is None:
             conn = self.connectToDB()
 
@@ -1820,6 +1770,9 @@ class McsCmd(object):
              - update table
         """
     
+        # The "update" at the bottom cannot have worked for a couple of years now.
+        raise NotImplementedError()
+
         cmdKeys = cmd.cmd.keywords
 
         # get frame id
@@ -1862,9 +1815,9 @@ class McsCmd(object):
         cmd.inform('text="successfully loaded image {fileName}"')
 
         # retrieve mcsData
-        mcsData = db.bulkSelect('mcs_data',sqlText('select * from mcs_data where '
-                    f'mcs_frame_id = {frameId}')).sort_values(by=['spot_id'])
-    
+        mcsData = db.query_dataframe('select * from mcs_data where '
+                                     f'mcs_frame_id = {frameId}').sort_values(by=['spot_id'])
+
         if(len(mcsData)==0):
             cmd.fail('text="No MCS data for frameID={frameId}"')
             
