@@ -1288,7 +1288,7 @@ class McsCmd(object):
         telescopeInfo = {'frameid': frameId,
                          'visitid': visitId,
                          'starttime': startTime,
-                         'exptime': expTime/1000,
+                         'exptime': expTime,
                          'altitude': alt,
                          'azimuth': az,
                          'instrot': instrot,
