@@ -1217,7 +1217,7 @@ class McsCmd(object):
         # to very unexpected input (like targets outside the patrol
         # region)
         if(flag > 0):
-            cmd.fail(f'text="Failure in cobra matching, {flag} matches unsuccessful.  This probably means the design file is wrong, and/or the target positions in the cobra_target table are wrong. Check the design file before restarting."')
+            cmd.fail(f'text="Failure in cobra matching, {flag} matches unsuccessful.  This probably means the design file is wrong, and/or the target positions in the cobra_target table are wrong. Check the design file before restarting; convergence should not continue."')
             
         t1 = time.time()
         cmd.inform(f'text="Fiber ID finished in {t1-t0:0.2f}s"')
