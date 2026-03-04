@@ -41,20 +41,6 @@ def connectToDB(hostname=None, port=None, dbname=None, username=None):
                    username=username)
     return db
 
-def loadCobraMatchFromDB(db, frameId):
-    """
-    read the cobra_match table information, convert to x+ij format, return positions and flags
-    """
-
-    sql = f'SELECT cobra_match.cobra_id,cobra_match.pfi_center_x_mm,cobra_match.pfi_center_x_mm,cobra_match.flags from cobra_match where cobra_match.mcs_frame_id={frameId}'
-
-    df = db.query_dataframe(sql)
-
-    positions = df['pfi_center_x_mm'] + df['pfi_center_y_mm'] * 1j
-    flags = df['flags']
-
-    return positions, flags
-
 
 def loadTelescopeParametersFromDB(db, frameId):
 
@@ -69,40 +55,6 @@ def loadTelescopeParametersFromDB(db, frameId):
     insRot = df['insrot'][0]
 
     return zenithAngle, insRot
-
-
-def loadBoresightFromDB(db, pfsVisitId):
-    """
-    read boresight informatino from database
-    table = mcs_boresight
-    """
-    sql = f'''SELECT * FROM mcs_boresight ORDER BY calculated_at DESC FETCH FIRST ROW ONLY'''
-    # sql=f'SELECT mcs_boresight.mcs_boresight_x_pix,mcs_boresight.mcs_boresight_y_pix from mcs_boresight where mcs_boresight.pfs_visit_id={pfsVisitId}'
-    df = db.query_dataframe(sql)
-    return [df['mcs_boresight_x_pix'][0], df['mcs_boresight_y_pix'][0]]
-
-
-def loadCentroidsFromDB(db, mcsFrameId):
-    """ retrieve a set of centroids from database and return as a numpy array"""
-
-    sql = f'select mcs_data.spot_id, mcs_data.mcs_center_x_pix, mcs_data.mcs_center_y_pix from mcs_data where mcs_data.mcs_frame_id={mcsFrameId}'
-    df = db.query_dataframe(sql)
-    return df.to_numpy()
-
-
-def loadFiducialsFromDB(db):
-    """
-    load fiducial fibre positions from the DB
-    table=fiducial_fiber_geometry
-
-    returns an  Nx3 array with the columns equal to the fiducial ID, x and y position
-    """
-
-    sql = f'SELECT fiducial_fiber_geometry.fiducial_fiber_id , fiducial_fiber_geometry.ff_center_on_pfi_x_mm ,fiducial_fiber_geometry.ff_center_on_pfi_y_mm from fiducial_fiber_geometry'
-
-    df = db.query_dataframe(sql)
-
-    return np.array([df['fiducial_fiber_id'], df['ff_center_on_pfi_x_mm'], df['ff_center_on_pfi_y_mm']]).T
 
 
 def loadTargetsFromDB(db, frameId):
@@ -148,80 +100,6 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName, doCloseTransaction
 
     return (df['mcs_frame_id'].values, df['x0'].values, df['y0'].values, df['dscale'].values,
             df['scale2'].values, df['theta'].values, df['alpha_rot'].values, df['camera_name'].values)
-
-
-def _writeData(db, tableName, columnNames, dataBuf):
-    """
-    COPY FROM STDIN (CSV) into a table using the SQLAlchemy Session.
-
-    Parameters
-    ----------
-    db : opdb.opdb.OpDB
-        Handle exposing `db.session` (SQLAlchemy Session).
-    tableName : str
-        Target table name, optionally schema-qualified (e.g. 'schema.table').
-    columnNames : iterable[str]
-        Columns to load, in the exact order they appear in the CSV stream.
-    dataBuf : io.StringIO
-        Text file-like object positioned anywhere; will be rewound.
-
-    Behavior
-    --------
-    - Reuses an active transaction on the Session; otherwise opens one and commits.
-    - Rolls back on error and re-raises the exception.
-    - Does not close the Session; only the DBAPI cursor is context-managed.
-
-    Raises
-    ------
-    Exception
-        Any error from COPY or the database driver; the Session is rolled back.
-    """
-
-    raise NotImplementedError()
-
-    columns = ','.join(f'"{c}"' for c in columnNames)
-    sql = f'COPY {tableName} ({columns}) FROM STDIN WITH CSV'
-    session = db.session
-    # make sure to rewind the buffer
-    dataBuf.seek(0)
-
-    def doCopy():
-        conn = session.connection()  # SQLA Connection (bound to current txn)
-        raw = conn.connection  # DBAPI connection (psycopg2)
-        with raw.cursor() as cur:
-            cur.copy_expert(sql, dataBuf)  # context manager closes cursor
-
-    try:
-        if session.in_transaction():
-            doCopy()  # reuse caller's transaction
-        else:
-            with session.begin():
-                doCopy()  # commit on success
-
-        return True
-
-    except Exception as e:
-        if session.in_transaction():
-            session.rollback()
-
-        logger.warning(f"failed to write with {sql}: {e}")
-
-        return False
-
-
-def writeTargetToDB(db, frameId, target, mpos):
-    visitId = frameId // 100
-    iteration = frameId % 100
-
-    # To-Do here we need a better implementation.
-    data = {'pfs_visit_id': np.repeat(visitId, 2394),
-            'iteration': np.repeat(iteration, 2394),
-            'cobra_id': np.arange(2394) + 1,
-
-            }
-
-    df = pd.DataFrame(data=data)
-    db.insert_dataframe("cobra_target", df)
 
 
 def writeFakeMoveToDB(db, frameId):
@@ -281,49 +159,6 @@ def writeFakeTargetToDB(db, centers, frameId):
     df = pd.DataFrame(data=data)
     db.insert_dataframe("cobra_target", df)
 
-def writeBoresightToDB(db, pfsVisitId, boresight):
-    """ write boresight to database with current timestamp """
-
-    dt = datetime.now(timezone.utc)
-
-    db.insert_kw('mcs_boresight',
-                 pfs_visit_id=pfsVisitId,
-                 mcs_boresight_x_pix=boresight[0],
-                 mcs_boresight_y_pix=boresight[1],
-                 calculated_at=dt)
-
-def writeCentroidsToDB(db, centroids, mcsFrameId):
-    """
-    write the centroids to the database
-    table=mcs_data
-    variables=spot_id,mcs_center_x_pix,mcs_center_y_pix
-              mcs_second_moment_x_pix,mcs_second_moment_y_pix,
-              mcs_second_moment_xy_pix,bgvalue,peakvalue
-    """
-
-    # get size of array
-    sz = centroids.shape
-
-    # create array of frameIDs (same for all spots)
-    mcsFrameIDs = np.repeat(mcsFrameId, sz[0]).astype('int')
-    # make a data frame
-    frame = np.zeros((sz[0], 9))
-    frame[:, 0] = mcsFrameIDs
-    frame[:, 1:] = centroids
-    # column names
-    columns = ['mcs_frame_id', 'spot_id', 'mcs_center_x_pix', 'mcs_center_y_pix', 'mcs_second_moment_x_pix',
-               'mcs_second_moment_y_pix', 'peakvalue', 'bgvalue', 'mcs_second_moment_xy_pix']
-
-    df = pd.DataFrame(frame, columns=columns)
-    db.insert_dataframe("mcs_data", df)
-
-
-def readMatchFromDB(db, mcsFrameId):
-    match = db.query_dataframe(f'select * from cobra_match where '
-                               f'mcs_frame_id = {mcsFrameId}')
-    return match
-
-
 def writeMatchesToDB(db, cobraMatch, mcsFrameId):
     """
     write the centroids to the database
@@ -346,29 +181,6 @@ def writeMatchesToDB(db, cobraMatch, mcsFrameId):
                    }
     df = pd.DataFrame(data=targetTable)
     db.insert_dataframe("cobra_match", df)
-
-def writeAffineToDB(db, afCoeff, frameId):
-    """
-    write the affine transformation to DB
-    """
-
-    sx = np.sqrt(afCoeff[0, 0] ** 2 + afCoeff[0, 1] ** 2)
-    sy = np.sqrt(afCoeff[1, 0] ** 2 + afCoeff[1, 1] ** 2)
-
-    xd = afCoeff[0, 2]
-    yd = afCoeff[1, 2]
-
-    rotation = np.arctan2(afCoeff[1, 0] / np.sqrt(afCoeff[0, 0] ** 2 + afCoeff[0, 1] ** 2),
-                          afCoeff[1, 1] / np.sqrt(afCoeff[1, 0] ** 2 + afCoeff[1, 1] ** 2))
-
-    df = pd.DataFrame({'mcs_frame_id': [frameId],
-                       'x_trans': [xd],
-                       'y_trans': [yd],
-                       'x_scale': [sx],
-                       'y_scale': [sy],
-                       'angle': [rotation]})
-    db.insert_dataframe('mcs_pfi_transformation', df)
-
 
 def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
     """
