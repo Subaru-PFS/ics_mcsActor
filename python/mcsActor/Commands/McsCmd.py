@@ -63,14 +63,12 @@ class McsCmd(object):
         self.adjacentCobras = None
         self.geometrySet = False
         self.geomFile = None
-        self.dotFile = None
 
         self.fids = None
         self.fidsGood = None
         self.fidsOuterRing = None
         self.prevPos = None
-        
-        self.simulationPath = None
+        self.centThresh = None
 
         
         logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
@@ -137,7 +135,6 @@ class McsCmd(object):
                                         keys.Key("matchRad", types.Int(),
                                                  help="radius in pixels for matching positions"),
                                         keys.Key("geomFile", types.String(), help="file for geometry"),
-                                        keys.Key("dotFile", types.String(), help="file for dot information"),
                                         keys.Key("fieldID", types.String(),
                                                  help="fieldID for getting instrument parameters"),
                                         keys.Key("cMethod", types.String(),
@@ -196,6 +193,9 @@ class McsCmd(object):
         cmd.finish(f'text="set db URI to {self.dbOverride}')
 
     def resolveDb(self, cmd):
+
+        """ get the database configuration parameters"""
+        
         if self.dbOverride is not None:
             username, hostname, port, dbname = self.dbOverride
             cmd.warn(f'text="using overridden db URI: {username}@{hostname}:{port}, db={dbname}"')
@@ -358,6 +358,9 @@ class McsCmd(object):
         return pycards
 
     def _constructHeader(self, cmd, filename, expType, expTime, expStart, frameId):
+
+        """ construct the header """
+        
         if expType == 'bias':
             expTime = 0.0
 
@@ -796,18 +799,23 @@ class McsCmd(object):
         cmd.inform('text="Centroids of exposure ID %08d dumped."' % (frameId))
 
     def switchFMethod(self, cmd):
+
+        """ switch the method for fibre identification """
         cmdKeys = cmd.cmd.keywords
         self.fMethod = cmdKeys['fMethod'].values[0]
         cmd.inform(f'text="fMethod = {self.fMethod}"')
         cmd.finish('switchFMethod=done')
 
     def switchCMethod(self, cmd):
+        """ switch the method for centroiding """
         cmdKeys = cmd.cmd.keywords
         self.cMethod = cmdKeys['cMethod'].values[0]
         cmd.inform(f'text="cMethod = {self.cMethod}"')
         cmd.finish('switchCMethod=done')
 
     def setApertureParams(self, cmd):
+        """ tweak aperture parameters for photometry """
+
         cmdKeys = cmd.cmd.keywords
 
         if('aperture' in cmdKeys):
@@ -829,6 +837,8 @@ class McsCmd(object):
 
     def getGeometry(self, cmd):
 
+        """ load cobra geometry and put in the expected format for fibreID """
+        
         cmd.inform(f'text="getting geometry"')
 
         if(self.geometrySet == True):
@@ -851,9 +861,6 @@ class McsCmd(object):
             self.geomFile = self.butler.get("moduleXml", moduleName="ALL", version="")
         pfi = self.geomFile
 
-        if(self.dotFile == None):
-            self.dotFile = os.path.join(
-                instPath, "data/pfi/dot/black_dots_mm.csv")
 
         dots = self.butler.get("black_dots", moduleName="ALL", version="")
 
@@ -1010,11 +1017,6 @@ class McsCmd(object):
         cmd.inform(f'text="PFI transformation method built"')
 
 
-    def setDotFile(self, cmd):
-
-        self.geomFile = cmd.cmd.keywords["dotFile"].values[0]
-        cmd.inform(f'text="geometry file set to {self.dotFile}"')
-
     def resetGeometryFile(self, cmd):
 
         self.geomFile = None
@@ -1030,78 +1032,6 @@ class McsCmd(object):
         self.geometrySet = False
         self.getGeometry(cmd)
         cmd.finish(f'text="geometry file set to {self.geomFile}"')
-
-    def easyFiberID(self, cmd, frameId):
-        reload(calculation)
-        
-        db = self.connectToDB(cmd)
-        cmd.inform(f'text="Running easy FibreID"')
-
-        # sorting the spot id, so that the ID returned by matching should 
-        # keep the same.
-        mcsData = db.bulkSelect('mcs_data',sqlText('select * from mcs_data where '
-                f'mcs_frame_id = {frameId}')).sort_values(by=['spot_id'])
-
-        renames = dict(mcs_frame_id='mcsId',
-                       spot_id='fiberId',
-                       mcs_center_x_pix='centroidx',
-                       mcs_center_y_pix='centroidy')
-
-        mcsData.rename(columns=renames, inplace=True)
-        df=mcsData.loc[mcsData['fiberId'] > 0]
-        
-        
-        '''
-            OK, here we transform all mcs_data to pfi
-        '''
-        x_mm, y_mm = self.pfiTrans.mcsToPfi(df['centroidx'].values,df['centroidy'].values)
-        
-        pos=x_mm+y_mm*(1j)
-        
-        centers=self.calibModel.centers
-        cmd.inform(f'text="cobra centers = {centers}" ')
-
-        cmd.inform(f'text="Loading arm-length = {self.calibModel.L1}" ')
-
-        # It should be one spot in patrol region. 
-        target = calculation.lazyIdentification(centers, pos, 
-            radii=self.calibModel.L1+self.calibModel.L2)
-        
-        cmd.inform(f'text="Total ID target = {target}" ')
-
-
-        cmd.inform(f'text="Loading DOT file for missing IDs" ')
-
-        dotData = pd.read_csv(self.dotFile, delimiter = ",", header=0)
-        dotCenter = dotData['x'].values+dotData['y'].values*1j
-
-        mpos = np.zeros(len(target), dtype=complex)
-        for n, k in enumerate(target):
-            if k < 0:
-                # If the target failed to match, we think it is highly possible in dot
-                mpos[n] = dotCenter[n]
-            else:
-                mpos[n] = pos[k]
-        indx = np.where(target < 0 )
-
-        visitId = frameId // 100
-        iteration = frameId % 100
-        cobraTarget = db.query_dataframe('select pfs_visit_id from cobra_target where '
-                                         f'(pfs_visit_id = {visitId}) AND iteration = {iteration}').reset_index()
-
-        db = self.connectToDB(cmd)
-        if len(cobraTarget) == 0:
-            cmd.inform(f'text="Fall back using cobra centers as target." ')
-            dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
-    
-        cobraMatch = np.zeros((2394, 5))
-        cobraMatch[:,0] = np.arange(2394)+1 
-        cobraMatch[:,1] = target+1
-        cobraMatch[:,2] = mpos.real
-        cobraMatch[:,3] = mpos.imag
-        cobraMatch[indx,4] = 1
-        
-        dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
 
     def resetPosition(self, cmd):
         """Declare that we do not know where the cobras are. """
