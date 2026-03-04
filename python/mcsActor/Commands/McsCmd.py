@@ -863,6 +863,8 @@ class McsCmd(object):
 
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
+        """load the basic transformation and refine based on the fiducial fibre positions"""
+        
         if self.fids is None:
             # Read fiducial and spot geometry
             fids = fiducials.Fiducials.read(self.butler)
@@ -998,12 +1000,16 @@ class McsCmd(object):
 
     def resetGeometryFile(self, cmd):
 
+        """ reset the geometry """
         self.geomFile = None
         self.geometrySet = False
         self.getGeometry(cmd)
         cmd.finish(f'text="geometry file set to {self.geomFile}"')
 
     def setGeometryFile(self, cmd):
+
+        """ set the geometry to custom file """
+        
         from ics.cobraCharmer import pfiDesign
 
         geomFilename = pathlib.Path(cmd.cmd.keywords["geomFile"].values[0])
@@ -1020,6 +1026,7 @@ class McsCmd(object):
 
     def fibreID(self, cmd, frameId, zenithAngle, insRot):
 
+        """ do fibre identification """
         writeFakeCobraMove = False
 
         db = self.connectToDB(cmd)
@@ -1078,6 +1085,9 @@ class McsCmd(object):
 
 
     def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
+
+        """aquire and write telescope geometry"""
+        
         # We are live: use Gen2 telescope info.
         gen2Model = self.actor.models['gen2'].keyVarDict
 
@@ -1143,7 +1153,7 @@ class McsCmd(object):
 
     def setCentroidParams(self, cmd):
         """
-        top level routine for setting centroid parameters. REads the defaults from teh config fil,e
+        top level routine for setting centroid parameters. Reads the defaults from the config fi,e
         then changes any specified in the keywords argument. 
 
         """
@@ -1153,6 +1163,10 @@ class McsCmd(object):
     
 
     def runCentroidSEP(self, cmd):
+
+        """ legacy routine to use SEP for centroiding; this is kept mostly for debugging in case something
+        goes extremely wonky """
+        
         cmdKeys = cmd.cmd.keywords
         self.newTable = "newTable" in cmdKeys
 
@@ -1281,6 +1295,8 @@ class McsCmd(object):
 
     def _writeTelescopeInfo(self, cmd, telescopeInfo, conn=None):
 
+        """ write telescope information to database """
+        
         # Let the database handle the primary key
         db = self.connectToDB(cmd)
 
@@ -1349,23 +1365,6 @@ class McsCmd(object):
         except Exception as e:
             self.logger.warn(f"failed to write with {sql}: {e}")
 
-    def _readData(self, sql):
-        """Wrap a direct COPY_TO via sqlalchemy. """
-
-        raise NotImplementedError()
-
-        dataBuf = io.StringIO()
-
-        try:
-            db = self.connectToDB(None)
-            session = db.session
-            with session.connection().connection.cursor() as cursor:
-                cursor.copy_expert(sqlText(sql), dataBuf)
-            dataBuf.seek(0, 0)
-            return dataBuf
-        except Exception as e:
-            self.logger.warn(f"failed to read with {sql}: {e}")
-
     def _writeCentroids(self, centArr, frameId, moveId, conn=None):
         """ Write all measurements for a given (frameId, moveId) """
 
@@ -1395,46 +1394,6 @@ class McsCmd(object):
         db = self.connectToDB(None)
         db.insert_dataframe('mcs_data', df)
 
-    def _writeExpectTarget(self, cmd, frameId, targets):
-        '''
-        Write the expect target to databse.
-        '''
-
-        mcs_f3c_model = {'camMatrix': np.array([[8.36047142e+03, 0.00000000e+00, 5.01140651e+03],
-                                                [0.00000000e+00, 8.75498927e+03, 3.53572485e+03],
-                                                [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]]),
-                         'camDistor': np.array([[0.04236098, -0.11608623, 0.0012094, -0.00031588, 0.08034843]]),
-                         'camRotVec': np.array([[-0.02458225],
-                                                [-0.06933687],
-                                                [-0.01775009]]),
-                         'camTranVec': np.array([[-72269.86663875],
-                                                 [-48804.84781669],
-                                                 [112015.99005353]])}
-
-        cobra_obj = np.array([targets.real, targets.imag, np.zeros(len(targets))]).T
-
-        imgpoints2, _ = cv2.projectPoints(cobra_obj.astype(np.float32),
-                                          mcs_f3c_model['camRotVec'], mcs_f3c_model['camTranVec'],
-                                          mcs_f3c_model['camMatrix'], mcs_f3c_model['camDistor'])
-        imgarr2 = imgpoints2[:, 0, :]
-        pfi_x = imgarr2[:, 0]
-        pfi_y = imgarr2[:, 1]
-
-        db = self.connectToDB(None)
-        colnames = db.session.execute(sqlText('select * FROM "cobra_target" where false'))
-        realcolnames = tuple(colnames.keys())[0:]
-
-        buf = io.StringIO()
-
-        for i in range(len(pfi_x)):
-            line = '%d,%d,%d,%d, %f,%f,%f,%f,%d,%d,%d,%f,%d,%d,%d,%f,%d\n'%(frameId/100, 1, i+1, 99, pfi_x[i], pfi_y[i],
-                                                                            pfi_x[i], pfi_y[i], 1, 1, 99, 99, 1, 1, 99, 99, 0, np.nan, np.nan)
-            buf.write(line)
-        buf.seek(0, 0)
-
-        self._writeData('cobra_target', realcolnames, buf)
-        buf.seek(0, 0)
-
     def doPhotometry(self, cmd):
         """
             perform photometry on previously taken MCS images
@@ -1442,6 +1401,8 @@ class McsCmd(object):
              - load image from disk
              - calculate photometry
              - update table
+
+        Note that this is currently unused, but kept in case of future interest 
         """
     
         # The "update" at the bottom cannot have worked for a couple of years now.
