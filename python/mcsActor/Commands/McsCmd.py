@@ -1395,23 +1395,6 @@ class McsCmd(object):
         db = self.connectToDB(None)
         db.insert_dataframe('mcs_data', df)
 
-    def _readCentroids(self, conn, frameId, moveId):
-        """ Read all measurements for a given (frameId, moveId)"""
-
-        raise NotImplementedError()
-        if conn is None:
-            conn = self.connectToDB()
-
-
-        cmd = """copy (select * from mcsPerFiber where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
-        buf = self._readData(cmd)
-
-        # Skip the frameId, etc. columns.
-        arr = np.genfromtxt(buf, dtype='f4',
-                            delimiter=',', usecols=range(4, 24))
-
-        return arr
-
     def _writeExpectTarget(self, cmd, frameId, targets):
         '''
         Write the expect target to databse.
