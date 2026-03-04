@@ -351,10 +351,6 @@ class McsCmd(object):
             pycards.append(pcard)
             cmd.debug('text=%s' % (qstr("fetched card: %s" % (str(pcard)))))
 
-        if self.simulationPath is not None:
-            pcard = 'W_MCSMNM', self.simulationPath[-1], 'Simulated file path'
-            pycards.append(pcard)
-
         return pycards
 
     def _constructHeader(self, cmd, filename, expType, expTime, expStart, frameId):
@@ -550,17 +546,15 @@ class McsCmd(object):
         cmd.inform(f'text="triggered writing image to filename={filename}"')
         return filename, image
 
-    def _doExpose(self, cmd, expTime, expType, frameId, mask=None):
+    def _doExpose(self, cmd, expTime, expType, frameId):
         """ Take an exposure and  """
 
         fileIdsQ = self.requestNextFileIds(cmd, frameId)
         cmd.diag(f'text="new exposure"')
         expStart = time.time()
-        if self.simulationPath is None:
-            filename = '/tmp/scratchFile'
-            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
-        else:
-            imagePath, image, target = self.getNextSimulationImage(cmd)
+        filename = '/tmp/scratchFile'
+        image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
+
         cmd.inform(f'text="done: image shape = {image.shape}"')
 
         try:
@@ -583,16 +577,6 @@ class McsCmd(object):
         hdr = self._constructHeader(cmd, filename, expType, expTime, expStart, frameId)
         cmd.diag(f'text="hdr done: {len(hdr)}"')
 
-        # Now, after getting the filename, get predicted locations
-        if self.simulationPath is not None:
-            self._writeExpectTarget(cmd, frameId, target)
-        else:
-            pass
-
-        if mask is not None:
-            cmd.inform(f'text="mask image shape: {mask.shape} type:{mask.dtype}"')
-            cmd.inform(f'text="image shape: {image.shape} type:{image.dtype}"')
-            image = image*mask.astype('uint16')
 
         return fileIds, hdr, image
 
@@ -1094,52 +1078,23 @@ class McsCmd(object):
 
 
     def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
-        if self.simulationPath is None:
-            # We are live: use Gen2 telescope info.
-            gen2Model = self.actor.models['gen2'].keyVarDict
+        # We are live: use Gen2 telescope info.
+        gen2Model = self.actor.models['gen2'].keyVarDict
 
-            axes = gen2Model['tel_axes'].getValue()
-            az, alt, *_ = axes
+        axes = gen2Model['tel_axes'].getValue()
+        az, alt, *_ = axes
 
-            rot = gen2Model['tel_rot'].getValue()
-            posAngle, instrot = rot
-            adc_type, adc_pa = gen2Model['tel_adc'].getValue()
+        rot = gen2Model['tel_rot'].getValue()
+        posAngle, instrot = rot
+        adc_type, adc_pa = gen2Model['tel_adc'].getValue()
 
-            dome_humidity, dome_pressure, dome_temperature, dome_wind = gen2Model['dome_env'].getValue()
-            outside_humidity, outside_pressure, outside_temperature, outside_wind = gen2Model['outside_env'].getValue()
-            
-            mebModel = self.actor.models['meb'].keyVarDict
-            _,_,m1_temperature, m1_cover_temperature, _, _, _ = mebModel['temps'].getValue()
+        dome_humidity, dome_pressure, dome_temperature, dome_wind = gen2Model['dome_env'].getValue()
+        outside_humidity, outside_pressure, outside_temperature, outside_wind = gen2Model['outside_env'].getValue()
+        
+        mebModel = self.actor.models['meb'].keyVarDict
+        _,_,m1_temperature, m1_cover_temperature, _, _, _ = mebModel['temps'].getValue()
 
-            startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        else:
-
-            # We are reading images from disk: get the geometry from the headers.
-            simPath = str(filename)
-            cmd.inform(f'text="filename= {simPath}"')
-
-            simHdr = fitsio.read_header(str(simPath), 0)
-            cmd.inform('text="loaded telescope info from %s"' % (simPath))
-
-            az = simHdr.get('AZIMUTH', -9998.0)
-            alt = simHdr.get('ALTITUDE', -9998.0)
-
-            if az is None:
-                az = -9998.0
-            if alt is None:
-                alt = -9998.0
-
-            expTime = simHdr.get('EXPTIME', -9998.0)
-            instrot = simHdr.get('INR-STR', -9998.0)
-
-            # Redefine instrot to be 0.5 since we know this fact from ASRD test.
-            instrot = 0.5
-            startTime = simHdr.get('UTC-STR', None)
-
-            if startTime is None:
-                ctime = os.stat(filename).st_ctime
-                startTime = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(ctime))
-                cmd.warn(f'text="no start card in {simPath}, using file date: {startTime}"')
+        startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         visitId = frameId // 100
         cmd.inform(f'text="frame={frameId} visit={visitId} az={az} alt={alt} instrot={instrot} adc_pa={adc_pa}"')
@@ -1447,20 +1402,13 @@ class McsCmd(object):
         if conn is None:
             conn = self.connectToDB()
 
-        if self.simulationPath is None:
-            cmd = """copy (select * from mcsPerFiber where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
-            buf = self._readData(cmd)
 
-            # Skip the frameId, etc. columns.
-            arr = np.genfromtxt(buf, dtype='f4',
-                                delimiter=',', usecols=range(4, 24))
-        else:
-            cmd = f"""copy (select * from 'mcsData' where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
-            buf = self._readData(cmd)
+        cmd = """copy (select * from mcsPerFiber where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
+        buf = self._readData(cmd)
 
-            # Skip the frameId, etc. columns.
-            arr = np.genfromtxt(buf, dtype='f4',
-                                delimiter=',', usecols=range(4, 8))
+        # Skip the frameId, etc. columns.
+        arr = np.genfromtxt(buf, dtype='f4',
+                            delimiter=',', usecols=range(4, 24))
 
         return arr
 
