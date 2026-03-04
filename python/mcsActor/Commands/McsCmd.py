@@ -88,7 +88,7 @@ class McsCmd(object):
             ('expose', '@(bias|test) [<frameId>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose',
-                'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@doPhot] [@simDot] '
+                'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@doPhot] '
                 '[@newField] [<rerunFrameId>]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
@@ -648,11 +648,6 @@ class McsCmd(object):
         doFibreID = 'doFibreID' in cmdKeys
         newField = 'newField' in cmdKeys
 
-        simDot = 'simDot' in cmdKeys
-        if simDot:
-            dotmask = self._makeDotMask(cmd)
-        else:
-            dotmask = None
 
         cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID} doPhot = {self.doPhot}')
 
@@ -688,7 +683,7 @@ class McsCmd(object):
             
             cmd.inform('text="Exposure time now is %d ms." ' % (expTime))
             try:
-                fileIds, hdr, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
+                fileIds, hdr, image = self._doExpose(cmd, expTime, expType, frameId )
             except Exception as e:
                 cmd.fail(f'text="failed to take exposure: {e}"')
                 return
@@ -1468,48 +1463,6 @@ class McsCmd(object):
                                 delimiter=',', usecols=range(4, 8))
 
         return arr
-
-    def _makeDotMask(self, cmd):
-        """ Make dot mask for simulation or proessing purpose)"""
-
-        # read dot location
-        dotfile = '/home/pfs/mhs/devel/pfs_instdata/data/pfi/dot/dot_measurements_20210428_el90_rot+00_ave.csv'
-        dotpos = pd.read_csv(dotfile)
-
-        unit_height = 30
-        unit_weight = 30
-        r_mean = np.around(np.mean(dotpos['r_tran'].values)).astype('int')
-        cmd.inform('text="Making dot image"')
-
-        mask = self._create_circular_mask(unit_height, unit_weight, radius=10)
-
-        masked_img = np.zeros([unit_height, unit_weight])+1
-
-        masked_img[mask] = 0
-        # To-do: change here for the image size
-        dotmask = np.zeros([7096, 10000])+1
-
-        for i in range(len(dotpos)):
-            xstart = np.around(dotpos['x_tran'].values[i]-(unit_weight/2)).astype('int')
-
-            ystart = np.around(dotpos['y_tran'].values[i]-(unit_height/2)).astype('int')
-
-            dotmask[ystart:ystart+unit_height, xstart:xstart+unit_weight] = masked_img
-
-        return dotmask
-
-    def _create_circular_mask(self, h, w, center=None, radius=None):
-
-        if center is None:  # use the middle of the image
-            center = (int(w/2), int(h/2))
-        if radius is None:  # use the smallest distance between the center and image walls
-            radius = min(center[0], center[1], w-center[0], h-center[1])
-
-        Y, X = np.ogrid[:h, :w]
-        dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
-
-        mask = dist_from_center <= radius
-        return mask
 
     def _writeExpectTarget(self, cmd, frameId, targets):
         '''
