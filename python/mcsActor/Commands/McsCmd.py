@@ -42,11 +42,6 @@ import multiprocessing
 
 from pfs.utils import butler
 
-from importlib import reload
-reload(dbTools)
-reload(mcsTools)
-reload(fiducials)
-
 class McsCmd(object):
 
     def __init__(self, actor):
@@ -55,7 +50,6 @@ class McsCmd(object):
         self.expTime = 1000
         self.prevExpTime = 1000
         self.newTable = None
-        self.simulationPath = None
         self._db = None
 
         self.centParms = self.actor.actorConfig['centroidParams']
@@ -75,7 +69,10 @@ class McsCmd(object):
         self.fidsGood = None
         self.fidsOuterRing = None
         self.prevPos = None
+        
+        self.simulationPath = None
 
+        
         logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
                             datefmt="%Y-%m-%dT%H:%M:%S")
         self.logger = logging.getLogger('mcscmd')
@@ -103,8 +100,6 @@ class McsCmd(object):
              self.setCentroidParams),
             ('setApertureParams', '[<aperture>] [<innerRad>] [<outerRad>]', self.setApertureParams),
             ('calcThresh', '[<threshSigma>] [<threshFact>]', self.calcThresh),
-            ('simulate', '<path>', self.simulateOn),
-            ('simulate', 'off', self.simulateOff),
             ('switchCMethod', '<cMethod>', self.switchCMethod),
             ('switchFMethod', '<fMethod>', self.switchFMethod),
             ('resetGeometry', '', self.resetGeometry),
@@ -122,8 +117,6 @@ class McsCmd(object):
                                         keys.Key("frameId", types.Int(), help="exposure frameID"),
                                         keys.Key("rerunFrameId", types.Int(), help="exposure frameID to reprocess"),
                                         keys.Key("filename", types.String(), help="exposure filename"),
-                                        keys.Key("path", types.String(), help="Simulated image directory"),
-                                        keys.Key("getArc", types.Int(), help="flag for arc image"),
                                         keys.Key("fwhmx", types.Float(), help="X fwhm for centroid routine"),
                                         keys.Key("fwhmy", types.Float(), help="Y fwhm for centroid routine"),
                                         keys.Key("boxFind", types.Int(), help="box size for finding spots"),
@@ -273,64 +266,6 @@ class McsCmd(object):
         cmd.inform(f'text="MCS camera present! camera name = {self.actor.cameraName}"')
         cmd.finish()
 
-    def simulateOff(self, cmd):
-        """turn off simulation mode"""
-
-        self.simulationPath = None
-        cmd.finish('text="set simulation path to %s"' % str(self.simulationPath))
-
-    def simulateOn(self, cmd):
-        """set path for simulated images"""
-
-        cmdKeys = cmd.cmd.keywords
-
-        path = cmdKeys['path'].values[0]
-
-        if not os.path.isdir(path):
-            cmd.fail('text="path %s is not a directory"' % (path))
-            return
-
-        self.simulationPath = (path, 0, '')
-        cmd.finish('text="set simulation path to %s"' % str(self.simulationPath))
-
-    def getNextSimulationImage(self, cmd):
-        import glob
-
-        path, idx, lastname = self.simulationPath
-        cmd.inform('text="frameIds1 = %s." '%{path})
-        files = sorted(glob.glob(os.path.join(path, 'PFSC*.fits')))
-
-        cmd.debug('text="%i of %i files in %s..."' % (idx, len(files), path))
-        if len(files) == 0:
-            raise RuntimeError(f"no .fits files in {path}")
-
-        if idx+1 > len(files):
-            # I don't think this is what we want: when the data set
-            # has been read we should *stop*, not loop back.
-            # idx = 0
-            raise RuntimeError(f"no more .fits files in {path}")
-
-        imagePath = files[idx]
-        cmd.inform('text="frameIds2 = %s." '%{imagePath})
-        image, hdr = pyfits.getdata(imagePath, 0, header=True)
-
-        self.simulationPath = (path, idx+1, imagePath)
-        imagePath = pathlib.Path(imagePath)
-        frameId = int(imagePath.stem[4:], base=10)
-        self.visitId = frameId // 100
-
-        try:
-            fwfile = sorted(glob.glob(os.path.join(path, 'thetaFW.npy')))
-            rvfile = sorted(glob.glob(os.path.join(path, 'thetaRV.npy')))
-            fw = np.load(fwfile[0])
-            rv = np.load(rvfile[0])
-            pos_array = np.append(fw, rv, axis=2)
-            targets = pos_array[:, 0, idx]
-        except:
-            targets = np.zeros(2394)+np.zeros(2394)*1j
-
-        cmd.inform('text="returning simulation file %s"' % (imagePath))
-        return imagePath, image, targets
 
     def requestNextFileIds(self, cmd, frameId):
         """ Return a queue which will eventually contain our fileIds. """
@@ -1336,85 +1271,7 @@ class McsCmd(object):
         self.centParms = mcsTools.getCentroidParams(cmd, self.actor.actorConfig['centroidParams'])
         self.logger.info(f'centParms: {self.centParms}')
     
-    def runDaofind(self, cmd):
-        cmdKeys = cmd.cmd.keywords
-        self.newTable = "newTable" in cmdKeys
 
-        cmd.debug('text="newTable value = %s"' % (self.newTable))
-
-        #image = copy.deepcopy(self.actor.image)
-
-        cmd.inform(f'state="measuring cached image: {self.actor.image.shape}"')
-        t0 = time.time()
-        #spCent = speedCentriod.speedDaofind(self.actor.image)
-        spCent.runDaofindMP()
-        spCent.arrangeCentroid()
-        centroids = spCent.centroids
-        
-        
-        t1 = time.time()
-        cmd.inform(f'text="Finished centroid with { spCent.cores } cores"')
-    
-        npoint = len(centroids)
-        tCentroids = np.zeros((npoint, 8))
-
-        tCentroids[:, 0] = np.arange(npoint)+1
-        tCentroids[:, 1] = centroids['xcentroid'].value
-        tCentroids[:, 2] = centroids['ycentroid'].value
-        tCentroids[:, 3] = np.zeros(npoint)
-        tCentroids[:, 4] = np.zeros(npoint)
-        tCentroids[:, 5] = np.zeros(npoint)
-        tCentroids[:, 6] = np.zeros(npoint)
-        tCentroids[:, 7] = centroids['peak']
-
-        self.centroids = tCentroids
-        self.nCentroid = len(centroids)
-
-        spCent.close()
-        cmd.inform('text="%d centroids in %f"' % (len(centroids), (t1-t0)))
-        cmd.inform('state="centroids measured"')
-
-    
-    def runCentroidSEPMP(self, cmd):
-
-
-        cmdKeys = cmd.cmd.keywords
-        self.newTable = "newTable" in cmdKeys
-
-        cmd.debug('text="newTable value = %s"' % (self.newTable))
-
-        #image = copy.deepcopy(self.actor.image)
-
-        cmd.inform(f'state="measuring cached image: {self.actor.image.shape}"')
-        t0 = time.time()
-        #spCent = speedCentriod.speedCentroid(self.actor.image)
-        spCent.runCentroidMP()
-        spCent.arrangeCentroid()
-        centroids = spCent.centroids
-        
-        
-        t1 = time.time()
-        cmd.inform(f'text="Finished centroid with { spCent.cores } cores"')
-    
-        npoint = centroids.shape[0]
-        tCentroids = np.zeros((npoint, 8))
-
-        tCentroids[:, 0] = np.arange(npoint)+1
-        tCentroids[:, 1] = centroids['x']
-        tCentroids[:, 2] = centroids['y']
-        tCentroids[:, 3] = centroids['x2']
-        tCentroids[:, 4] = centroids['y2']
-        tCentroids[:, 5] = centroids['xy']
-        tCentroids[:, 6] = centroids['thresh']
-        tCentroids[:, 7] = centroids['peak']
-
-        self.centroids = tCentroids
-        self.nCentroid = len(centroids)
-
-        spCent.close()
-        cmd.inform('text="%d centroids in %f"' % (len(centroids), (t1-t0)))
-        cmd.inform('state="centroids measured"')
-    
     def runCentroidSEP(self, cmd):
         cmdKeys = cmd.cmd.keywords
         self.newTable = "newTable" in cmdKeys
