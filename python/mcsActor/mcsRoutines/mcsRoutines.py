@@ -143,6 +143,8 @@ def makeAdjacentList(ff, armLength):
 def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos,
             goodIdx, adjacentCobras, fMethod, targetSize=2.0):
 
+    """ do the fibre identification. """
+    
     centers = centrePos
     points = centroids
     nPoints = len(centroids)
@@ -501,6 +503,8 @@ def secondPass(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch,
 
 def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, prevPos, dFrom, assignMethod, anyChange, goodIdx):
 
+    """ final pass for cobra identification, based on distance from the target position """
+    
     # temporary list of unassigned cobras, to keep track
     tempUnaCobras = copy.deepcopy(unaCobras)
     tempUnaPoints = copy.deepcopy(unaPoints)
@@ -644,7 +648,10 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     return aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange
 
 def getThreshBench(image, boreSight, sigmaThresh, findSigma, centSigma):
-  
+
+    """ threshold determination for the bench, which has a significant fraction of the pixels with 
+    a flux of 0, so sigma based stats don't work """
+    
     mpx = boreSight[0]
     mpy = boreSight[1]
 

@@ -34,6 +34,9 @@ logger.setLevel(logging.INFO)
 
 
 def connectToDB(hostname=None, port=None, dbname=None, username=None):
+
+    """ connect to database """
+    
     raise NotImplementedError()
 
     db = opdb.OpDB(hostname=hostname, port=port,
@@ -44,6 +47,8 @@ def connectToDB(hostname=None, port=None, dbname=None, username=None):
 
 def loadTelescopeParametersFromDB(db, frameId):
 
+    """ load telescope parameters from database """
+    
     sql = f'SELECT mcs_exposure.insrot,mcs_exposure.altitude FROM mcs_exposure WHERE mcs_exposure.mcs_frame_id={frameId}'
     df = db.query_dataframe(sql)
 
@@ -104,7 +109,7 @@ def writeTransformToDB(db, frameId, pfiTransform, cameraName, doCloseTransaction
 
 def writeFakeMoveToDB(db, frameId):
     """
-    make sure there is a target value if the target d
+    make sure there is a target value if the target database is empty
     """
     visitId = frameId // 100
     iteration = frameId % 100
@@ -137,7 +142,7 @@ def writeFakeMoveToDB(db, frameId):
 
 def writeFakeTargetToDB(db, centers, frameId):
     """
-    make sure there is a target value if the target d
+    make sure there is a target value if the target database is empty
     """
     visitId = frameId // 100
     iteration = frameId % 100
