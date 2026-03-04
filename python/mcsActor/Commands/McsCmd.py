@@ -38,7 +38,6 @@ import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 import mcsActor.mcsRoutines.fiducials as fiducials
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
-import mcsActor.mcsRoutines.speedCentroid as speedCentriod
 import multiprocessing
 
 from pfs.utils import butler
@@ -1347,7 +1346,7 @@ class McsCmd(object):
 
         cmd.inform(f'state="measuring cached image: {self.actor.image.shape}"')
         t0 = time.time()
-        spCent = speedCentriod.speedDaofind(self.actor.image)
+        #spCent = speedCentriod.speedDaofind(self.actor.image)
         spCent.runDaofindMP()
         spCent.arrangeCentroid()
         centroids = spCent.centroids
@@ -1388,7 +1387,7 @@ class McsCmd(object):
 
         cmd.inform(f'state="measuring cached image: {self.actor.image.shape}"')
         t0 = time.time()
-        spCent = speedCentriod.speedCentroid(self.actor.image)
+        #spCent = speedCentriod.speedCentroid(self.actor.image)
         spCent.runCentroidMP()
         spCent.arrangeCentroid()
         centroids = spCent.centroids
