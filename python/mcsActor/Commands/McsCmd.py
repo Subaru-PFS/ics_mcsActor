@@ -28,6 +28,7 @@ from ics.utils.fits import timecards
 from opscore.utility.qstr import qstr
 
 import pfs.utils.coordinates.transform as transformUtils
+from pfs.utils.coordinates.transform import TestBenchTransform
 import pfs.utils.coordinates.MakeWCSCards as pfsWcs
 
 from sqlalchemy import text as sqlText
@@ -968,10 +969,13 @@ class McsCmd(object):
         
         # make sure pfiTransform is defined
         if 'rmod' in self.actor.cameraName.lower():
-            altitude = 90.0
-            insrot = 0
-            pfiTransform = transformUtils.fromCameraName('usmcs', 
-                altitude=altitude, insrot=insrot,nsigma=0, alphaRot=0)
+            # Reuse existing TestBenchTransform across frames (warm start).
+            # The test bench camera is fixed, so the polynomial is stable;
+            # each call to updateTransform refines it from the previous fit.
+            if not isinstance(getattr(self, 'pfiTrans', None), TestBenchTransform):
+                pfiTransform = TestBenchTransform()
+            else:
+                pfiTransform = self.pfiTrans
         else:
             pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, 
                 altitude=altitude, insrot=insrot,nsigma=0, alphaRot=1)
