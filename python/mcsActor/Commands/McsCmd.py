@@ -38,15 +38,9 @@ import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 import mcsActor.mcsRoutines.fiducials as fiducials
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
-import mcsActor.mcsRoutines.speedCentroid as speedCentriod
 import multiprocessing
 
 from pfs.utils import butler
-
-from importlib import reload
-reload(dbTools)
-reload(mcsTools)
-reload(fiducials)
 
 class McsCmd(object):
 
@@ -56,7 +50,6 @@ class McsCmd(object):
         self.expTime = 1000
         self.prevExpTime = 1000
         self.newTable = None
-        self.simulationPath = None
         self._db = None
 
         self.centParms = self.actor.actorConfig['centroidParams']
@@ -70,13 +63,14 @@ class McsCmd(object):
         self.adjacentCobras = None
         self.geometrySet = False
         self.geomFile = None
-        self.dotFile = None
 
         self.fids = None
         self.fidsGood = None
         self.fidsOuterRing = None
         self.prevPos = None
+        self.centThresh = None
 
+        
         logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
                             datefmt="%Y-%m-%dT%H:%M:%S")
         self.logger = logging.getLogger('mcscmd')
@@ -94,7 +88,7 @@ class McsCmd(object):
             ('expose', '@(bias|test) [<frameId>]', self.expose),
             ('expose', '@(dark|flat) <expTime> [<frameId>]', self.expose),
             ('expose',
-                'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@doPhot] [@simDot] '
+                'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@doPhot] '
                 '[@newField] [<rerunFrameId>]', self.expose),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
@@ -104,8 +98,6 @@ class McsCmd(object):
              self.setCentroidParams),
             ('setApertureParams', '[<aperture>] [<innerRad>] [<outerRad>]', self.setApertureParams),
             ('calcThresh', '[<threshSigma>] [<threshFact>]', self.calcThresh),
-            ('simulate', '<path>', self.simulateOn),
-            ('simulate', 'off', self.simulateOff),
             ('switchCMethod', '<cMethod>', self.switchCMethod),
             ('switchFMethod', '<fMethod>', self.switchFMethod),
             ('resetGeometry', '', self.resetGeometry),
@@ -123,8 +115,6 @@ class McsCmd(object):
                                         keys.Key("frameId", types.Int(), help="exposure frameID"),
                                         keys.Key("rerunFrameId", types.Int(), help="exposure frameID to reprocess"),
                                         keys.Key("filename", types.String(), help="exposure filename"),
-                                        keys.Key("path", types.String(), help="Simulated image directory"),
-                                        keys.Key("getArc", types.Int(), help="flag for arc image"),
                                         keys.Key("fwhmx", types.Float(), help="X fwhm for centroid routine"),
                                         keys.Key("fwhmy", types.Float(), help="Y fwhm for centroid routine"),
                                         keys.Key("boxFind", types.Int(), help="box size for finding spots"),
@@ -145,7 +135,6 @@ class McsCmd(object):
                                         keys.Key("matchRad", types.Int(),
                                                  help="radius in pixels for matching positions"),
                                         keys.Key("geomFile", types.String(), help="file for geometry"),
-                                        keys.Key("dotFile", types.String(), help="file for dot information"),
                                         keys.Key("fieldID", types.String(),
                                                  help="fieldID for getting instrument parameters"),
                                         keys.Key("cMethod", types.String(),
@@ -204,6 +193,9 @@ class McsCmd(object):
         cmd.finish(f'text="set db URI to {self.dbOverride}')
 
     def resolveDb(self, cmd):
+
+        """ get the database configuration parameters"""
+        
         if self.dbOverride is not None:
             username, hostname, port, dbname = self.dbOverride
             cmd.warn(f'text="using overridden db URI: {username}@{hostname}:{port}, db={dbname}"')
@@ -274,64 +266,6 @@ class McsCmd(object):
         cmd.inform(f'text="MCS camera present! camera name = {self.actor.cameraName}"')
         cmd.finish()
 
-    def simulateOff(self, cmd):
-        """turn off simulation mode"""
-
-        self.simulationPath = None
-        cmd.finish('text="set simulation path to %s"' % str(self.simulationPath))
-
-    def simulateOn(self, cmd):
-        """set path for simulated images"""
-
-        cmdKeys = cmd.cmd.keywords
-
-        path = cmdKeys['path'].values[0]
-
-        if not os.path.isdir(path):
-            cmd.fail('text="path %s is not a directory"' % (path))
-            return
-
-        self.simulationPath = (path, 0, '')
-        cmd.finish('text="set simulation path to %s"' % str(self.simulationPath))
-
-    def getNextSimulationImage(self, cmd):
-        import glob
-
-        path, idx, lastname = self.simulationPath
-        cmd.inform('text="frameIds1 = %s." '%{path})
-        files = sorted(glob.glob(os.path.join(path, 'PFSC*.fits')))
-
-        cmd.debug('text="%i of %i files in %s..."' % (idx, len(files), path))
-        if len(files) == 0:
-            raise RuntimeError(f"no .fits files in {path}")
-
-        if idx+1 > len(files):
-            # I don't think this is what we want: when the data set
-            # has been read we should *stop*, not loop back.
-            # idx = 0
-            raise RuntimeError(f"no more .fits files in {path}")
-
-        imagePath = files[idx]
-        cmd.inform('text="frameIds2 = %s." '%{imagePath})
-        image, hdr = pyfits.getdata(imagePath, 0, header=True)
-
-        self.simulationPath = (path, idx+1, imagePath)
-        imagePath = pathlib.Path(imagePath)
-        frameId = int(imagePath.stem[4:], base=10)
-        self.visitId = frameId // 100
-
-        try:
-            fwfile = sorted(glob.glob(os.path.join(path, 'thetaFW.npy')))
-            rvfile = sorted(glob.glob(os.path.join(path, 'thetaRV.npy')))
-            fw = np.load(fwfile[0])
-            rv = np.load(rvfile[0])
-            pos_array = np.append(fw, rv, axis=2)
-            targets = pos_array[:, 0, idx]
-        except:
-            targets = np.zeros(2394)+np.zeros(2394)*1j
-
-        cmd.inform('text="returning simulation file %s"' % (imagePath))
-        return imagePath, image, targets
 
     def requestNextFileIds(self, cmd, frameId):
         """ Return a queue which will eventually contain our fileIds. """
@@ -417,13 +351,12 @@ class McsCmd(object):
             pycards.append(pcard)
             cmd.debug('text=%s' % (qstr("fetched card: %s" % (str(pcard)))))
 
-        if self.simulationPath is not None:
-            pcard = 'W_MCSMNM', self.simulationPath[-1], 'Simulated file path'
-            pycards.append(pcard)
-
         return pycards
 
     def _constructHeader(self, cmd, filename, expType, expTime, expStart, frameId):
+
+        """ construct the header """
+        
         if expType == 'bias':
             expTime = 0.0
 
@@ -613,17 +546,15 @@ class McsCmd(object):
         cmd.inform(f'text="triggered writing image to filename={filename}"')
         return filename, image
 
-    def _doExpose(self, cmd, expTime, expType, frameId, mask=None):
+    def _doExpose(self, cmd, expTime, expType, frameId):
         """ Take an exposure and  """
 
         fileIdsQ = self.requestNextFileIds(cmd, frameId)
         cmd.diag(f'text="new exposure"')
         expStart = time.time()
-        if self.simulationPath is None:
-            filename = '/tmp/scratchFile'
-            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
-        else:
-            imagePath, image, target = self.getNextSimulationImage(cmd)
+        filename = '/tmp/scratchFile'
+        image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
+
         cmd.inform(f'text="done: image shape = {image.shape}"')
 
         try:
@@ -646,16 +577,6 @@ class McsCmd(object):
         hdr = self._constructHeader(cmd, filename, expType, expTime, expStart, frameId)
         cmd.diag(f'text="hdr done: {len(hdr)}"')
 
-        # Now, after getting the filename, get predicted locations
-        if self.simulationPath is not None:
-            self._writeExpectTarget(cmd, frameId, target)
-        else:
-            pass
-
-        if mask is not None:
-            cmd.inform(f'text="mask image shape: {mask.shape} type:{mask.dtype}"')
-            cmd.inform(f'text="image shape: {image.shape} type:{image.dtype}"')
-            image = image*mask.astype('uint16')
 
         return fileIds, hdr, image
 
@@ -711,11 +632,6 @@ class McsCmd(object):
         doFibreID = 'doFibreID' in cmdKeys
         newField = 'newField' in cmdKeys
 
-        simDot = 'simDot' in cmdKeys
-        if simDot:
-            dotmask = self._makeDotMask(cmd)
-        else:
-            dotmask = None
 
         cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID} doPhot = {self.doPhot}')
 
@@ -751,7 +667,7 @@ class McsCmd(object):
             
             cmd.inform('text="Exposure time now is %d ms." ' % (expTime))
             try:
-                fileIds, hdr, image = self._doExpose(cmd, expTime, expType, frameId, mask=dotmask)
+                fileIds, hdr, image = self._doExpose(cmd, expTime, expType, frameId )
             except Exception as e:
                 cmd.fail(f'text="failed to take exposure: {e}"')
                 return
@@ -862,18 +778,23 @@ class McsCmd(object):
         cmd.inform('text="Centroids of exposure ID %08d dumped."' % (frameId))
 
     def switchFMethod(self, cmd):
+
+        """ switch the method for fibre identification """
         cmdKeys = cmd.cmd.keywords
         self.fMethod = cmdKeys['fMethod'].values[0]
         cmd.inform(f'text="fMethod = {self.fMethod}"')
         cmd.finish('switchFMethod=done')
 
     def switchCMethod(self, cmd):
+        """ switch the method for centroiding """
         cmdKeys = cmd.cmd.keywords
         self.cMethod = cmdKeys['cMethod'].values[0]
         cmd.inform(f'text="cMethod = {self.cMethod}"')
         cmd.finish('switchCMethod=done')
 
     def setApertureParams(self, cmd):
+        """ tweak aperture parameters for photometry """
+
         cmdKeys = cmd.cmd.keywords
 
         if('aperture' in cmdKeys):
@@ -895,6 +816,8 @@ class McsCmd(object):
 
     def getGeometry(self, cmd):
 
+        """ load cobra geometry and put in the expected format for fibreID """
+        
         cmd.inform(f'text="getting geometry"')
 
         if(self.geometrySet == True):
@@ -917,9 +840,6 @@ class McsCmd(object):
             self.geomFile = self.butler.get("moduleXml", moduleName="ALL", version="")
         pfi = self.geomFile
 
-        if(self.dotFile == None):
-            self.dotFile = os.path.join(
-                instPath, "data/pfi/dot/black_dots_mm.csv")
 
         dots = self.butler.get("black_dots", moduleName="ALL", version="")
 
@@ -943,6 +863,8 @@ class McsCmd(object):
 
     def establishTransform(self, cmd, altitude, insrot, frameID):
 
+        """load the basic transformation and refine based on the fiducial fibre positions"""
+        
         if self.fids is None:
             # Read fiducial and spot geometry
             fids = fiducials.Fiducials.read(self.butler)
@@ -1076,19 +998,18 @@ class McsCmd(object):
         cmd.inform(f'text="PFI transformation method built"')
 
 
-    def setDotFile(self, cmd):
-
-        self.geomFile = cmd.cmd.keywords["dotFile"].values[0]
-        cmd.inform(f'text="geometry file set to {self.dotFile}"')
-
     def resetGeometryFile(self, cmd):
 
+        """ reset the geometry """
         self.geomFile = None
         self.geometrySet = False
         self.getGeometry(cmd)
         cmd.finish(f'text="geometry file set to {self.geomFile}"')
 
     def setGeometryFile(self, cmd):
+
+        """ set the geometry to custom file """
+        
         from ics.cobraCharmer import pfiDesign
 
         geomFilename = pathlib.Path(cmd.cmd.keywords["geomFile"].values[0])
@@ -1096,78 +1017,6 @@ class McsCmd(object):
         self.geometrySet = False
         self.getGeometry(cmd)
         cmd.finish(f'text="geometry file set to {self.geomFile}"')
-
-    def easyFiberID(self, cmd, frameId):
-        reload(calculation)
-        
-        db = self.connectToDB(cmd)
-        cmd.inform(f'text="Running easy FibreID"')
-
-        # sorting the spot id, so that the ID returned by matching should 
-        # keep the same.
-        mcsData = db.bulkSelect('mcs_data',sqlText('select * from mcs_data where '
-                f'mcs_frame_id = {frameId}')).sort_values(by=['spot_id'])
-
-        renames = dict(mcs_frame_id='mcsId',
-                       spot_id='fiberId',
-                       mcs_center_x_pix='centroidx',
-                       mcs_center_y_pix='centroidy')
-
-        mcsData.rename(columns=renames, inplace=True)
-        df=mcsData.loc[mcsData['fiberId'] > 0]
-        
-        
-        '''
-            OK, here we transform all mcs_data to pfi
-        '''
-        x_mm, y_mm = self.pfiTrans.mcsToPfi(df['centroidx'].values,df['centroidy'].values)
-        
-        pos=x_mm+y_mm*(1j)
-        
-        centers=self.calibModel.centers
-        cmd.inform(f'text="cobra centers = {centers}" ')
-
-        cmd.inform(f'text="Loading arm-length = {self.calibModel.L1}" ')
-
-        # It should be one spot in patrol region. 
-        target = calculation.lazyIdentification(centers, pos, 
-            radii=self.calibModel.L1+self.calibModel.L2)
-        
-        cmd.inform(f'text="Total ID target = {target}" ')
-
-
-        cmd.inform(f'text="Loading DOT file for missing IDs" ')
-
-        dotData = pd.read_csv(self.dotFile, delimiter = ",", header=0)
-        dotCenter = dotData['x'].values+dotData['y'].values*1j
-
-        mpos = np.zeros(len(target), dtype=complex)
-        for n, k in enumerate(target):
-            if k < 0:
-                # If the target failed to match, we think it is highly possible in dot
-                mpos[n] = dotCenter[n]
-            else:
-                mpos[n] = pos[k]
-        indx = np.where(target < 0 )
-
-        visitId = frameId // 100
-        iteration = frameId % 100
-        cobraTarget = db.query_dataframe('select pfs_visit_id from cobra_target where '
-                                         f'(pfs_visit_id = {visitId}) AND iteration = {iteration}').reset_index()
-
-        db = self.connectToDB(cmd)
-        if len(cobraTarget) == 0:
-            cmd.inform(f'text="Fall back using cobra centers as target." ')
-            dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
-    
-        cobraMatch = np.zeros((2394, 5))
-        cobraMatch[:,0] = np.arange(2394)+1 
-        cobraMatch[:,1] = target+1
-        cobraMatch[:,2] = mpos.real
-        cobraMatch[:,3] = mpos.imag
-        cobraMatch[indx,4] = 1
-        
-        dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
 
     def resetPosition(self, cmd):
         """Declare that we do not know where the cobras are. """
@@ -1177,6 +1026,7 @@ class McsCmd(object):
 
     def fibreID(self, cmd, frameId, zenithAngle, insRot):
 
+        """ do fibre identification """
         writeFakeCobraMove = False
 
         db = self.connectToDB(cmd)
@@ -1235,52 +1085,26 @@ class McsCmd(object):
 
 
     def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
-        if self.simulationPath is None:
-            # We are live: use Gen2 telescope info.
-            gen2Model = self.actor.models['gen2'].keyVarDict
 
-            axes = gen2Model['tel_axes'].getValue()
-            az, alt, *_ = axes
+        """aquire and write telescope geometry"""
+        
+        # We are live: use Gen2 telescope info.
+        gen2Model = self.actor.models['gen2'].keyVarDict
 
-            rot = gen2Model['tel_rot'].getValue()
-            posAngle, instrot = rot
-            adc_type, adc_pa = gen2Model['tel_adc'].getValue()
+        axes = gen2Model['tel_axes'].getValue()
+        az, alt, *_ = axes
 
-            dome_humidity, dome_pressure, dome_temperature, dome_wind = gen2Model['dome_env'].getValue()
-            outside_humidity, outside_pressure, outside_temperature, outside_wind = gen2Model['outside_env'].getValue()
-            
-            mebModel = self.actor.models['meb'].keyVarDict
-            _,_,m1_temperature, m1_cover_temperature, _, _, _ = mebModel['temps'].getValue()
+        rot = gen2Model['tel_rot'].getValue()
+        posAngle, instrot = rot
+        adc_type, adc_pa = gen2Model['tel_adc'].getValue()
 
-            startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        else:
+        dome_humidity, dome_pressure, dome_temperature, dome_wind = gen2Model['dome_env'].getValue()
+        outside_humidity, outside_pressure, outside_temperature, outside_wind = gen2Model['outside_env'].getValue()
+        
+        mebModel = self.actor.models['meb'].keyVarDict
+        _,_,m1_temperature, m1_cover_temperature, _, _, _ = mebModel['temps'].getValue()
 
-            # We are reading images from disk: get the geometry from the headers.
-            simPath = str(filename)
-            cmd.inform(f'text="filename= {simPath}"')
-
-            simHdr = fitsio.read_header(str(simPath), 0)
-            cmd.inform('text="loaded telescope info from %s"' % (simPath))
-
-            az = simHdr.get('AZIMUTH', -9998.0)
-            alt = simHdr.get('ALTITUDE', -9998.0)
-
-            if az is None:
-                az = -9998.0
-            if alt is None:
-                alt = -9998.0
-
-            expTime = simHdr.get('EXPTIME', -9998.0)
-            instrot = simHdr.get('INR-STR', -9998.0)
-
-            # Redefine instrot to be 0.5 since we know this fact from ASRD test.
-            instrot = 0.5
-            startTime = simHdr.get('UTC-STR', None)
-
-            if startTime is None:
-                ctime = os.stat(filename).st_ctime
-                startTime = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(ctime))
-                cmd.warn(f'text="no start card in {simPath}, using file date: {startTime}"')
+        startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         visitId = frameId // 100
         cmd.inform(f'text="frame={frameId} visit={visitId} az={az} alt={alt} instrot={instrot} adc_pa={adc_pa}"')
@@ -1329,7 +1153,7 @@ class McsCmd(object):
 
     def setCentroidParams(self, cmd):
         """
-        top level routine for setting centroid parameters. REads the defaults from teh config fil,e
+        top level routine for setting centroid parameters. Reads the defaults from the config fi,e
         then changes any specified in the keywords argument. 
 
         """
@@ -1337,86 +1161,12 @@ class McsCmd(object):
         self.centParms = mcsTools.getCentroidParams(cmd, self.actor.actorConfig['centroidParams'])
         self.logger.info(f'centParms: {self.centParms}')
     
-    def runDaofind(self, cmd):
-        cmdKeys = cmd.cmd.keywords
-        self.newTable = "newTable" in cmdKeys
 
-        cmd.debug('text="newTable value = %s"' % (self.newTable))
-
-        #image = copy.deepcopy(self.actor.image)
-
-        cmd.inform(f'state="measuring cached image: {self.actor.image.shape}"')
-        t0 = time.time()
-        spCent = speedCentriod.speedDaofind(self.actor.image)
-        spCent.runDaofindMP()
-        spCent.arrangeCentroid()
-        centroids = spCent.centroids
-        
-        
-        t1 = time.time()
-        cmd.inform(f'text="Finished centroid with { spCent.cores } cores"')
-    
-        npoint = len(centroids)
-        tCentroids = np.zeros((npoint, 8))
-
-        tCentroids[:, 0] = np.arange(npoint)+1
-        tCentroids[:, 1] = centroids['xcentroid'].value
-        tCentroids[:, 2] = centroids['ycentroid'].value
-        tCentroids[:, 3] = np.zeros(npoint)
-        tCentroids[:, 4] = np.zeros(npoint)
-        tCentroids[:, 5] = np.zeros(npoint)
-        tCentroids[:, 6] = np.zeros(npoint)
-        tCentroids[:, 7] = centroids['peak']
-
-        self.centroids = tCentroids
-        self.nCentroid = len(centroids)
-
-        spCent.close()
-        cmd.inform('text="%d centroids in %f"' % (len(centroids), (t1-t0)))
-        cmd.inform('state="centroids measured"')
-
-    
-    def runCentroidSEPMP(self, cmd):
-
-
-        cmdKeys = cmd.cmd.keywords
-        self.newTable = "newTable" in cmdKeys
-
-        cmd.debug('text="newTable value = %s"' % (self.newTable))
-
-        #image = copy.deepcopy(self.actor.image)
-
-        cmd.inform(f'state="measuring cached image: {self.actor.image.shape}"')
-        t0 = time.time()
-        spCent = speedCentriod.speedCentroid(self.actor.image)
-        spCent.runCentroidMP()
-        spCent.arrangeCentroid()
-        centroids = spCent.centroids
-        
-        
-        t1 = time.time()
-        cmd.inform(f'text="Finished centroid with { spCent.cores } cores"')
-    
-        npoint = centroids.shape[0]
-        tCentroids = np.zeros((npoint, 8))
-
-        tCentroids[:, 0] = np.arange(npoint)+1
-        tCentroids[:, 1] = centroids['x']
-        tCentroids[:, 2] = centroids['y']
-        tCentroids[:, 3] = centroids['x2']
-        tCentroids[:, 4] = centroids['y2']
-        tCentroids[:, 5] = centroids['xy']
-        tCentroids[:, 6] = centroids['thresh']
-        tCentroids[:, 7] = centroids['peak']
-
-        self.centroids = tCentroids
-        self.nCentroid = len(centroids)
-
-        spCent.close()
-        cmd.inform('text="%d centroids in %f"' % (len(centroids), (t1-t0)))
-        cmd.inform('state="centroids measured"')
-    
     def runCentroidSEP(self, cmd):
+
+        """ legacy routine to use SEP for centroiding; this is kept mostly for debugging in case something
+        goes extremely wonky """
+        
         cmdKeys = cmd.cmd.keywords
         self.newTable = "newTable" in cmdKeys
 
@@ -1545,6 +1295,8 @@ class McsCmd(object):
 
     def _writeTelescopeInfo(self, cmd, telescopeInfo, conn=None):
 
+        """ write telescope information to database """
+        
         # Let the database handle the primary key
         db = self.connectToDB(cmd)
 
@@ -1613,23 +1365,6 @@ class McsCmd(object):
         except Exception as e:
             self.logger.warn(f"failed to write with {sql}: {e}")
 
-    def _readData(self, sql):
-        """Wrap a direct COPY_TO via sqlalchemy. """
-
-        raise NotImplementedError()
-
-        dataBuf = io.StringIO()
-
-        try:
-            db = self.connectToDB(None)
-            session = db.session
-            with session.connection().connection.cursor() as cursor:
-                cursor.copy_expert(sqlText(sql), dataBuf)
-            dataBuf.seek(0, 0)
-            return dataBuf
-        except Exception as e:
-            self.logger.warn(f"failed to read with {sql}: {e}")
-
     def _writeCentroids(self, centArr, frameId, moveId, conn=None):
         """ Write all measurements for a given (frameId, moveId) """
 
@@ -1659,112 +1394,6 @@ class McsCmd(object):
         db = self.connectToDB(None)
         db.insert_dataframe('mcs_data', df)
 
-    def _readCentroids(self, conn, frameId, moveId):
-        """ Read all measurements for a given (frameId, moveId)"""
-
-        raise NotImplementedError()
-        if conn is None:
-            conn = self.connectToDB()
-
-        if self.simulationPath is None:
-            cmd = """copy (select * from mcsPerFiber where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
-            buf = self._readData(cmd)
-
-            # Skip the frameId, etc. columns.
-            arr = np.genfromtxt(buf, dtype='f4',
-                                delimiter=',', usecols=range(4, 24))
-        else:
-            cmd = f"""copy (select * from 'mcsData' where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
-            buf = self._readData(cmd)
-
-            # Skip the frameId, etc. columns.
-            arr = np.genfromtxt(buf, dtype='f4',
-                                delimiter=',', usecols=range(4, 8))
-
-        return arr
-
-    def _makeDotMask(self, cmd):
-        """ Make dot mask for simulation or proessing purpose)"""
-
-        # read dot location
-        dotfile = '/home/pfs/mhs/devel/pfs_instdata/data/pfi/dot/dot_measurements_20210428_el90_rot+00_ave.csv'
-        dotpos = pd.read_csv(dotfile)
-
-        unit_height = 30
-        unit_weight = 30
-        r_mean = np.around(np.mean(dotpos['r_tran'].values)).astype('int')
-        cmd.inform('text="Making dot image"')
-
-        mask = self._create_circular_mask(unit_height, unit_weight, radius=10)
-
-        masked_img = np.zeros([unit_height, unit_weight])+1
-
-        masked_img[mask] = 0
-        # To-do: change here for the image size
-        dotmask = np.zeros([7096, 10000])+1
-
-        for i in range(len(dotpos)):
-            xstart = np.around(dotpos['x_tran'].values[i]-(unit_weight/2)).astype('int')
-
-            ystart = np.around(dotpos['y_tran'].values[i]-(unit_height/2)).astype('int')
-
-            dotmask[ystart:ystart+unit_height, xstart:xstart+unit_weight] = masked_img
-
-        return dotmask
-
-    def _create_circular_mask(self, h, w, center=None, radius=None):
-
-        if center is None:  # use the middle of the image
-            center = (int(w/2), int(h/2))
-        if radius is None:  # use the smallest distance between the center and image walls
-            radius = min(center[0], center[1], w-center[0], h-center[1])
-
-        Y, X = np.ogrid[:h, :w]
-        dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
-
-        mask = dist_from_center <= radius
-        return mask
-
-    def _writeExpectTarget(self, cmd, frameId, targets):
-        '''
-        Write the expect target to databse.
-        '''
-
-        mcs_f3c_model = {'camMatrix': np.array([[8.36047142e+03, 0.00000000e+00, 5.01140651e+03],
-                                                [0.00000000e+00, 8.75498927e+03, 3.53572485e+03],
-                                                [0.00000000e+00, 0.00000000e+00, 1.00000000e+00]]),
-                         'camDistor': np.array([[0.04236098, -0.11608623, 0.0012094, -0.00031588, 0.08034843]]),
-                         'camRotVec': np.array([[-0.02458225],
-                                                [-0.06933687],
-                                                [-0.01775009]]),
-                         'camTranVec': np.array([[-72269.86663875],
-                                                 [-48804.84781669],
-                                                 [112015.99005353]])}
-
-        cobra_obj = np.array([targets.real, targets.imag, np.zeros(len(targets))]).T
-
-        imgpoints2, _ = cv2.projectPoints(cobra_obj.astype(np.float32),
-                                          mcs_f3c_model['camRotVec'], mcs_f3c_model['camTranVec'],
-                                          mcs_f3c_model['camMatrix'], mcs_f3c_model['camDistor'])
-        imgarr2 = imgpoints2[:, 0, :]
-        pfi_x = imgarr2[:, 0]
-        pfi_y = imgarr2[:, 1]
-
-        db = self.connectToDB(None)
-        colnames = db.session.execute(sqlText('select * FROM "cobra_target" where false'))
-        realcolnames = tuple(colnames.keys())[0:]
-
-        buf = io.StringIO()
-
-        for i in range(len(pfi_x)):
-            line = '%d,%d,%d,%d, %f,%f,%f,%f,%d,%d,%d,%f,%d,%d,%d,%f,%d\n'%(frameId/100, 1, i+1, 99, pfi_x[i], pfi_y[i],
-                                                                            pfi_x[i], pfi_y[i], 1, 1, 99, 99, 1, 1, 99, 99, 0, np.nan, np.nan)
-            buf.write(line)
-        buf.seek(0, 0)
-
-        self._writeData('cobra_target', realcolnames, buf)
-        buf.seek(0, 0)
-
     def doPhotometry(self, cmd):
         """
             perform photometry on previously taken MCS images
@@ -1772,6 +1401,8 @@ class McsCmd(object):
              - load image from disk
              - calculate photometry
              - update table
+
+        Note that this is currently unused, but kept in case of future interest 
         """
     
         # The "update" at the bottom cannot have worked for a couple of years now.
