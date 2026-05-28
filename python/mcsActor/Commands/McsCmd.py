@@ -751,6 +751,9 @@ class McsCmd(object):
 
                     # fibreID
                     self.fibreID(cmd, frameId)
+
+                    self.tweakCobraMatch(cmd, frameId)
+
                     self.dumpCobraMatchToDB(cmd, frameId)
 
             except Exception as e:
@@ -1082,6 +1085,13 @@ class McsCmd(object):
         if (writeFakeCobraMove):
             dbTools.writeFakeMoveToDB(self._db, int(frameId))
             cmd.inform(f'text="wrote fake cobra move to DB"')
+
+    def tweakCobraMatch(self, cmd, frameId):
+        """
+            tweaking the cobra match result based on the table.
+        """
+        
+        pass
 
 
     def dumpCobraMatchToDB(self, cmd, frameId):
