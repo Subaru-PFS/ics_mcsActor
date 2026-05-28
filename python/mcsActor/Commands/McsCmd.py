@@ -750,9 +750,9 @@ class McsCmd(object):
                         cmd.inform(f'text="made adjacent lists"')
 
                     # fibreID
-                    self.fibreID(cmd, frameId, zenithAngle, insRot)
+                    self.fibreID(cmd, frameId)
                     self.dumpCobraMatchToDB(cmd, frameId)
-                    
+
             except Exception as e:
                 cmd.warn(f'text="Failed to do fibreID: {e}"')
 
@@ -1028,7 +1028,7 @@ class McsCmd(object):
         self.prevPos = None
         cmd.finish('text="cleared known position"')
 
-    def fibreID(self, cmd, frameId, zenithAngle, insRot):
+    def fibreID(self, cmd, frameId):
 
         """ do fibre identification """
         writeFakeCobraMove = False
