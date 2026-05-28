@@ -59,6 +59,8 @@ class McsCmd(object):
         self.cMethod = 'win'
         self.fMethod = 'target'
 
+        self.cobraMatchTable = None
+
         # self.setCentroidParams(None)
         self.adjacentCobras = None
         self.geometrySet = False
@@ -749,6 +751,8 @@ class McsCmd(object):
 
                     # fibreID
                     self.fibreID(cmd, frameId, zenithAngle, insRot)
+                    self.dumpCobraMatchToDB(cmd, frameId)
+                    
             except Exception as e:
                 cmd.warn(f'text="Failed to do fibreID: {e}"')
 
@@ -1072,17 +1076,24 @@ class McsCmd(object):
         t1 = time.time()
         cmd.inform(f'text="Fiber ID finished in {t1-t0:0.2f}s"')
 
-        dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
-        cmd.inform(f'text="wrote matched cobras to database"')
-
-        # save the values to the previous position
-        self.prevPos = cobraMatch[:, [0, 2, 3]]
+        self.cobraMatchTable = cobraMatch
 
         # Handling the case of 0 target case
         if (writeFakeCobraMove):
-            dbTools.writeFakeMoveToDB(db, int(frameId))
+            dbTools.writeFakeMoveToDB(self._db, int(frameId))
             cmd.inform(f'text="wrote fake cobra move to DB"')
 
+
+    def dumpCobraMatchToDB(self, cmd, frameId):
+        """ dump the cobra match to the database """
+
+        dbTools.writeMatchesToDB(self._db, self.cobraMatchTable, int(frameId))
+        cmd.inform(f'text="wrote matched cobras to database"')
+
+        # save the values to the previous position
+        self.prevPos = self.cobraMatchTable[:, [0, 2, 3]]
+
+        
 
     def handleTelescopeGeometry(self, cmd, filename, frameId, expTime):
 
