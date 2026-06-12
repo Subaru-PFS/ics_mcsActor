@@ -49,7 +49,7 @@ def loadTelescopeParametersFromDB(db, frameId):
 
     """ load telescope parameters from database """
     
-    sql = f'SELECT mcs_exposure.insrot,mcs_exposure.altitude FROM mcs_exposure WHERE mcs_exposure.mcs_frame_id={frameId}'
+    sql = f'SELECT mcs_exposure.insrot,mcs_exposure.altitude,mcs_exposure.mcs_camera_id FROM mcs_exposure WHERE mcs_exposure.mcs_frame_id={frameId}'
     df = db.query_dataframe(sql)
 
     if df['altitude'][0] < -99:
@@ -59,7 +59,13 @@ def loadTelescopeParametersFromDB(db, frameId):
 
     insRot = df['insrot'][0]
 
-    return zenithAngle, insRot
+    # this is only used in simulation mode
+    if(df['mcs_camera_id'] == 1):
+        "dbCam = rmod_71m"
+    else:
+        dbCam = "canon_50m"
+        
+    return zenithAngle, insRot, dbCam
 
 
 def loadTargetsFromDB(db, frameId):

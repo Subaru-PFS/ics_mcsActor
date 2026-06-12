@@ -687,7 +687,7 @@ class McsCmd(object):
         cmd.inform(f'text="loading telescope parameters for frame={frameId}"')
         db = self.connectToDB(cmd)
 
-        zenithAngle, insRot = dbTools.loadTelescopeParametersFromDB(db, int(frameId))
+        zenithAngle, insRot, dbCam = dbTools.loadTelescopeParametersFromDB(db, int(frameId))
 
         # get the geometry if it hasn't been loaded yet
         cmd.inform('text="loading geometry"')
@@ -736,13 +736,13 @@ class McsCmd(object):
 
             try:
                 if enableEasyID:
-                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
+                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId, rerunFrameId, dbCam)
                     
                     self.easyFiberID(cmd, frameId)
 
                 else:
 
-                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
+                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId, rerunFrameId, dbCam)
                     if(self.adjacentCobras is None):
                         self.adjacentCobras = mcsTools.makeAdjacentList(self.centrePos, self.armLength)
                         cmd.inform(f'text="made adjacent lists"')
@@ -861,7 +861,7 @@ class McsCmd(object):
         else:
             raise RuntimeError(f"updateTransform returned unexpected number of values: {len(result)}")
 
-    def establishTransform(self, cmd, altitude, insrot, frameID):
+    def establishTransform(self, cmd, altitude, insrot, frameID, rerunFrameId, dbCam):
 
         """load the basic transformation and refine based on the fiducial fibre positions"""
         
@@ -887,16 +887,29 @@ class McsCmd(object):
                                      f'from mcs_data where mcs_frame_id = {frameID}')
 
         self.logger.info(f'Initiating the transformation function')
-        
-        # make sure pfiTransform is defined
-        if 'rmod' in self.actor.cameraName.lower():
-            altitude = 90.0
-            insrot = 0
-            pfiTransform = transformUtils.fromCameraName('usmcs', 
-                altitude=altitude, insrot=insrot,nsigma=0, alphaRot=0)
-        else:
-            pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, 
-                altitude=altitude, insrot=insrot,nsigma=0, alphaRot=1)
+
+        # in simulation mode, get the camera from the database and set the transformation appropriately
+        if(rerunFrameId is not None):
+            if('rmod' in dbCam):
+                altitude = 90.0
+                insrot = 0
+                pfiTransform = transformUtils.fromCameraName('usmcs', 
+                   altitude=altitude, insrot=insrot,nsigma=0, alphaRot=0)
+            else:
+                pfiTransform = transformUtils.fromCameraName(dbCam, 
+                   altitude=altitude, insrot=insrot,nsigma=0, alphaRot=1)
+
+        # regular operation
+        else:    
+            # make sure pfiTransform is defined
+            if 'rmod' in self.actor.cameraName.lower():
+                altitude = 90.0
+                insrot = 0
+                pfiTransform = transformUtils.fromCameraName('usmcs', 
+                    altitude=altitude, insrot=insrot,nsigma=0, alphaRot=0)
+            else:
+                pfiTransform = transformUtils.fromCameraName(self.actor.cameraName, 
+                    altitude=altitude, insrot=insrot,nsigma=0, alphaRot=1)
 
         self.logger.info(f'Camera name: {self.actor.cameraName}')
         cmd.inform(f'text="camera name: {self.actor.cameraName} altitude = {altitude}"')
