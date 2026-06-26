@@ -302,32 +302,17 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos,
     assignMethod=np.zeros(nCobras, dtype=np.int32)
 
     bPoints = []  # non real points (fids, stuck fibres)
+    sPoints = [] # stuck points (known position)
 
-    #first, quick positional matching to remove fiducial fibres from list of matchable points
-    #note that the matching should return either 0 points (unilluminated fiducials) or
-    #1 points (match) as the fiducial fibres don't have a patrol radius
-
-    D = cdist(fidPos[:,1:3],points[:,1:3])
-    for i in range(len(fidPos)):
-        ind = np.where(D[i, :] < 1) # 1mm seems big...
-        #print("Fid Match", i, ind, len(ind[0]))
-        if len(ind[0]) > 0:
-            unaPoints.remove(ind[0][0])
-            bPoints.append(ind[0][0])
-
-    #D = cdist(stuckPos[:,1:3], points[:,1:3])
-    #for i in range(len(stuckPos)):
-    #    ind = np.where(D[i, :] < 1)
-    #    if len(ind[0]) > 0:
-    #        unaPoints.remove(ind[0][0])
-    #        bPoints.append(ind[0][0])
-    # get the distnace between cobras and points. cdist is pretty fast, check total time
+    # calculate the distances between points and centres
+    
     D = cdist(points[:, 1:3], centers[:, 1:3])
 
     if targets is not None:
         Dtarget = cdist(points[:, 1:3], targets[:, 1:3])
 
-    # find the cobras which are within arm length of each point and add to the list
+    # first we make a master list of which points are within a patrol radius
+    # of a given cobra
     
     for i in range(nPoints):
         if targets is not None:
@@ -348,12 +333,48 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos,
 
         potPointMatch.append(list(ind1[0]))
 
-    # now remove the non cobra points
+    
+    #first, quick positional matching to remove fiducial fibres from list of matchable points
+    #note that the matching should return either 0 points (unilluminated fiducials) or
+    #1 points (match) as the fiducial fibres don't have a patrol radius
+
+    D = cdist(fidPos[:,1:3],points[:,1:3])
+    for i in range(len(fidPos)):
+        ind = np.where(D[i, :] < 1) # 1mm seems big...
+
+        # if we find a match, remove the point from the unassigned points list
+        if len(ind[0]) > 0:
+            unaPoints.remove(ind[0][0])
+            aPoints.append(ind[0][0])
+            bPoints.append(ind[0][0])
+        
+    #now do the same thing with fixed cobras
+    D = cdist(stuckPos[:,1:3], points[:,1:3])
+    for i in range(len(stuckPos)):
+        ind = np.where(D[i, :] < 1)
+
+        # if there is a match, remove the point and the cobra from consideration
+        if len(ind[0]) > 0:
+            aPoints.append(ind[0][0])
+            unaPoints.remove(ind[0][0])
+            unaCobras.remove(stuckPos[i,0]]
+            aCobras.append(stuckPos[i,0])
+            sPoints.append(ind[0][0])
+            potCobraMatch[stuckPos[i,0]] = ind[0][0]
+        
+    # now remove the assigned points from the master list
     for iPoint in bPoints:
         for l in unaCobras:
             if(iPoint in potPointMatch[l]):
                 potPointMatch[l].remove(iPoint)
 
+    for iPoint in sPoints:
+        for l in unaCobras:
+            if(iPoint in potPointMatch[l]):
+                potPointMatch[l].remove(iPoint)
+
+                
+                
     return aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod
 
 
@@ -383,6 +404,10 @@ def firstPass(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMat
     change = 1
     nLoop = 0
 
+    for ind in stuckIdx:
+        
+        
+    
     # loop until no more changes
     while(change == 1):
         nLoop = nLoop+1
