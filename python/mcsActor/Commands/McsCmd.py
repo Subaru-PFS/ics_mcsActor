@@ -90,6 +90,7 @@ class McsCmd(object):
             ('expose',
                 'object <expTime> [<frameId>] [@noCentroid] [@doCentroid] [@doFibreID] [@doPhot] '
                 '[@newField] [<rerunFrameId>]', self.expose),
+            ('biaControl', '@(on|off)', self.biaControl),
             ('runCentroid', '[@newTable]', self.runCentroid),
             #('runFibreID', '[@newTable]', self.runFibreID),
             ('reconnect', '', self.reconnect),
@@ -262,8 +263,16 @@ class McsCmd(object):
         self.actor.camera.sendStatusKeys(cmd)
         self.actor.connectCamera(cmd)
         self.actor.camera.setExposureTime(cmd, self.expTime)
+        self.actor.biaControl.genKeys(cmd)
 
         cmd.inform(f'text="MCS camera present! camera name = {self.actor.cameraName}"')
+        cmd.finish()
+
+    def biaControl(self, cmd):
+        """Activate/deactivate bia control, eg mcs driving the sps bia during its own exposures."""
+        cmdKeys = cmd.cmd.keywords
+
+        self.actor.biaControl.declare(cmd, activated='on' in cmdKeys)
         cmd.finish()
 
 
@@ -553,7 +562,16 @@ class McsCmd(object):
         cmd.diag(f'text="new exposure"')
         expStart = time.time()
         filename = '/tmp/scratchFile'
-        image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
+
+        biaControl = self.actor.biaControl
+
+        try:
+            # bia on, only returns when the cobras are actually illuminated, raise otherwise.
+            biaControl.switchOn(cmd, expType)
+            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
+        finally:
+            # camera is done integrating, note that the camera shutter is closed way before that.
+            biaControl.switchOff(cmd, expType)
 
         cmd.inform(f'text="done: image shape = {image.shape}"')
 

@@ -8,6 +8,8 @@ import socket
 from opscore.utility import sdss3logging
 import actorcore.ICC
 
+from mcsActor.biaControl import BiaControl
+
 class Mcs(actorcore.ICC.ICC):
     def __init__(self, name, productName=None, configFile=None, debugLevel=30):
         # This sets up the connections to/from the hub, the logger, and the twisted reactor.
@@ -19,9 +21,11 @@ class Mcs(actorcore.ICC.ICC):
 
         print(f'   actorConfig: {self.actorConfig}')
 
-        self.connectCamera(self.bcast)
-
+        # note that connectCamera sets cameraName, so declare it beforehand.
         self.cameraName = None
+        self.biaControl = BiaControl(self)
+
+        self.connectCamera(self.bcast)
 
     def reloadConfiguration(self, cmd):
         """Use our hostname to set the interface we listen on for tron.
@@ -71,8 +75,9 @@ class Mcs(actorcore.ICC.ICC):
             self.camera.initialCamera(cmd)
 
         self.camera.sendStatusKeys(cmd)
-        self.cameraName = camera
-        cmd.inform(f'text="camera name = {camera}"')
+        # taking the name from the camera which got actually loaded, not the one we tried to load.
+        self.cameraName = self.camera.name.lower()
+        cmd.inform(f'text="camera name = {self.cameraName}"')
 # To work
 
 
