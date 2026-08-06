@@ -34,11 +34,12 @@ from sqlalchemy import text as sqlText
 
 from ics.cobraCharmer.cobraCoach import calculation
 
-import mcsActor.windowedCentroid.centroid as centroid
+# import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 import mcsActor.mcsRoutines.fiducials as fiducials
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
-import mcsActor.mcsRoutines.speedCentroid as speedCentriod
+import mcsActor.mcsRoutines.offlineMatch as offlineMatch
+# import mcsActor.mcsRoutines.speedCentroid as speedCentriod
 import multiprocessing
 
 from pfs.utils import butler
@@ -621,7 +622,12 @@ class McsCmd(object):
         expStart = time.time()
         if self.simulationPath is None:
             filename = '/tmp/scratchFile'
-            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
+            # image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
+            cmd.inform('exposureState="exposing"')
+            time.sleep(expTime/1000)
+            image = np.zeros((5778, 8960))
+            cmd.inform('exposureState="reading"')
+            time.sleep(1.0)
         else:
             imagePath, image, target = self.getNextSimulationImage(cmd)
         cmd.inform(f'text="done: image shape = {image.shape}"')
@@ -765,6 +771,7 @@ class McsCmd(object):
 
         # set visitID
         self.visitId = frameId // 100
+        self.iteration = frameId - self.visitId * 100
         self.actor.image = image
 
         # load telescope values from the DB
@@ -797,44 +804,133 @@ class McsCmd(object):
             
             # Use only one version of Centroid code.
             #self.runCentroidSEPMP(cmd)
-            self.runCentroid(cmd, self.centParms)
+        #     self.runCentroid(cmd, self.centParms)
+        #
+        #     if not cmd.isAlive(): # command might have failed in runCentroid, so do not proceed further.
+        #         return
+        #
+        #     t2 = time.time()
+        #     cmd.inform(f'text="Centroids done in {t2-t1} second" ')
+        #
+        #     # dumpCentroidtoDB
+        #     self.dumpCentroidtoDB(cmd, frameId)
+        #
+        #     cmd.inform('text="Sending centroid data to database" ')
+        #
+        # # do the fibre identification
+        # if doFibreID:
+        #
+        #     cmd.inform('text="zenith angle=%s"'%(zenithAngle))
+        #     cmd.inform('text="instrument rotation=%s"'%(insRot))
+        #
+        #     enableEasyID=False
+        #
+        #     try:
+        #         if enableEasyID:
+        #             self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
+        #
+        #             self.easyFiberID(cmd, frameId)
+        #
+        #         else:
+        #
+        #             self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
+        #             if(self.adjacentCobras is None):
+        #                 self.adjacentCobras = mcsTools.makeAdjacentList(self.centrePos, self.armLength)
+        #                 cmd.inform(f'text="made adjacent lists"')
+        #
+        #             # fibreID
+        #             self.fibreID(cmd, frameId, zenithAngle, insRot)
+        #     except Exception as e:
+        #         cmd.warn(f'text="Failed to do fibreID: {e}"')
+        import psycopg2
 
-            if not cmd.isAlive(): # command might have failed in runCentroid, so do not proceed further.
-                return
+        def substitute(mcs_frame_id, pfs_visit_id):
+            iterstr = f'{mcs_frame_id:08d}'[-2:]
+            return int(f'{pfs_visit_id:06d}{iterstr}')
 
-            t2 = time.time()
-            cmd.inform(f'text="Centroids done in {t2-t1} second" ')
+        def getConn():
+            """
+            Establishes a connection to the PostgreSQL database 'opdb' on host 'pfsa-db' and port 5432 with user 'pfs'.
+            Returns:
+                conn: A PostgreSQL connection object.
+            """
+            return psycopg2.connect("dbname='opdb' host='db-ics' port=5432 user='pfs'")
 
-            # dumpCentroidtoDB
-            self.dumpCentroidtoDB(cmd, frameId)
-        
-            cmd.inform('text="Sending centroid data to database" ')
-                
-        # do the fibre identification
-        if doFibreID:
-        
-            cmd.inform('text="zenith angle=%s"'%(zenithAngle))
-            cmd.inform('text="instrument rotation=%s"'%(insRot))
-            
-            enableEasyID=False
+        def getUpdatedDf(table, dirName, frameId):
+            filepath = os.path.join(dirName, f"{table}.csv")
+            df = pd.read_csv(filepath)
 
+            frameId = int(frameId)
+            newVisit = int(frameId // 100)
+            newIteration = int(frameId % 100)
+
+            if 'iteration' not in df.columns:
+                iteration = df.mcs_frame_id.to_numpy() % 100
+            else:
+                iteration = df.iteration.to_numpy()
+
+            maxIteration = max(iteration)
+            sel = maxIteration if newIteration > maxIteration else newIteration
+            dfi = df[iteration == sel].copy()
+
+            if 'mcs_frame_id' in df.columns:
+                dfi.loc[:, 'mcs_frame_id'] = frameId
+
+            if 'iteration' in df.columns:
+                dfi.loc[:, 'iteration'] = newIteration
+
+            if 'pfs_visit_id' in df.columns:
+                dfi.loc[:, 'pfs_visit_id'] = newVisit
+
+            return dfi
+
+        def insertTablesFromCsv(table, dirName):
+            """
+            Insert CSV rows into Postgres, converting NumPy/pandas dtypes to Python natives.
+            """
+            conn = getConn()
+            cur = conn.cursor()
             try:
-                if enableEasyID:
-                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
-                    
-                    self.easyFiberID(cmd, frameId)
+                df = getUpdatedDf(table, dirName, frameId)
+                if table == 'cobra_match':
+                    df = offlineMatch.measureAgainstTargets(df, frameId, cur)
+                # convert dtypes: NumPy scalars -> Python, NaN -> None
+                df = df.astype(object).where(pd.notna(df), None)
+                for c in df.columns:
+                    df[c] = df[c].map(lambda x: x.item() if isinstance(x, np.generic) else x)
 
-                else:
+                cols = ', '.join(df.columns)
+                placeholders = ', '.join(['%s'] * len(df.columns))
+                sql = f"INSERT INTO {table} ({cols}) VALUES ({placeholders})"
 
-                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
-                    if(self.adjacentCobras is None):
-                        self.adjacentCobras = mcsTools.makeAdjacentList(self.centrePos, self.armLength)
-                        cmd.inform(f'text="made adjacent lists"')
-
-                    # fibreID
-                    self.fibreID(cmd, frameId, zenithAngle, insRot)
+                rows = list(df.itertuples(index=False, name=None))
+                if rows:
+                    cur.executemany(sql, rows)
+                    conn.commit()
+                cmd.inform(f'text="Inserted {len(rows)} rows into {table}"')
             except Exception as e:
-                cmd.warn(f'text="Failed to do fibreID: {e}"')
+                conn.rollback()
+                cmd.warn(f'text="Error inserting data: {e}"')
+            finally:
+                cur.close()
+                conn.close()
+
+        # cobra_target belongs to fps, which writes it whenever it commands a target.  A
+        # frame with nothing commanded still needs the row cobra_match references, so fall
+        # back exactly as the online path does.
+        db = self.connectToDB(cmd)
+        commanded = db.query_dataframe('select pfs_visit_id from cobra_target where '
+                                       f'(pfs_visit_id = {frameId // 100}) '
+                                       f'AND iteration = {frameId % 100}')
+        if len(commanded) == 0:
+            cmd.inform('text="Fall back using cobra centers as target."')
+            dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
+
+        tables = ["mcs_data", "cobra_match"]
+        dirName = 'extractOpDB'
+
+        for table in tables:
+            insertTablesFromCsv(table, dirName=dirName)
 
         cmd.inform(f'frameId={frameId}; filename={filename}')
 
@@ -1250,7 +1346,8 @@ class McsCmd(object):
             outside_humidity, outside_pressure, outside_temperature, outside_wind = gen2Model['outside_env'].getValue()
             
             mebModel = self.actor.models['meb'].keyVarDict
-            _,_,m1_temperature, m1_cover_temperature, _, _, _ = mebModel['temps'].getValue()
+            m1_temperature = m1_cover_temperature = 5.5
+            # _,_,m1_temperature, m1_cover_temperature, _, _, _ = mebModel['temps'].getValue()
 
             startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
