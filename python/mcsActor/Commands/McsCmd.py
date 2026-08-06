@@ -34,11 +34,13 @@ from sqlalchemy import text as sqlText
 
 from ics.cobraCharmer.cobraCoach import calculation
 
-import mcsActor.windowedCentroid.centroid as centroid
+# import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 import mcsActor.mcsRoutines.fiducials as fiducials
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
+import mcsActor.mcsRoutines.offlineMatch as offlineMatch
 import multiprocessing
+import psycopg2
 
 from pfs.utils import butler
 
@@ -568,7 +570,12 @@ class McsCmd(object):
         try:
             # bia on, only returns when the cobras are actually illuminated, raise otherwise.
             biaControl.switchOn(cmd, expType)
-            image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
+            # image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
+            cmd.inform('exposureState="exposing"')
+            time.sleep(expTime / 1000)
+            image = np.zeros((5778, 8960))
+            cmd.inform('exposureState="reading"')
+            time.sleep(1.0)
         finally:
             # camera is done integrating, note that the camera shutter is closed way before that.
             biaControl.switchOff(cmd, expType)
@@ -735,34 +742,83 @@ class McsCmd(object):
             t1 = time.time()
         
             
-            # Use only one version of Centroid code.
-            #self.runCentroidSEPMP(cmd)
-            self.runCentroid(cmd, self.centParms)
-
-            if not cmd.isAlive(): # command might have failed in runCentroid, so do not proceed further.
-                self.logger.warning('Centroiding failed; writing FITS file for inspection')
-                self.writeFITS(fileIds, hdr, image, cmd)
-                return
-
-            t2 = time.time()
-            cmd.inform(f'text="Centroids done in {t2-t1} second" ')
-
-            # dumpCentroidtoDB
-            self.dumpCentroidtoDB(cmd, frameId)
-        
-            cmd.inform('text="Sending centroid data to database" ')
+            # offline: no centroiding, mcs_data is replayed by replayOffline.
+            # self.runCentroid(cmd, self.centParms)
+            # self.dumpCentroidtoDB(cmd, frameId)
                 
         # the image is saved whether or not fibre identification succeeds; its failure
         # then fails the command.
         try:
             if doFibreID:
-                self.identifyFibres(cmd, frameId, zenithAngle, insRot)
+                # offline: replay instead of self.identifyFibres(cmd, frameId, zenithAngle, insRot)
+                self.replayOffline(cmd, frameId)
         finally:
             cmd.inform(f'frameId={frameId}; filename={filename}')
             if rerunFrameId is None:
                 self.writeFITS(fileIds, hdr, image, cmd)
 
         cmd.finish('text="expose command finished"')
+
+    @staticmethod
+    def _replayedRows(table, dirName, frameId):
+        """The rows of `table` recorded in dirName/<table>.csv for this frame's iteration
+        (the last recorded one beyond it), carrying this frame's visit, iteration and id."""
+        df = pd.read_csv(os.path.join(dirName, f"{table}.csv"))
+
+        frameId = int(frameId)
+        newVisit, newIteration = divmod(frameId, 100)
+
+        iteration = df.iteration.to_numpy() if 'iteration' in df.columns else df.mcs_frame_id.to_numpy() % 100
+        sel = min(newIteration, max(iteration))
+        dfi = df[iteration == sel].copy()
+
+        if 'mcs_frame_id' in df.columns:
+            dfi.loc[:, 'mcs_frame_id'] = frameId
+        if 'iteration' in df.columns:
+            dfi.loc[:, 'iteration'] = newIteration
+        if 'pfs_visit_id' in df.columns:
+            dfi.loc[:, 'pfs_visit_id'] = newVisit
+
+        return dfi
+
+    def replayOffline(self, cmd, frameId, dirName='extractOpDB'):
+        """Offline stand-in for centroiding and fibre identification.
+
+        mcs_data and cobra_match rows recorded in `dirName` are inserted under this
+        frame's ids; cobra_match positions are rewritten as a measurement of the targets
+        fps commanded (offlineMatch). A frame with nothing commanded gets cobra centres as
+        targets, as fibreID does online.
+        """
+        db = self.connectToDB(cmd)
+        commanded = db.query_dataframe('select pfs_visit_id from cobra_target where '
+                                       f'pfs_visit_id = {frameId // 100} AND iteration = {frameId % 100}')
+        if len(commanded) == 0:
+            cmd.inform('text="Fall back using cobra centers as target."')
+            dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
+
+        for table in ('mcs_data', 'cobra_match'):
+            df = self._replayedRows(table, dirName, frameId)
+            conn = psycopg2.connect("dbname='opdb' host='db-ics' port=5432 user='pfs'")
+            cur = conn.cursor()
+            try:
+                if table == 'cobra_match':
+                    df = offlineMatch.measureAgainstTargets(df, frameId, cur)
+                # NumPy scalars -> Python, NaN -> None
+                df = df.astype(object).where(pd.notna(df), None)
+                for c in df.columns:
+                    df[c] = df[c].map(lambda x: x.item() if isinstance(x, np.generic) else x)
+                rows = list(df.itertuples(index=False, name=None))
+                if rows:
+                    placeholders = ', '.join(['%s'] * len(df.columns))
+                    cur.executemany(f"INSERT INTO {table} ({', '.join(df.columns)}) VALUES ({placeholders})", rows)
+                    conn.commit()
+                cmd.inform(f'text="Inserted {len(rows)} rows into {table}"')
+            except Exception as e:
+                conn.rollback()
+                cmd.warn(f'text="Error inserting data: {e}"')
+            finally:
+                cur.close()
+                conn.close()
 
     def identifyFibres(self, cmd, frameId, zenithAngle, insRot):
         """Establish the MCS-to-PFI transform and match the frame's spots to cobras.
@@ -1124,7 +1180,8 @@ class McsCmd(object):
         outside_humidity, outside_pressure, outside_temperature, outside_wind = gen2Model['outside_env'].getValue()
         
         mebModel = self.actor.models['meb'].keyVarDict
-        _,_,m1_temperature, m1_cover_temperature, _, _, _ = mebModel['temps'].getValue()
+        m1_temperature = m1_cover_temperature = 5.5
+        # _,_,m1_temperature, m1_cover_temperature, _, _, _ = mebModel['temps'].getValue()
 
         startTime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
