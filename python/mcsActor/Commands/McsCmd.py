@@ -716,6 +716,8 @@ class McsCmd(object):
             self.runCentroid(cmd, self.centParms)
 
             if not cmd.isAlive(): # command might have failed in runCentroid, so do not proceed further.
+                self.logger.warning('Centroiding failed; writing FITS file for inspection')
+                self.writeFITS(fileIds, hdr, image, cmd)
                 return
 
             t2 = time.time()
@@ -1259,8 +1261,8 @@ class McsCmd(object):
             return
 
         if(nSpots > 4000):
-            cmd.fail('text="More than 4500 spots detected; something is likely wrong"')
-
+            cmd.fail('text="More than 4000 spots detected; something is likely wrong"')
+            return
 
         maxSize = (centroids[:,3] * centroids[:,2]).max()
         if(maxSize > 1000):
