@@ -28,7 +28,27 @@ TAIL_SIGMA_MM = 0.080
 """Scatter for a tail cobra, at every iteration."""
 
 BLIND_FRACTION = 0.015
-"""Cobras the camera never matches, reported with spot_id -1 and no position."""
+"""Cobras the camera never matches, drawn at random and independent of where they are."""
+
+DOT_RADIUS_MM = 0.711
+"""Tip-to-dot-centre distance below which a fibre is not centroided.
+
+The 50% point of the detection profile measured over 4.44M stacked detections.  The real
+transition has a 54 um width; a threshold keeps a replay reproducible.
+"""
+
+_dotCentres = None
+
+
+def dotCentres():
+    """Black dot centre of every cobra as complex mm, indexed by cobra_id - 1."""
+    global _dotCentres
+    if _dotCentres is None:
+        from pfs.utils.butler import Butler
+        dots = Butler().get('black_dots', moduleName='ALL', version='').sort_values('spotId')
+        _dotCentres = dots.x.to_numpy() + 1j * dots.y.to_numpy()
+    return _dotCentres
+
 
 
 def perCobraDraw(pfsVisitId, cobraId):
@@ -114,8 +134,22 @@ def measureAgainstTargets(df, mcsFrameId, cursor):
     sigma = scatterFor(iteration, isTail)
     x = xy[:, 0] + sigma * rng.standard_normal(len(cobraId))
     y = xy[:, 1] + sigma * rng.standard_normal(len(cobraId))
-    x[isBlind] = np.nan
-    y[isBlind] = np.nan
+
+    # A cobra measured behind its dot is not centroided, whatever its draw: this is the
+    # one kind of blindness that follows from where the cobra is rather than from luck,
+    # and it is the kind a dot sequence depends on.
+    dots = dotCentres()
+    inRange = (cobraId >= 1) & (cobraId <= len(dots))
+    fallback = np.full(len(cobraId), np.nan + 0j)
+    fallback[inRange] = dots[cobraId[inRange] - 1]
+    with np.errstate(invalid='ignore'):
+        isBlind |= np.abs((x + 1j * y) - fallback) < DOT_RADIUS_MM
+
+    # cobra_match reports the dot centre for a cobra it matched no spot to, never a null,
+    # so a caller that reads the position without checking spot_id gets a plausible
+    # number rather than a NaN that would announce itself.
+    x = np.where(isBlind, fallback.real, x)
+    y = np.where(isBlind, fallback.imag, y)
 
     df = df.copy()
     df.loc[:, 'pfi_center_x_mm'] = x
