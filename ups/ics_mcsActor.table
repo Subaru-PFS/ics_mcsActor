@@ -1,8 +1,8 @@
-setupRequired(ics_actorkeys)
+setupRequired(ics_actorkeys INSTRM-2968)
 setupRequired(ics_cobraCharmer)
 setupRequired(spt_operational_database)
 setupRequired(pfs_utils)
-setupRequired(pfs_instdata)
+setupRequired(pfs_instdata INSTRM-2968)
 
 pathPrepend(PATH, ${PRODUCT_DIR}/bin)
 pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
