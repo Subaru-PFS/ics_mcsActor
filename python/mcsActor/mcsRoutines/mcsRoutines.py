@@ -7,11 +7,29 @@ import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
 import sep
 
 from scipy.spatial import cKDTree
+from scipy.optimize import linear_sum_assignment
+from scipy.sparse import bmat, csr_matrix
+from scipy.sparse.csgraph import connected_components
 from scipy.spatial.distance import cdist
 import cv2
 import copy
 import yaml
 from scipy import optimize
+
+ARM_SCALE = 1.05
+"""Multiplies the arm length when deciding which spots a cobra could have produced.
+
+armFudge absorbs measurement error, a fixed distance; this absorbs error in the arm length
+itself, which grows with the arm.  A cobra commanded near full extension otherwise lands
+outside its own candidacy radius, and its spot is claimed by a neighbour instead.
+"""
+
+MISS_COST = 10.0
+"""Cost, in mm, of leaving a cobra unassigned.
+
+Larger than any patrol, so a cobra takes a feasible spot rather than none; it exists to
+stop a pathological cost dominating the solution.
+"""
 
 def getCentroidParams(cmd, configuredCentParms):
     """Given the default configuration from pfs_instdata, update with any parameters in the command."""
@@ -140,101 +158,266 @@ def makeAdjacentList(ff, armLength):
     return(adjacent)
 
 
-def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos,
-            goodIdx, adjacentCobras, fMethod, targetSize=2.0):
+def fibreIdLegacy(points, nPoints, nCobras, centers, arms, goodIdx, isFiducial, targets,
+                  prepTargets, dotPos, adjacentCobras, targetSize=2.0):
+    """Identify spots by successive passes over the candidate lists.
 
-    """ do the fibre identification. """
-    
-    centers = centrePos
-    points = centroids
-    nPoints = len(centroids)
-    nCobras = len(centrePos)
-    arms = armLength
-    fidPos =  np.array([fids['fiducialId'],fids['x_mm'],fids['y_mm']]).T
+    Parameters
+    ----------
+    points : `numpy.ndarray`, (nPoints, 3)
+        Spot id, x, y in mm.
+    nPoints, nCobras : `int`
+        Number of spots and of cobras.
+    centers : `numpy.ndarray`, (nCobras, 3)
+        Cobra index, x, y in mm.
+    arms : `numpy.ndarray`, (nCobras,)
+        Patrol reach, L1 + L2.
+    goodIdx : `numpy.ndarray` of `int`
+        Indices of the cobras being matched; the reported id is the index plus one.
+    isFiducial : `numpy.ndarray` of `bool`, (nPoints,)
+        True for the spots produced by fiducial fibres, which are offered to no cobra.
+    targets : `numpy.ndarray`, (nCobras, 3)
+        Cobra index and the position this iteration commanded, used to break ties between
+        cobras competing for the same spot.
+    prepTargets : `numpy.ndarray`, (nCobras, 3), or `None`
+        Same array again to also restrict candidacy to the spots lying within `targetSize`
+        of the target, or None to let candidacy depend on the patrol reach alone.
+    dotPos : `numpy.ndarray`, (nCobras, 4)
+        Dot id, x, y, radius in mm, reported as the position of a cobra given no spot.
+    adjacentCobras : `list` of `list` of `int`
+        Neighbours of each cobra, used to tell a hidden cobra from a contested spot.
+    targetSize : `float`
+        Radius in mm of the candidacy restriction, ignored when `prepTargets` is None.
 
+    Returns
+    -------
+    `numpy.ndarray`, (nCobras, 5)
+        Cobra id, spot id, x, y, flags.  Spot id is -1 for a cobra given no spot, whose
+        position is then the dot centre.
+    `list` of `int`
+        Indices of the spots no cobra was given.
+    `int`
+        Number of cobras left with more than one candidate, which should never happen.
+    """
     anyChange = 0
-    targets = tarPos
-    
-    # these are the effective number of cobras (ie, goodIdx)
-    nPoints = points.shape[0]
-    nCobras = targets.shape[0]
 
-
-    # set up variables
-    if fMethod == 'previous':
-        prepTargets = targets
-    else:
-        prepTargets = None
-        targetSize = 0.0
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod = prepWork(
-        points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge=0.1,
+        points, nPoints, nCobras, centers, arms, goodIdx, isFiducial, armFudge=0.1,
         targets=prepTargets, targetSize=targetSize)
-
 
     # first pass - assign cobra/spot pairs based on the spots poiint of view
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange = firstPass(
         aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange)
 
-
     # second pass - assign cobra/spot pairs based on the cobra point of view
-    aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange = secondPass(
-        aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras, assignMethod, anyChange)
-
+    (aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod,
+     anyChange) = secondPass(
+        aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras,
+        assignMethod, anyChange)
 
     # last pass - figure out the spots that can belong to more than one cobra, and things hidden by dots
     aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange = lastPassDist(
-        aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, tarPos, 't', assignMethod, anyChange, goodIdx)
-
+        aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, points, targets, centers, targets, 't',
+        assignMethod, anyChange, goodIdx)
 
     # some final tidying up
-    aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod, anyChange = secondPass(
-        aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras, assignMethod, anyChange)
-
+    (aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod,
+     anyChange) = secondPass(
+        aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras,
+        assignMethod, anyChange)
 
     # turn the results into an array to be written to teh database
     cobraMatch = np.empty((nCobras, 5), dtype='f4')
 
-    # That is HORRIBLE and DANGEROUS: ids are INTs, and you 
+    # That is HORRIBLE and DANGEROUS: ids are INTs, and you
     # basically never need to use doubles. Want something like the following
-    # but that requires more effort should go i=on this ticket. I merely changed to 
+    # but that requires more effort should go i=on this ticket. I merely changed to
     # 32-bit reals.
-    #cobraMatch = np.empty((nCobras, 5), 
-    #                      dtype=[('cobra_id', 'int32'), ('spot_id', 'int32'), 
-    #                             ('x_mm', 'float32'), ('y_mm', 'float32'), 
+    # cobraMatch = np.empty((nCobras, 5),
+    #                      dtype=[('cobra_id', 'int32'), ('spot_id', 'int32'),
+    #                             ('x_mm', 'float32'), ('y_mm', 'float32'),
     #                             ('flags', 'int32')])
     ii = 0
     flag = 0
-    for i in range(int(goodIdx[-1]+2)):
-        if(i in goodIdx):
+    for i in range(int(goodIdx[-1] + 2)):
+        if (i in goodIdx):
 
             # cobras assigned to spots
-            if(len(potPointMatch[ii]) == 1):
-                cobraMatch[ii, 0] = i+1
-                cobraMatch[ii, 1] = points[potPointMatch[ii][0],0]
+            if (len(potPointMatch[ii]) == 1):
+                cobraMatch[ii, 0] = i + 1
+                cobraMatch[ii, 1] = points[potPointMatch[ii][0], 0]
                 cobraMatch[ii, 2] = points[potPointMatch[ii][0], 1]
                 cobraMatch[ii, 3] = points[potPointMatch[ii][0], 2]
                 cobraMatch[ii, 4] = 0
-                if(assignMethod[ii]==0):
+                if (assignMethod[ii] == 0):
                     cobraMatch[ii, 4] += 1
 
-                
             # cobras assigned to dots - set spot_id to -1 and set flag
-            elif(len(potPointMatch[ii]) == 0):
-                cobraMatch[ii, 0] = i+1
+            elif (len(potPointMatch[ii]) == 0):
+                cobraMatch[ii, 0] = i + 1
                 cobraMatch[ii, 1] = -1
                 cobraMatch[ii, 2] = dotPos[ii, 1]
                 cobraMatch[ii, 3] = dotPos[ii, 2]
                 cobraMatch[ii, 4] = 2
-                if(assignMethod[ii]==0):
+                if (assignMethod[ii] == 0):
                     cobraMatch[ii, 4] += 1
 
             # if there is more than one potential match for a cobra, something has gone badly wrong
             else:
-                flag = flag+1
-                #print(ii,i,potPointMatch[ii])
-            ii = ii+1
-            
+                flag = flag + 1
+                # print(ii,i,potPointMatch[ii])
+            ii = ii + 1
+
     return cobraMatch, unaPoints, flag
+
+
+def fiducialSpots(points, fidPos, matchRadius=1.0):
+    """Find the spots sitting on a fiducial fibre.
+
+    Parameters
+    ----------
+    points : `numpy.ndarray`, (nPoints, 3)
+        Spot id, x, y in mm.
+    fidPos : `numpy.ndarray`, (nFiducials, 3)
+        Fiducial id, x, y in mm.  Every fiducial counts, including the ones excluded from
+        the transform fit: a fiducial flagged bad still produces a spot, and that spot is
+        still not a cobra.
+    matchRadius : `float`
+        Distance in mm within which a spot is taken to be that fiducial.
+
+    Returns
+    -------
+    `numpy.ndarray` of `bool`, (nPoints,)
+        True where the spot is a fiducial.  A fiducial has no patrol region, so it matches
+        at most one spot and an unilluminated one matches none.
+    """
+    isFiducial = np.zeros(len(points), dtype=bool)
+    D = cdist(fidPos[:, 1:3], points[:, 1:3])
+    for i in range(len(fidPos)):
+        ind = np.where(D[i, :] < matchRadius)[0]
+        if len(ind) > 0:
+            isFiducial[ind[0]] = True
+    return isFiducial
+
+
+def assignByCost(points, centres, arms, targets, feasible=None, armFudge=0.08,
+                 armScale=ARM_SCALE, missCost=MISS_COST):
+    """Assign spots to cobras by minimising the total distance to the commanded targets.
+
+    Feasibility is the patrol reach; among the feasible pairings this returns the combination
+    with the lowest total cost, so the order in which cobras are visited cannot change the
+    answer and a cobra is never given a distant spot merely because no other cobra could have
+    produced it.
+
+    The problem separates into independent groups -- a cobra and the spots it can reach, the
+    other cobras that can reach those spots, and so on -- and each group is solved exactly.
+    The groups stay small because patrol circles overlap only a few neighbours.
+
+    Parameters
+    ----------
+    points : `numpy.ndarray`, (nPoints, 3)
+        Spot id, x, y in mm.
+    centres : `numpy.ndarray`, (nCobras, 3)
+        Cobra index, x, y in mm.
+    arms : `numpy.ndarray`, (nCobras,)
+        Patrol reach, L1 + L2.
+    targets : `numpy.ndarray`, (nCobras, 3)
+        Cobra index and the position this iteration commanded.
+    feasible : `numpy.ndarray` of `bool`, (nPoints,), or `None`
+        Spots a cobra may be given, all of them when None.
+    armFudge : `float`
+        Distance in mm added to the reach, absorbing measurement error.
+    armScale : `float`
+        Factor applied to the reach, absorbing error in the arm length itself.
+    missCost : `float`
+        Cost in mm of leaving a cobra with no spot.
+
+    Returns
+    -------
+    `numpy.ndarray` of `int`, (nCobras,)
+        Index into `points` for each cobra, -1 where it was given no spot.
+    `numpy.ndarray` of `float`, (nCobras,)
+        Distance in mm from the assigned spot to that cobra's target, NaN where unassigned.
+    """
+    nCobras = len(centres)
+    assigned = np.full(nCobras, -1, dtype=int)
+    cost = np.full(nCobras, np.nan)
+
+    reach = cdist(points[:, 1:3], centres[:, 1:3]) < (arms * armScale + armFudge)
+    if feasible is not None:
+        reach[~feasible, :] = False
+    toTarget = cdist(points[:, 1:3], targets[:, 1:3])
+
+    # group the cobras and spots that compete with one another, and solve each group on its own
+    graph = csr_matrix(reach.T.astype(np.int8))
+    nGroup, label = connected_components(bmat([[None, graph], [graph.T, None]]),
+                                         directed=False)
+    for g in range(nGroup):
+        members = np.flatnonzero(label == g)
+        cob = members[members < nCobras]
+        pts = members[members >= nCobras] - nCobras
+        if not len(cob) or not len(pts):
+            continue
+        sub = np.where(reach.T[np.ix_(cob, pts)], toTarget.T[np.ix_(cob, pts)], np.inf)
+        # one spare column per cobra, so a cobra may end with no spot at all
+        padded = np.hstack([sub, np.full((len(cob), len(cob)), missCost)])
+        rows, cols = linear_sum_assignment(padded)
+        for r, c in zip(rows, cols):
+            if c < len(pts) and np.isfinite(sub[r, c]):
+                assigned[cob[r]] = pts[c]
+                cost[cob[r]] = sub[r, c]
+    return assigned, cost
+
+
+def fibreIdByCost(points, nPoints, nCobras, centers, arms, goodIdx, isFiducial, targets, dotPos):
+    """Identify spots by minimising the total distance to the commanded targets.
+
+    Arguments and returns are those of `fibreIdLegacy`, without the pass-specific ones.  A
+    cobra cannot end with more than one spot, so the third return value is always zero.
+    """
+    assigned, _ = assignByCost(points, centers, arms, targets, feasible=~isFiducial)
+
+    cobraMatch = np.empty((nCobras, 5), dtype='f4')
+    for i, iPoint in enumerate(assigned):
+        cobraMatch[i, 0] = goodIdx[i] + 1
+        if iPoint >= 0:
+            cobraMatch[i, 1:4] = points[iPoint, 0:3]
+            cobraMatch[i, 4] = 0
+        else:
+            cobraMatch[i, 1] = -1
+            cobraMatch[i, 2:4] = dotPos[i, 1:3]
+            cobraMatch[i, 4] = 2
+
+    taken = {int(iPoint) for iPoint in assigned if iPoint >= 0}
+    unaPoints = [i for i in range(nPoints) if i not in taken and not isFiducial[i]]
+    return cobraMatch, unaPoints, 0
+
+
+def fibreId(points, centers, armLength, targets, isFiducial, dotPos,
+            goodIdx, adjacentCobras, fMethod, targetSize=2.0):
+
+    """ do the fibre identification.
+
+    isFiducial is the nPoint long boolean marking the spots the fiducial matching claimed,
+    which no cobra may be given.
+    """
+    arms = armLength
+
+    # these are the effective number of cobras (ie, goodIdx)
+    nPoints = points.shape[0]
+    nCobras = targets.shape[0]
+
+    if fMethod == 'previous':
+        # candidacy is restricted to the spots near where the cobra was last seen
+        return fibreIdLegacy(points, nPoints, nCobras, centers, arms, goodIdx, isFiducial,
+                             targets, targets, dotPos, adjacentCobras, targetSize=targetSize)
+    elif fMethod == 'jkarr':
+        # the passes, with candidacy on the patrol reach alone
+        return fibreIdLegacy(points, nPoints, nCobras, centers, arms, goodIdx, isFiducial,
+                             targets, None, dotPos, adjacentCobras, targetSize=0.0)
+    else:
+        return fibreIdByCost(points, nPoints, nCobras, centers, arms, goodIdx, isFiducial,
+                             targets, dotPos)
 
 
 def nearestNeighbourMatching(points, targets):
@@ -262,7 +445,7 @@ def nearestNeighbourMatching(points, targets):
 
     return matchPoint
 
-def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos,
+def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, isFiducial,
              armFudge=0.08, targets=None, targetSize=1.0):
     """
     Create initial list of potential cobra/pooint matches
@@ -275,6 +458,7 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos,
     nCobras: number of cobras
     centers: centers of cobras
     arms: list of arm lenghts (l1+l2)
+    isFiducial: nPoint long boolean, True for the spots produced by fiducial fibres
     armFucge: amount in pixels, by which to increae the arm length to take into account measurement uncertainties
 
     note that the cobra values aer assumed to be for good cobras (ie, goodIdx)
@@ -301,19 +485,9 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos,
 
     assignMethod=np.zeros(nCobras, dtype=np.int32)
 
-    bPoints = []  # non real points (fids, stuck fibres)
-
-    #first, quick positional matching to remove fiducial fibres from list of matchable points
-    #note that the matching should return either 0 points (unilluminated fiducials) or
-    #1 points (match) as the fiducial fibres don't have a patrol radius
-
-    D = cdist(fidPos[:,1:3],points[:,1:3])
-    for i in range(len(fidPos)):
-        ind = np.where(D[i, :] < 1) # 1mm seems big...
-        #print("Fid Match", i, ind, len(ind[0]))
-        if len(ind[0]) > 0:
-            unaPoints.remove(ind[0][0])
-            bPoints.append(ind[0][0])
+    # spots produced by fiducial fibres are not offered to any cobra
+    bPoints = list(np.flatnonzero(isFiducial))
+    unaPoints = [i for i in unaPoints if not isFiducial[i]]
 
     #D = cdist(stuckPos[:,1:3], points[:,1:3])
     #for i in range(len(stuckPos)):
@@ -331,20 +505,20 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos,
     
     for i in range(nPoints):
         if targets is not None:
-            ind1 = np.where((D[i, :] < (arms+armFudge)) &
+            ind1 = np.where((D[i, :] < (arms*ARM_SCALE+armFudge)) &
                             (Dtarget[i, :] < targetSize))
         else:
-            ind1 = np.where(D[i, :] < (arms+armFudge))
+            ind1 = np.where(D[i, :] < (arms*ARM_SCALE+armFudge))
 
         potCobraMatch.append(list(ind1[0]))
 
     # now the mirror - find the points which are within arm length of each cobra and add to the list
     for i in range(nCobras):
         if targets is not None:
-            ind1 = np.where((D[:, i] < (arms[i]+armFudge)) &
+            ind1 = np.where((D[:, i] < (arms[i]*ARM_SCALE+armFudge)) &
                             ((Dtarget[:, i] < targetSize)))
         else:
-            ind1 = np.where(D[:, i] < (arms[i]+armFudge))
+            ind1 = np.where(D[:, i] < (arms[i]*ARM_SCALE+armFudge))
 
         potPointMatch.append(list(ind1[0]))
 
@@ -463,9 +637,9 @@ def secondPass(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch,
                 assignMethod[iCobra]=1
                 change = 1
                 anyChange = 1
-                for l in unaCobras:
-                    if(iCobra in potPointMatch[l]):
-                        potPointMatch[l].remove(iCobra)
+                for l in unaPoints:
+                    if(iCobra in potCobraMatch[l]):
+                        potCobraMatch[l].remove(iCobra)
             # if there is one potential match, check the surroudning cobras. If they are all assigned, 
             # there can't be a dot involved, and we can assign the cobra-point pair
 

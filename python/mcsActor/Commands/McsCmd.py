@@ -67,6 +67,7 @@ class McsCmd(object):
         self.fids = None
         self.fidsGood = None
         self.fidsOuterRing = None
+        self.fidSpotIds = np.array([], dtype=int)
         self.prevPos = None
         self.centThresh = None
 
@@ -987,6 +988,9 @@ class McsCmd(object):
         mcsData['pfi_center_x_mm'] = x_mm.astype(np.float32)
         mcsData['pfi_center_y_mm'] = y_mm.astype(np.float32)
 
+        # the spots claimed by the fiducial matching, which no cobra may be given
+        self.fidSpotIds = mcsData['spot_id'].to_numpy()[ffid > 0]
+
         # Preparing fids for writing to DB
         self.fids['match_mask']=fidMask
 
@@ -1059,9 +1063,13 @@ class McsCmd(object):
         # do the identification
         cmd.inform(f'text="Starting Fiber ID"')
         t0 = time.time()
+        # a spot on any fiducial, plus whatever the transform fit claimed, is not a cobra
+        fidPos = np.array([self.fids['fiducialId'], self.fids['x_mm'], self.fids['y_mm']]).T
+        isFiducial = (mcsTools.fiducialSpots(self.mmCentroids, fidPos)
+                      | np.isin(self.mmCentroids[:, 0], self.fidSpotIds))
         cobraMatch, unaPoints, flag = mcsTools.fibreId(self.mmCentroids, self.centrePos,
                                                        self.armLength, tarPos,
-                                                       self.fids, self.dotPos,
+                                                       isFiducial, self.dotPos,
                                                        self.goodIdx, self.adjacentCobras,
                                                        self.fMethod)
 
