@@ -262,6 +262,15 @@ def nearestNeighbourMatching(points, targets):
 
     return matchPoint
 
+ARM_SCALE = 1.05
+"""Multiplies the arm length when deciding which spots a cobra could have produced.
+
+armFudge absorbs measurement error, a fixed distance; this absorbs error in the arm length
+itself, which grows with the arm.  A cobra commanded near full extension otherwise lands
+outside its own candidacy radius, and its spot is claimed by a neighbour instead.
+"""
+
+
 def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos,
              armFudge=0.08, targets=None, targetSize=1.0):
     """
@@ -331,20 +340,20 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos,
     
     for i in range(nPoints):
         if targets is not None:
-            ind1 = np.where((D[i, :] < (arms+armFudge)) &
+            ind1 = np.where((D[i, :] < (arms*ARM_SCALE+armFudge)) &
                             (Dtarget[i, :] < targetSize))
         else:
-            ind1 = np.where(D[i, :] < (arms+armFudge))
+            ind1 = np.where(D[i, :] < (arms*ARM_SCALE+armFudge))
 
         potCobraMatch.append(list(ind1[0]))
 
     # now the mirror - find the points which are within arm length of each cobra and add to the list
     for i in range(nCobras):
         if targets is not None:
-            ind1 = np.where((D[:, i] < (arms[i]+armFudge)) &
+            ind1 = np.where((D[:, i] < (arms[i]*ARM_SCALE+armFudge)) &
                             ((Dtarget[:, i] < targetSize)))
         else:
-            ind1 = np.where(D[:, i] < (arms[i]+armFudge))
+            ind1 = np.where(D[:, i] < (arms[i]*ARM_SCALE+armFudge))
 
         potPointMatch.append(list(ind1[0]))
 
@@ -463,9 +472,9 @@ def secondPass(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch,
                 assignMethod[iCobra]=1
                 change = 1
                 anyChange = 1
-                for l in unaCobras:
-                    if(iCobra in potPointMatch[l]):
-                        potPointMatch[l].remove(iCobra)
+                for l in unaPoints:
+                    if(iCobra in potCobraMatch[l]):
+                        potCobraMatch[l].remove(iCobra)
             # if there is one potential match, check the surroudning cobras. If they are all assigned, 
             # there can't be a dot involved, and we can assign the cobra-point pair
 
