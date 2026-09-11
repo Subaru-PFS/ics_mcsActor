@@ -9,7 +9,6 @@ tables involved
 
 mcs_data (write)
 mcs_exposure (write, read)
-mcs_boresight (read, write in calibration mode)
 mcs_pfi_transformation (write)
 cobra_target (read)
 cobra_match (write)
@@ -81,25 +80,21 @@ def loadTargetsFromDB(db, frameId):
 
 def writeTransformToDB(db, frameId, pfiTransform, cameraName, doCloseTransaction=False):
     """Write [x0,y0,theta,dscale,scale2,alpha_rot,camera_name] for one frame into mcs_pfi_transformation.
+
+    The boresight the transform was applied about goes with them: it is recomputed from
+    the altitude of every frame, so the parameters alone do not describe the transform
+    that ran.
+
     If doCloseTransaction=True and a transaction is already active, commit here; else delegate to db.insert().
     """
-    pfs_visit_id = frameId // 100
-    iteration = frameId % 100
-
-    # just recording mcs_boresight for the first iteration.
-    if iteration == 0:
-        db.insert_kw('mcs_boresight',
-                     pfs_visit_id=pfs_visit_id,
-                     mcs_boresight_x_pix=float(pfiTransform.mcs_boresight_x_pix),
-                     mcs_boresight_y_pix=float(pfiTransform.mcs_boresight_y_pix),
-                     calculated_at='now')
-
     mcsDistortCols = ['x0', 'y0', 'theta', 'dscale', 'scale2']
 
     df = pd.DataFrame(pfiTransform.mcsDistort.getArgs().reshape(1, len(mcsDistortCols)), columns=mcsDistortCols)
     df['mcs_frame_id'] = frameId
     df['alpha_rot'] = float(pfiTransform.alphaRot)
     df['camera_name'] = cameraName
+    df['mcs_boresight_x_pix'] = float(pfiTransform.mcs_boresight_x_pix)
+    df['mcs_boresight_y_pix'] = float(pfiTransform.mcs_boresight_y_pix)
 
     db.insert_dataframe('mcs_pfi_transformation', df)
 
