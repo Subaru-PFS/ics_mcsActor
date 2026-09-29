@@ -167,7 +167,7 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos,
         prepTargets = None
         targetSize = 0.0
     aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, assignMethod = prepWork(
-        points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge=0.1,
+        points, nPoints, nCobras, centers, arms, goodIdx, fidPos, armFudge=0.2,
         targets=prepTargets, targetSize=targetSize)
 
 
@@ -275,7 +275,7 @@ def prepWork(points, nPoints, nCobras, centers, arms, goodIdx, fidPos,
     nCobras: number of cobras
     centers: centers of cobras
     arms: list of arm lenghts (l1+l2)
-    armFucge: amount in pixels, by which to increae the arm length to take into account measurement uncertainties
+    armFudge: amount in mm, by which to increase the arm length to take into account measurement uncertainties
 
     note that the cobra values aer assumed to be for good cobras (ie, goodIdx)
 
@@ -392,7 +392,7 @@ def firstPass(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPointMat
         # only one point the cobra can be matched with
 
         # go through unassigned points
-        for iPoint in unaPoints:
+        for iPoint in list(unaPoints):
             # if there's only one possible cobra match
             if(len(potCobraMatch[iPoint]) == 1):
 
@@ -453,7 +453,7 @@ def secondPass(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch,
         change = 0
 
         # cycle through the unassigned cobras
-        for iCobra in unaCobras:
+        for iCobra in list(unaCobras):
 
             # no potential match for the cobra, point must be hidden by dot
             if(len(potPointMatch[iCobra]) == 0):
@@ -463,9 +463,9 @@ def secondPass(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch,
                 assignMethod[iCobra]=1
                 change = 1
                 anyChange = 1
-                for l in unaCobras:
-                    if(iCobra in potPointMatch[l]):
-                        potPointMatch[l].remove(iCobra)
+                for l in unaPoints:
+                    if(iCobra in potCobraMatch[l]):
+                        potCobraMatch[l].remove(iCobra)
             # if there is one potential match, check the surroudning cobras. If they are all assigned, 
             # there can't be a dot involved, and we can assign the cobra-point pair
 
@@ -477,7 +477,7 @@ def secondPass(aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch,
                     iPoint = potPointMatch[iCobra][0]
 
                     change = 1
-                    anychange = 1
+                    anyChange = 1
                     # update the lists
                     unaCobras.remove(iCobra)
                     aCobras.append(iCobra)
@@ -512,13 +512,9 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     # repeat of first pass to account for newly singled points/cobras
     change = 1
 
-    
-    masterUnaPoints = np.copy(unaPoints)
-    masterUnaCobras = np.copy(unaCobras)
-
     while(change == 1):
         change = 0
-        for iPoint in unaPoints:
+        for iPoint in list(unaPoints):
             elem = potCobraMatch[iPoint]
 
             if(len(elem) == 1):
@@ -551,7 +547,12 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
 
     #get distances between unassigned points and unassigned cobras
     #sort, to find the lowest value
-    D = cdist(points[unaPoints, 1:3], targets[unaCobras, 1:3])
+    # ind1/ind2 index D, so the lists D is built from are the ones they resolve against;
+    # the loop below removes from unaPoints and unaCobras while using them.
+    masterUnaPoints = list(unaPoints)
+    masterUnaCobras = list(unaCobras)
+
+    D = cdist(points[masterUnaPoints, 1:3], targets[masterUnaCobras, 1:3])
     ind = np.unravel_index(np.argsort(D, axis = None), D.shape)
     
 
@@ -561,8 +562,8 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
     # 3* the number of unassigned points, which will give us all the points-cobras
     # distances that are w/i a patrol (one cobra can be in at most 3 patrol regions)
     
-    ind1 = list(ind[0][0:3*len(unaPoints)])
-    ind2 = list(ind[1][0:3*len(unaPoints)])
+    ind1 = list(ind[0][0:3*len(masterUnaPoints)])
+    ind2 = list(ind[1][0:3*len(masterUnaPoints)])
 
     while(change == 1):
 
@@ -608,8 +609,8 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
                 potCobraMatch[iPoint] = [iCob]
                 potPointMatch[iCob] = [iPoint]
 
-                ind1.remove(ind1[i-1])
-                ind2.remove(ind2[i-1])
+                del ind1[i-1]
+                del ind2[i-1]
 
 
                 
@@ -619,7 +620,7 @@ def lastPassDist(aCobras, unaCobras, aPoints, unaPoints, potCobraMatch, potPoint
  
         while(nchange == 1):
             nchange = 0
-            for iPoint in unaPoints:
+            for iPoint in list(unaPoints):
                 elem = potCobraMatch[iPoint]
         
                 if(len(elem) == 1):
