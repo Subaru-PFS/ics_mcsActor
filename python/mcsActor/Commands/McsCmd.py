@@ -689,6 +689,7 @@ class McsCmd(object):
             except Exception as e:
                 cmd.fail(f'text="failed to take exposure: {e}"')
                 return
+            cmd.inform('exposureState=done')
             filename = fileIds['filename']
             
             if frameId is None:
@@ -746,38 +747,38 @@ class McsCmd(object):
         
             cmd.inform('text="Sending centroid data to database" ')
                 
-        # do the fibre identification
-        if doFibreID:
-        
-            cmd.inform('text="zenith angle=%s"'%(zenithAngle))
-            cmd.inform('text="instrument rotation=%s"'%(insRot))
-            
-            enableEasyID=False
+        # the image is saved whether or not fibre identification succeeds; its failure
+        # then fails the command.
+        try:
+            if doFibreID:
+                self.identifyFibres(cmd, frameId, zenithAngle, insRot)
+        finally:
+            cmd.inform(f'frameId={frameId}; filename={filename}')
+            if rerunFrameId is None:
+                self.writeFITS(fileIds, hdr, image, cmd)
 
-            try:
-                if enableEasyID:
-                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
-                    
-                    self.easyFiberID(cmd, frameId)
+        cmd.finish()
 
-                else:
+    def identifyFibres(self, cmd, frameId, zenithAngle, insRot):
+        """Establish the MCS-to-PFI transform and match the frame's spots to cobras.
 
-                    self.establishTransform(cmd, 90-zenithAngle, insRot, frameId)
-                    if(self.adjacentCobras is None):
-                        self.adjacentCobras = mcsTools.makeAdjacentList(self.centrePos, self.armLength)
-                        cmd.inform(f'text="made adjacent lists"')
+        Parameters
+        ----------
+        cmd : `actorcore.Command`
+        frameId : `int`
+        zenithAngle, insRot : `float`
+            Telescope zenith angle and instrument rotation for the frame, degrees.
+        """
+        cmd.inform(f'text="zenith angle={zenithAngle}"')
+        cmd.inform(f'text="instrument rotation={insRot}"')
 
-                    # fibreID
-                    self.fibreID(cmd, frameId, zenithAngle, insRot)
-            except Exception as e:
-                cmd.warn(f'text="Failed to do fibreID: {e}"')
+        self.establishTransform(cmd, 90 - zenithAngle, insRot, frameId)
 
-        cmd.inform(f'frameId={frameId}; filename={filename}')
+        if self.adjacentCobras is None:
+            self.adjacentCobras = mcsTools.makeAdjacentList(self.centrePos, self.armLength)
+            cmd.inform('text="made adjacent lists"')
 
-        if rerunFrameId is None:
-            self.writeFITS(fileIds, hdr, image, cmd)
-
-        cmd.finish('exposureState=done')
+        self.fibreID(cmd, frameId, zenithAngle, insRot)
 
     def dumpCentroidtoDB(self, cmd, frameId):
         """Connect to database and return json string to an attribute."""
@@ -1077,18 +1078,19 @@ class McsCmd(object):
         # do the identification
         cmd.inform(f'text="Starting Fiber ID"')
         t0 = time.time()
-        cobraMatch, unaPoints, flag = mcsTools.fibreId(self.mmCentroids, self.centrePos,
-                                                       self.armLength, tarPos,
-                                                       self.fids, self.dotPos,
-                                                       self.goodIdx, self.adjacentCobras,
-                                                       self.fMethod)
+        cobraMatch, unaPoints, nAmbiguous = mcsTools.fibreId(self.mmCentroids, self.centrePos,
+                                                             self.armLength, tarPos,
+                                                             self.fids, self.dotPos,
+                                                             self.goodIdx, self.adjacentCobras,
+                                                             self.fMethod)
 
-        # this flag will catch a failure in fibre identification due
-        # to very unexpected input (like targets outside the patrol
-        # region)
-        if(flag > 0):
-            cmd.fail(f'text="Failure in cobra matching, {flag} matches unsuccessful.  This probably means the design file is wrong, and/or the target positions in the cobra_target table are wrong. Check the design file before restarting; convergence should not continue."')
-            
+        # cobras left with several candidate spots: the input is very unexpected, such as
+        # targets outside the patrol region.
+        if nAmbiguous > 0:
+            raise RuntimeError(f'cobra matching failed: {nAmbiguous} cobras left with more than one '
+                               'candidate spot. The design file and/or the cobra_target positions are '
+                               'probably wrong; check them before restarting, convergence should not continue.')
+
         t1 = time.time()
         cmd.inform(f'text="Fiber ID finished in {t1-t0:0.2f}s"')
 
