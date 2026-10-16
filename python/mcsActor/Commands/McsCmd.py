@@ -757,7 +757,7 @@ class McsCmd(object):
             if rerunFrameId is None:
                 self.writeFITS(fileIds, hdr, image, cmd)
 
-        cmd.finish()
+        cmd.finish('text="expose command finished"')
 
     def identifyFibres(self, cmd, frameId, zenithAngle, insRot):
         """Establish the MCS-to-PFI transform and match the frame's spots to cobras.
