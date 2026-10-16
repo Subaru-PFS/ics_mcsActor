@@ -1,3 +1,4 @@
+import enum
 import os
 import numpy as np
 from importlib import reload
@@ -140,6 +141,62 @@ def makeAdjacentList(ff, armLength):
     return(adjacent)
 
 
+class MatchFlag(enum.IntFlag):
+    """Bits of the flags column of a cobra match, as written to cobra_match."""
+
+    BY_DISTANCE = 1
+    """Paired with its spot by distance to target, not by elimination."""
+    NO_SPOT = 2
+    """No candidate spot: hidden by its black dot, placed at the dot."""
+    AMBIGUOUS = 4
+    """Several candidate spots left unresolved: placed at its dot, no spot."""
+
+
+def matchTable(goodIdx, potPointMatch, points, dotPos, assignMethod):
+    """One row per cobra describing what fibre identification made of it.
+
+    Parameters
+    ----------
+    goodIdx : `numpy.ndarray` of `int`
+        Cobra indices, ascending; cobra_id is index + 1.
+    potPointMatch : `list` of `list` of `int`
+        Per cobra, in goodIdx order, the rows of `points` it can still be matched to.
+    points : `numpy.ndarray`, shape (nPoints, 3)
+        spot_id, x, y [mm].
+    dotPos : `numpy.ndarray`, shape (nCobra, 4)
+        Per cobra, in goodIdx order: spot_id, x, y [mm], radius of its black dot.
+    assignMethod : `numpy.ndarray` of `int`
+        Per cobra, in goodIdx order: 0 if it was paired by distance to target.
+
+    Returns
+    -------
+    cobraMatch : `numpy.ndarray`, shape (len(goodIdx), 5), float32
+        cobra_id, spot_id (-1 without a spot), x, y [mm], flags (`MatchFlag`).
+    nAmbiguous : `int`
+        Cobras left with several candidate spots.
+    """
+    cobraMatch = np.empty((len(goodIdx), 5), dtype='f4')
+    nAmbiguous = 0
+
+    for row, cobraIdx in enumerate(goodIdx):
+        candidates = potPointMatch[row]
+
+        if len(candidates) == 1:
+            spotId, x, y = points[candidates[0]]
+            flags = MatchFlag(0)
+        else:
+            spotId, x, y = -1, dotPos[row, 1], dotPos[row, 2]
+            flags = MatchFlag.AMBIGUOUS if candidates else MatchFlag.NO_SPOT
+            nAmbiguous += bool(candidates)
+
+        if assignMethod[row] == 0 and not flags & MatchFlag.AMBIGUOUS:
+            flags |= MatchFlag.BY_DISTANCE
+
+        cobraMatch[row] = cobraIdx + 1, spotId, x, y, flags
+
+    return cobraMatch, nAmbiguous
+
+
 def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos,
             goodIdx, adjacentCobras, fMethod, targetSize=2.0):
 
@@ -191,50 +248,8 @@ def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos,
         aCobras, unaCobras, dotCobras, aPoints, unaPoints, potCobraMatch, potPointMatch, adjacentCobras, assignMethod, anyChange)
 
 
-    # turn the results into an array to be written to teh database
-    cobraMatch = np.empty((nCobras, 5), dtype='f4')
-
-    # That is HORRIBLE and DANGEROUS: ids are INTs, and you 
-    # basically never need to use doubles. Want something like the following
-    # but that requires more effort should go i=on this ticket. I merely changed to 
-    # 32-bit reals.
-    #cobraMatch = np.empty((nCobras, 5), 
-    #                      dtype=[('cobra_id', 'int32'), ('spot_id', 'int32'), 
-    #                             ('x_mm', 'float32'), ('y_mm', 'float32'), 
-    #                             ('flags', 'int32')])
-    ii = 0
-    flag = 0
-    for i in range(int(goodIdx[-1]+2)):
-        if(i in goodIdx):
-
-            # cobras assigned to spots
-            if(len(potPointMatch[ii]) == 1):
-                cobraMatch[ii, 0] = i+1
-                cobraMatch[ii, 1] = points[potPointMatch[ii][0],0]
-                cobraMatch[ii, 2] = points[potPointMatch[ii][0], 1]
-                cobraMatch[ii, 3] = points[potPointMatch[ii][0], 2]
-                cobraMatch[ii, 4] = 0
-                if(assignMethod[ii]==0):
-                    cobraMatch[ii, 4] += 1
-
-                
-            # cobras assigned to dots - set spot_id to -1 and set flag
-            elif(len(potPointMatch[ii]) == 0):
-                cobraMatch[ii, 0] = i+1
-                cobraMatch[ii, 1] = -1
-                cobraMatch[ii, 2] = dotPos[ii, 1]
-                cobraMatch[ii, 3] = dotPos[ii, 2]
-                cobraMatch[ii, 4] = 2
-                if(assignMethod[ii]==0):
-                    cobraMatch[ii, 4] += 1
-
-            # if there is more than one potential match for a cobra, something has gone badly wrong
-            else:
-                flag = flag+1
-                #print(ii,i,potPointMatch[ii])
-            ii = ii+1
-            
-    return cobraMatch, unaPoints, flag
+    cobraMatch, nAmbiguous = matchTable(goodIdx, potPointMatch, points, dotPos, assignMethod)
+    return cobraMatch, unaPoints, nAmbiguous
 
 
 def nearestNeighbourMatching(points, targets):

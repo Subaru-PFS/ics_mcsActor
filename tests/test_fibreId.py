@@ -85,6 +85,24 @@ class FibreIdTestCase(unittest.TestCase):
             mcsRoutines.lastPassDist(*lists, points, points, None, None, 't', np.zeros(2, dtype=int), 0,
                                      np.arange(2))
 
+    def testMatchTableWritesEveryRow(self):
+        """Matched, hidden and ambiguous cobras each get a complete row with their flags."""
+        goodIdx = np.array([0, 1, 2, 3])
+        points = np.array([[100, 1., 2.], [101, 3., 4.], [102, 5., 6.]])
+        dotPos = np.column_stack([np.zeros(4), np.arange(4) + 0.5, np.arange(4) + 0.25, np.full(4, 0.75)])
+        potPointMatch = [[0], [], [1, 2], [2]]
+        assignMethod = np.array([1, 1, 0, 0])
+        cobraMatch, nAmbiguous = mcsRoutines.matchTable(goodIdx, potPointMatch, points, dotPos, assignMethod)
+        Flag = mcsRoutines.MatchFlag
+
+        self.assertEqual(nAmbiguous, 1)
+        np.testing.assert_array_equal(cobraMatch, np.array([
+            [1, 100, 1., 2., 0],
+            [2, -1, 1.5, 1.25, Flag.NO_SPOT],
+            [3, -1, 2.5, 2.25, Flag.AMBIGUOUS],
+            [4, 102, 5., 6., Flag.BY_DISTANCE],
+        ], dtype='f4'))
+
 
 if __name__ == '__main__':
     unittest.main()
