@@ -653,6 +653,11 @@ class McsCmd(object):
 
         cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID} doPhot = {self.doPhot}')
 
+        # fibre identification matches the centroids of this frame, which noCentroid skips.
+        if doFibreID and not doCentroid:
+            cmd.fail('text="doFibreID needs this frame\'s centroids: drop noCentroid"')
+            return
+
         if 'rerunFrameId' in cmdKeys:
             if self.dbOverride is None:
                 cmd.fail('text="rerunFrameId requires a custom DB connection -- see setDb command"')
