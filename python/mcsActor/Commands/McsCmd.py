@@ -1048,31 +1048,27 @@ class McsCmd(object):
     def fibreID(self, cmd, frameId, zenithAngle, insRot):
 
         """ do fibre identification """
-        writeFakeCobraMove = False
-
         db = self.connectToDB(cmd)
 
         self.mmCentroids = np.copy(self.centroids)
         #transformthe coordinates to mm in place
         self.mmCentroids[:,1], self.mmCentroids[:,2] = self.pfiTrans.mcsToPfi(self.centroids[:,1],
                                                                               self.centroids[:,2])
-        # load target positions
-        if (self.fMethod == 'previous'):
-            tarPos = self.prevPos
-        else:
-            tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
+        # a frame with targets in cobra_target is matched against them; any other one against
+        # fake targets written here: the previous positions under fMethod=previous, else the centres.
+        isCommanded = len(dbTools.loadTargetsFromDB(db, int(frameId))) > 0
+        fMethod = 'target' if isCommanded else self.fMethod
 
-        if tarPos is None or len(tarPos) == 0 :
-            # When fMethod = 'target' but no targets in DB
-            # OR, fMethod = 'previous' and we have no prevPos:
-            writeFakeCobraMove = True
-            dbTools.writeFakeTargetToDB(db, self.calibModel.centers, int(frameId))
-        elif self.fMethod == 'previous':
-            # use prevPos when we know it.
-            writeFakeCobraMove = True
-            dbTools.writeFakeTargetToDB(db, tarPos[:,1]+tarPos[:,2]*1j, int(frameId))
+        if isCommanded and self.fMethod == 'previous':
+            cmd.warn(f'text="fMethod=previous ignored: frame {frameId} has commanded targets"')
 
-        # Always use whatever we inserted.
+        if not isCommanded:
+            if self.fMethod == 'previous' and self.prevPos is not None:
+                fakeTargets = self.prevPos[:, 1] + self.prevPos[:, 2] * 1j
+            else:
+                fakeTargets = self.calibModel.centers
+            dbTools.writeFakeTargetToDB(db, fakeTargets, int(frameId))
+
         tarPos = dbTools.loadTargetsFromDB(db, int(frameId))
 
         # do the identification
@@ -1082,7 +1078,7 @@ class McsCmd(object):
                                                              self.armLength, tarPos,
                                                              self.fids, self.dotPos,
                                                              self.goodIdx, self.adjacentCobras,
-                                                             self.fMethod)
+                                                             fMethod)
 
         # cobras left with several candidate spots: the input is very unexpected, such as
         # targets outside the patrol region.
@@ -1100,8 +1096,7 @@ class McsCmd(object):
         # save the values to the previous position
         self.prevPos = cobraMatch[:, [0, 2, 3]]
 
-        # Handling the case of 0 target case
-        if (writeFakeCobraMove):
+        if not isCommanded:
             dbTools.writeFakeMoveToDB(db, int(frameId))
             cmd.inform(f'text="wrote fake cobra move to DB"')
 
