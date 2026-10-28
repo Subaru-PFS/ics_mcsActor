@@ -1380,10 +1380,9 @@ class McsCmd(object):
         db = self.connectToDB(cmd)
 
         taken_at = "'"+telescopeInfo['starttime']+"'"
-        if self.actor.cameraName == 'canon_50m':
-            mcs_camera_id = 0
-        if self.actor.cameraName == 'rmod_71m':
-            mcs_camera_id = 1
+        # offline: any camera other than the canon, the fake one included, stands in for the
+        # rmod, whose frames the replay comes from.
+        mcs_camera_id = 0 if self.actor.cameraName == 'canon_50m' else 1
         if self.cMethod == 'win':
             measurement_algorithm = "'windowed'"
         if self.cMethod == 'sep':
