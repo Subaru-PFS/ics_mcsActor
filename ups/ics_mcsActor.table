@@ -6,3 +6,6 @@ setupRequired(pfs_instdata)
 
 pathPrepend(PATH, ${PRODUCT_DIR}/bin)
 pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
+
+# Offline test branch: measure frames from fps' pfiSimServer truth port on this machine.
+envSet(MCS_SIM_TRUTH, localhost:4002)
