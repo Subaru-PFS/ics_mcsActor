@@ -10,6 +10,10 @@ fraction the camera never matches.  Tail and blind membership are drawn per cobr
 stable across the iterations of a visit, so a cobra that misses keeps missing.
 """
 
+import json
+import os
+import socket
+
 import numpy as np
 
 FIRST_SIGMA_MM = 0.100
@@ -36,6 +40,13 @@ DOT_RADIUS_MM = 0.711
 The 50% point of the detection profile measured over 4.44M stacked detections.  The real
 transition has a 54 um width; a threshold keeps a replay reproducible.
 """
+
+SIM_TRUTH = os.environ.get('MCS_SIM_TRUTH')
+"""host:port of a physics simulator's truth server (fps tests/integration/pfiSimServer).
+With it set, every frame measures where the simulated fibres are, see `measureTruth`."""
+
+CENTROID_NOISE_MM = 0.0037
+"""MCS centroid scatter, measured per cobra about its own median."""
 
 _dotCentres = None
 
@@ -135,9 +146,16 @@ def measureAgainstTargets(df, mcsFrameId, cursor):
     x = xy[:, 0] + sigma * rng.standard_normal(len(cobraId))
     y = xy[:, 1] + sigma * rng.standard_normal(len(cobraId))
 
-    # A cobra measured behind its dot is not centroided, whatever its draw: this is the
-    # one kind of blindness that follows from where the cobra is rather than from luck,
-    # and it is the kind a dot sequence depends on.
+    return report(df, cobraId, x, y, isBlind, spotId)
+
+
+def report(df, cobraId, x, y, isBlind, spotId):
+    """Write measured positions into replayed cobra_match rows, as cobra_match reports them.
+
+    A cobra measured behind its dot is not centroided, whatever its draw: this is the one
+    kind of blindness that follows from where the cobra is rather than from luck, and it is
+    the kind a dot sequence depends on.
+    """
     dots = dotCentres()
     inRange = (cobraId >= 1) & (cobraId <= len(dots))
     fallback = np.full(len(cobraId), np.nan + 0j)
@@ -157,3 +175,57 @@ def measureAgainstTargets(df, mcsFrameId, cursor):
     df.loc[:, 'spot_id'] = np.where(isBlind, -1, spotId)
 
     return df
+
+
+def truePositions(address=None):
+    """Where the simulated fibres are, complex PFI mm indexed by cobra_id - 1."""
+    host, port = (address or SIM_TRUTH).rsplit(':', 1)
+    with socket.create_connection((host, int(port)), timeout=10) as sock:
+        reply = json.loads(sock.makefile().readline())
+    return np.asarray(reply['x']) + 1j * np.asarray(reply['y'])
+
+
+def measureTruth(df, mcsFrameId, cursor):
+    """Replace replayed positions with a measurement of the simulated fibres.
+
+    The simulator moves the cobras as the motors would, so the only error added here is
+    the centroid's; the blind fraction, the dot occultation and the spot rule are those of
+    `measureAgainstTargets`.
+
+    Parameters
+    ----------
+    df : `pandas.DataFrame`
+        Replayed cobra_match rows, already carrying this frame's ids.
+    mcsFrameId : `int`
+    cursor : `psycopg2.extensions.cursor`
+
+    Returns
+    -------
+    `pandas.DataFrame`
+    """
+    pfsVisitId = int(mcsFrameId) // 100
+    truth = truePositions()
+    cobraId = df.cobra_id.to_numpy().astype(int)
+    inRange = (cobraId >= 1) & (cobraId <= len(truth))
+    position = np.full(len(cobraId), np.nan + 0j)
+    position[inRange] = truth[cobraId[inRange] - 1]
+
+    cursor.execute('SELECT spot_id FROM mcs_data WHERE mcs_frame_id = %s', (mcsFrameId,))
+    spots = {int(spotId) for (spotId,) in cursor.fetchall()}
+    spotId = df.spot_id.to_numpy().astype(int)
+    hasSpot = np.array([sid in spots for sid in spotId])
+
+    draw = perCobraDraw(pfsVisitId, cobraId)
+    isBlind = (draw < BLIND_FRACTION) | ~np.isfinite(position) | ~hasSpot
+
+    rng = np.random.default_rng(int(mcsFrameId))
+    x = position.real + CENTROID_NOISE_MM * rng.standard_normal(len(cobraId))
+    y = position.imag + CENTROID_NOISE_MM * rng.standard_normal(len(cobraId))
+    return report(df, cobraId, x, y, isBlind, spotId)
+
+
+def measure(df, mcsFrameId, cursor):
+    """`measureTruth` when a simulator is attached, else `measureAgainstTargets`."""
+    if SIM_TRUTH:
+        return measureTruth(df, mcsFrameId, cursor)
+    return measureAgainstTargets(df, mcsFrameId, cursor)

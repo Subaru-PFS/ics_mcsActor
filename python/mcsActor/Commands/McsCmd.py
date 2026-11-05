@@ -802,7 +802,7 @@ class McsCmd(object):
             cur = conn.cursor()
             try:
                 if table == 'cobra_match':
-                    df = offlineMatch.measureAgainstTargets(df, frameId, cur)
+                    df = offlineMatch.measure(df, frameId, cur)
                 # NumPy scalars -> Python, NaN -> None
                 df = df.astype(object).where(pd.notna(df), None)
                 for c in df.columns:
