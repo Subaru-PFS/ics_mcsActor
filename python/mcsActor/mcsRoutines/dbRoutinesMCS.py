@@ -182,10 +182,14 @@ def writeMatchesToDB(db, cobraMatch, mcsFrameId):
     df = pd.DataFrame(data=targetTable)
     db.insert_dataframe("cobra_match", df)
 
-def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
+def writeFidToDB(db, fidSpot, mcsData, mcs_frame_id, fids):
     """
     Write the fiducial table to DB, combining with matched MCS data.
-    Each fiducial will have its matched spot info if available.
+
+    fidSpot gives, per row of fids, the row of mcsData holding its spot, or -1 when no
+    pass matched it or a later pass gave its spot to another fiducial. A fiducial the
+    final pass clipped keeps the spot of the last pass that matched it; match_mask bit 4
+    marks the fiducials the final pass matched.
     """
 
     # Prepare output columns
@@ -198,15 +202,10 @@ def writeFidToDB(db, ffid, mcsData, mcs_frame_id, fids):
     pfi_center_x_mm = np.full(nFids, np.nan)
     pfi_center_y_mm = np.full(nFids, np.nan)
 
-    # For each fiducial, check if it was matched in ffid
-    for i, fid in enumerate(fids['fiducialId']):
-        # Find the index in ffid where this fiducial was matched
-        idx = np.where(ffid == fid)[0]
-        if len(idx) > 0:
-            # Take the first match (or handle multiple matches as needed)
-            spot_id[i] = mcsData['spot_id'].iloc[idx[0]]
-            pfi_center_x_mm[i] = mcsData['pfi_center_x_mm'].iloc[idx[0]]
-            pfi_center_y_mm[i] = mcsData['pfi_center_y_mm'].iloc[idx[0]]
+    matched = fidSpot >= 0
+    spot_id[matched] = mcsData['spot_id'].to_numpy()[fidSpot[matched]]
+    pfi_center_x_mm[matched] = mcsData['pfi_center_x_mm'].to_numpy()[fidSpot[matched]]
+    pfi_center_y_mm[matched] = mcsData['pfi_center_y_mm'].to_numpy()[fidSpot[matched]]
 
     logging.info(f"Writing {len(fids)} fiducials to DB for frame {mcs_frame_id}")
 

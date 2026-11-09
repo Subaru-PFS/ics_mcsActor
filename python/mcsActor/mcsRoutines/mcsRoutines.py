@@ -140,6 +140,29 @@ def makeAdjacentList(ff, armLength):
     return(adjacent)
 
 
+def recordFiducialMatches(ffid, bit, fidMask, fidSpot):
+    """Record, in place, the fiducials one transform pass matched.
+
+    Parameters
+    ----------
+    ffid : `numpy.ndarray` of `int`
+        Per spot, the fiducialId it matched, or -1; as returned by `updateTransform`.
+    bit : `int`
+        Bit set in `fidMask` for every fiducial this pass matched.
+    fidMask : `numpy.ndarray` of `int`
+        Per fiducial, in fiducialId order (row ``fiducialId - 1``), the bits of the passes
+        that matched it.
+    fidSpot : `numpy.ndarray` of `int`
+        Per fiducial, the index into ``ffid`` of its spot, or -1. Set to this pass's spot
+        for every fiducial it matched; a spot this pass gives to another fiducial is
+        taken from the one an earlier pass gave it to.
+    """
+    spots = np.where(ffid > 0)[0]
+    fidSpot[np.isin(fidSpot, spots)] = -1
+    fidMask[ffid[spots] - 1] |= bit
+    fidSpot[ffid[spots] - 1] = spots
+
+
 def fibreId(centroids, centrePos, armLength, tarPos, fids, dotPos,
             goodIdx, adjacentCobras, fMethod, targetSize=2.0):
 

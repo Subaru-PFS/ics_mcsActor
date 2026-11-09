@@ -40,10 +40,10 @@ class Fiducials(pd.DataFrame):
         Returns
         -------
         Fiducials
-            A Fiducials instance containing the fiducials data.
+            A Fiducials instance containing the fiducials data, one row per fiducial in
+            fiducialId order.
         """
-        # Retrieve fiducials data using butler
-        return cls(butler.get('fiducials'))
+        return cls(butler.get('fiducials').sort_values('fiducialId').reset_index(drop=True))
 
     @property
     def goodMask(self):
