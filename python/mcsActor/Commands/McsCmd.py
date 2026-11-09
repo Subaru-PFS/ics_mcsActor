@@ -932,7 +932,9 @@ class McsCmd(object):
         self.logger.info(f'Calcuating transformation using FF at outer region')
         
         fidMask = np.zeros(len(self.fids), dtype=int)
-        
+        # mcsData row of each fiducial's spot, from the last pass that matched it; -1 if none did
+        fidSpot = np.full(len(self.fids), -1, dtype=int)
+
         # 使用 self.fids 而不是 fids
         self.fidsGood = self.fids[self.fids.goodMask]
         self.fidsOuterRing = self.fids[self.fids.goodMask & self.fids.outerRingMask]
@@ -962,7 +964,7 @@ class McsCmd(object):
         q25, q75 = np.nanpercentile(ffdist, [25, 75])
         std = 0.741*(q75 - q25) 
         distThres=np.mean(ffdist)+3*std
-        fidMask[ffid[ffid > 0] - 1] |= 1
+        mcsTools.recordFiducialMatches(ffid, 1, fidMask, fidSpot)
 
         self.logger.info(f'Matched {nMatch} of {nFidsOuterGood} outer ring fiducial fibres')
 
@@ -989,7 +991,7 @@ class McsCmd(object):
             q25, q75 = np.nanpercentile(ffdist, [25, 75])
             std = 0.741*(q75 - q25) 
             distThres=np.mean(ffdist)+3*std
-            fidMask[ffid[ffid > 0] - 1] |= 2*(i + 1)
+            mcsTools.recordFiducialMatches(ffid, 2*(i + 1), fidMask, fidSpot)
 
         nMatch = len(np.where(ffid > 0)[0])
         self.logger.info(f'Matched {nMatch}  of {nFidsGood}  fiducial fibres')
@@ -1015,7 +1017,7 @@ class McsCmd(object):
         self.fids['match_mask']=fidMask
 
         db = self.connectToDB(cmd)
-        dbTools.writeFidToDB(db, ffid, mcsData, frameID, self.fids)
+        dbTools.writeFidToDB(db, fidSpot, mcsData, frameID, self.fids)
         cmd.inform(f'text="wrote matched FF to opdb."')
         
         # save pfiTransform to class attribute
