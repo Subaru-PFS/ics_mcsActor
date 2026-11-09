@@ -22,6 +22,7 @@ import opscore.protocols.types as types
 
 from pfs.utils.database import opdb
 
+from ics.utils import versions
 from ics.utils.fits import mhs as fitsUtils
 from ics.utils.fits import timecards
 
@@ -58,6 +59,16 @@ class McsCmd(object):
         self.centThresh = None
         self.cMethod = 'win'
         self.fMethod = 'target'
+
+        # Written to mcs_exposure as the version_* keywords report them: git describe of a live
+        # checkout, EUPS version otherwise; NULL when they cannot be read.
+        try:
+            self.softwareVersions = dict(version_actor=self.actor.versionString(self.actor.bcast),
+                                         version_instdata=versions.version('pfs_instdata'),
+                                         version_pfs_utils=versions.version('pfs_utils'))
+        except Exception:
+            logging.getLogger('mcscmd').exception('failed to read the software versions')
+            self.softwareVersions = dict(version_actor=None, version_instdata=None, version_pfs_utils=None)
 
         # self.setCentroidParams(None)
         self.adjacentCobras = None
@@ -1333,9 +1344,6 @@ class McsCmd(object):
             measurement_algorithm = "'windowed'"
         if self.cMethod == 'sep':
             measurement_algorithm = "'sep'"
-        version_actor = '0'
-        version_instdata = '0'
-
         db.insert_kw('mcs_exposure',
                      mcs_frame_id=telescopeInfo['frameid'],
                      pfs_visit_id=telescopeInfo['visitid'],
@@ -1356,8 +1364,7 @@ class McsCmd(object):
                      taken_in_hst_at=taken_at,
                      mcs_camera_id=mcs_camera_id,
                      measurement_algorithm=measurement_algorithm,
-                     version_actor=version_actor,
-                     version_instdata=version_instdata,
+                     **self.softwareVersions,
                      )
 
         cmd.inform('text="Telescope information for frame %s populated."' % (telescopeInfo['frameid']))
