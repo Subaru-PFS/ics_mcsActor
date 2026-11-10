@@ -63,6 +63,10 @@
 /* Approximate frame period of the free-running camera, in milliseconds. */
 #define FRAME_PERIOD_MS 800.0
 
+/* Upper limit of exposure time in ms, so that the u_short co-add cannot overflow:
+ * loops = ceil(exptime / FRAME_PERIOD_MS) + 1 <= 16  ->  exptime <= 12000 ms
+ * (assumes 12-bit data, max pixel value 4095; 16 * 4095 = 65520 <= 65535). */
+#define MAX_EXPTIME_MS 12000
 
 /*
  * Population standard deviation of the first n values in d.
@@ -512,6 +516,11 @@ int main(int argc, char *argv[]){
 		file="exposure";
 	}
 
+	if (exptime > MAX_EXPTIME_MS) {
+    fprintf(stderr, "Error: (%s:%s:%d) exposure time %d ms exceeds the limit of %d ms.\n",
+            __FILE__, __func__, __LINE__, exptime, MAX_EXPTIME_MS);
+    return EXIT_FAILURE;
+}
 	/* Determine the total number of frames needed from the exposure time */
 	nloops=ceil(((float)exptime/FRAME_PERIOD_MS))+1;
 	loops = (int)nloops;
