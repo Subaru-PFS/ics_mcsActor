@@ -544,7 +544,8 @@ class McsCmd(object):
             try:
                 ok, details = q.get(timeout=15)
             except queue.Empty:
-                cmd.warn(f'text="probably failed to write {fileIds["filename"]}: {details}"')
+                cmd.warn(f'text="probably failed to write {fileIds["filename"]}: '
+                         f'no answer from the writing process in 15 s"')
                 return
             
             t1 = time.time()
