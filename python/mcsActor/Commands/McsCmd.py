@@ -80,6 +80,7 @@ class McsCmd(object):
         self.fidsGood = None
         self.fidsOuterRing = None
         self.prevPos = None
+        self.spotFlags = None
         self.centThresh = None
 
         
@@ -469,7 +470,7 @@ class McsCmd(object):
         return hdr
 
     def _makeSpotHDU(self, cmd):
-        """ Create a binary table HDU with spot positions. """
+        """ Create a binary table HDU with spot positions and flags. """
 
         try:
             centroids = self.centroids
@@ -477,10 +478,16 @@ class McsCmd(object):
             centroids = np.empty((0,3), dtype='f4')
         nspots = min(4000, len(centroids))
 
+        # centroids whose saturation was not flagged are marked unknown.
+        flags = self.spotFlags
+        if flags is None or len(flags) != len(centroids):
+            flags = saturation.spotFlags(None, centroids[:, 1], centroids[:, 2])
+
         spots = [pyfits.Column(name='x', format='E', unit='mm', 
                                array=centroids[:nspots, 1]),
                  pyfits.Column(name='y', format='E', unit='mm', 
-                               array=centroids[:nspots, 2])]
+                               array=centroids[:nspots, 2]),
+                 pyfits.Column(name='flags', format='J', array=flags[:nspots])]
         return pyfits.BinTableHDU.from_columns(spots, name='SPOTS')
 
     def writeFITS(self, fileIds, hdr, image, cmd, saturated):
