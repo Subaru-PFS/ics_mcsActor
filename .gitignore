@@ -9,6 +9,7 @@ build/
 /.project
 
 python/mcsActor/windowedCentroid/centroid_wrapper.c
+python/mcsActor/spotFinder/spotFinder_wrapper.c
 callgrind.out.*
 *.png
 \#*

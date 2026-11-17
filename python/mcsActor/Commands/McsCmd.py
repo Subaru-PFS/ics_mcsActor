@@ -43,6 +43,25 @@ import multiprocessing
 
 from pfs.utils import butler
 
+C_METHODS = ('win', 'spotFinder')
+"""Methods measuring the spots that switchCMethod and the actor config can name: the windowed centroid, and
+the spotFinder library."""
+
+
+def configuredCMethod(actorConfig):
+    """The method measuring the spots that an actor config names, 'win' when it names none.
+
+    Raises
+    ------
+    ValueError
+        The config names a method not in `C_METHODS`.
+    """
+    cMethod = actorConfig.get('cMethod', 'win')
+    if cMethod not in C_METHODS:
+        raise ValueError(f'cMethod of the actor config is {cMethod!r}: one of {C_METHODS} is needed')
+    return cMethod
+
+
 class McsCmd(object):
 
     def __init__(self, actor):
@@ -57,7 +76,7 @@ class McsCmd(object):
         self.dbOverride = None
         self.findThresh = None
         self.centThresh = None
-        self.cMethod = 'win'
+        self.cMethod = configuredCMethod(self.actor.actorConfig)
         self.fMethod = 'target'
 
         # Written to mcs_exposure as the version_* keywords report them: git describe of a live
@@ -150,7 +169,8 @@ class McsCmd(object):
                                         keys.Key("fieldID", types.String(),
                                                  help="fieldID for getting instrument parameters"),
                                         keys.Key("cMethod", types.String(),
-                                                 help="method for centroiding (of 'win', 'cent', default 'win')"),
+                                                 help="method for centroiding (of 'win', 'spotFinder'; default from "
+                                                      "the cMethod of the actor config, else 'win')"),
                                         keys.Key("fMethod", types.String(),
                                                  help="method for fibreId (of 'target', 'previous', default 'target')"),
                                         keys.Key("aperture", types.Float(), help="Aperture for photometery"),
@@ -733,22 +753,24 @@ class McsCmd(object):
             cmd.inform('text="Setting centroid parameters." ')
             self.setCentroidParams(cmd)
 
-            cmd.inform(f'text="findThresh={self.findThresh} frameId={frameId} prevExpTime = {self.prevExpTime} expTime = {self.expTime}" ')
-            cmd.inform('text="checking if statment {self.findThresh is None or frameId % 100 == 0 or self.prevExpTime != self.expTime}" ')
-            if self.findThresh is None or frameId % 100 == 0 or self.prevExpTime != self.expTime:
-                cmd.inform('text="Calculating threshold." ')
-                self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
+            # spotFinder takes its threshold from each frame.
+            if self.cMethod != 'spotFinder':
+                cmd.inform(f'text="findThresh={self.findThresh} frameId={frameId} prevExpTime = {self.prevExpTime} expTime = {self.expTime}" ')
+                cmd.inform('text="checking if statment {self.findThresh is None or frameId % 100 == 0 or self.prevExpTime != self.expTime}" ')
+                if self.findThresh is None or frameId % 100 == 0 or self.prevExpTime != self.expTime:
+                    cmd.inform('text="Calculating threshold." ')
+                    self.calcThresh(cmd, frameId, zenithAngle, insRot, self.centParms)
             self.prevExpTime = expTime
 
             cmd.inform('text="Running centroid on current image" ')
 
             # switch for different centroid methods. Call with switchCMethod
             t1 = time.time()
-        
-            
-            # Use only one version of Centroid code.
-            #self.runCentroidSEPMP(cmd)
-            self.runCentroid(cmd, self.centParms)
+
+            if self.cMethod == 'spotFinder':
+                self.findSpots(cmd, self.centParms)
+            else:
+                self.runCentroid(cmd, self.centParms)
 
             if not cmd.isAlive(): # command might have failed in runCentroid, so do not proceed further.
                 self.logger.warning('Centroiding failed; writing FITS file for inspection')
@@ -825,7 +847,16 @@ class McsCmd(object):
     def switchCMethod(self, cmd):
         """ switch the method for centroiding """
         cmdKeys = cmd.cmd.keywords
-        self.cMethod = cmdKeys['cMethod'].values[0]
+        cMethod = cmdKeys['cMethod'].values[0]
+        if cMethod not in C_METHODS:
+            cmd.fail(f'text="cMethod {cMethod} is not one of {", ".join(C_METHODS)}"')
+            return
+
+        # the thresholds of 'win' are those of the last frame it measured.
+        if cMethod != self.cMethod:
+            self.findThresh = None
+            self.centThresh = None
+        self.cMethod = cMethod
         cmd.inform(f'text="cMethod = {self.cMethod}"')
         cmd.finish('switchCMethod=done')
 
@@ -1328,6 +1359,49 @@ class McsCmd(object):
         cmd.inform('text="%d centroids"' % (len(centroids)))
         cmd.inform('state="centroids measured"')
 
+    def findSpots(self, cmd, centParms):
+        """ Find and measure the spots of the last acquired image with the spotFinder library. """
+
+        # imported here: the other methods run on a host where spotFinder is not built.
+        import mcsActor.mcsRoutines.spotMeasurement as spotMeasurement
+
+        image = self.actor.image
+
+        cmd.inform(f'state="measuring cached image: {image.shape}"')
+
+        try:
+            points, levels = spotMeasurement.measureSpots(image, centParms)
+        except (TypeError, ValueError, RuntimeError, MemoryError) as e:
+            cmd.fail(f'text={qstr(f"no spots measured: {e}")}')
+            return
+
+        cmd.inform(f'text="spotFinder: background {levels["background"]:0.1f} noise {levels["noise"]:0.2f} '
+                   f'threshold {levels["threshold"]:0.1f}"')
+        cmd.inform(f'text="spotFinder: findSigma {centParms["findSigma"]} nmin {centParms["nmin"]} maxIt {centParms["maxIt"]} '
+                   f'boxFind {centParms["boxFind"]} boxCent {centParms["boxCent"]} fwhmx {centParms["fwhmx"]} '
+                   f'fwhmy {centParms["fwhmy"]} aperture {centParms["aperture"]}"')
+
+        nSpots = len(points)
+
+        # check for no illumination
+        if(nSpots == 0):
+            cmd.fail('text="No spots detected; check the illuminator and light path"')
+            return
+
+        if(nSpots > 4000):
+            cmd.fail('text="More than 4000 spots detected; something is likely wrong"')
+            return
+
+        maxSize = (points[:, 3] * points[:, 4]).max()
+        if(maxSize > 1000):
+            cmd.warn('text="Anomalous spot sizes detected; check for scattered light"')
+
+        self.centroids = points
+
+        self.nCentroid = nSpots
+        cmd.inform('text="%d centroids"' % (nSpots))
+        cmd.inform('state="centroids measured"')
+
     def _writeTelescopeInfo(self, cmd, telescopeInfo, conn=None):
 
         """ write telescope information to database """
@@ -1344,6 +1418,8 @@ class McsCmd(object):
             measurement_algorithm = "'windowed'"
         if self.cMethod == 'sep':
             measurement_algorithm = "'sep'"
+        if self.cMethod == 'spotFinder':
+            measurement_algorithm = "'spotFinder'"
         db.insert_kw('mcs_exposure',
                      mcs_frame_id=telescopeInfo['frameid'],
                      pfs_visit_id=telescopeInfo['visitid'],
