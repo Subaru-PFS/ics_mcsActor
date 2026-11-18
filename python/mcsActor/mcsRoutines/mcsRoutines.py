@@ -13,48 +13,6 @@ import copy
 import yaml
 from scipy import optimize
 
-def getCentroidParams(cmd, configuredCentParms):
-    """Given the default configuration from pfs_instdata, update with any parameters in the command."""
-    try:
-        cmdKeys = cmd.cmd.keywords
-    except:
-        cmdKeys = []
-
-    # returns just the values dictionary
-    centParms = configuredCentParms.copy()
-
-    if('fwhmx' in cmdKeys):
-        centParms['fwhmx'] = cmd.cmd.keywords["fwhmx"].values[0]
-    if('fwhmy' in cmdKeys):
-        centParms['fwhmy'] = cmd.cmd.keywords["fwhmy"].values[0]
-
-    if('boxFind' in cmdKeys):
-        centParms['boxFind'] = cmd.cmd.keywords["boxFind"].values[0]
-    if('boxCent' in cmdKeys):
-        centParms['boxCent'] = cmd.cmd.keywords["boxCent"].values[0]
-
-    if('findSigma' in cmdKeys):
-        centParms['findSigma'] = cmd.cmd.keywords["findSigma"].values[0]
-    if('centSigma' in cmdKeys):
-        centParms['centSigma'] = cmd.cmd.keywords["centSigma"].values[0]
-    if('threshSigma' in cmdKeys):
-        centParms['threshSigma'] = cmd.cmd.keywords["threshSigma"].values[0]
-
-    if('nmin' in cmdKeys):
-        centParms['nmin'] = cmd.cmd.keywords["nmin"].values[0]
-    if('maxIt' in cmdKeys):
-        centParms['maxIt'] = cmd.cmd.keywords["maxIt"].values[0]
-
-    if('aperture' in cmdKeys):
-        centParms['aperture'] = cmd.cmd.keywords["aperture"].values[0]
-    if('innerRad' in cmdKeys):
-        centParms['innerRad'] = cmd.cmd.keywords["innerRad"].values[0]
-    if('outerRad' in cmdKeys):
-        centParms['outerRad'] = cmd.cmd.keywords["outerRad"].values[0]
-
-    return centParms
-
-
 def readCobraGeometry(des,dotData):
     """
     read cobra geometry from configuration file/inst_config

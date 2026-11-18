@@ -7,7 +7,7 @@ import numpy as np
 import mcsActor.Commands.McsCmd as McsCmd
 import mcsActor.mcsRoutines.spotMeasurement as spotMeasurement
 from test_spotFinder import cameraFrame, gridPositions, noisyFrame
-from test_spotMeasurement import CENT_PARMS
+from test_spotMeasurement import CENT_PARMS, GAIN
 
 
 class FakeCmd:
@@ -40,7 +40,8 @@ class FakeCmd:
 def commandSet(image):
     """Stand-in for the command set, with thresholds as the windowed centroid would have left them."""
     return types.SimpleNamespace(actor=types.SimpleNamespace(image=image, cameraName='canon_50m'), findThresh=2010.0,
-                                 centThresh=2010.0, avBack=1795.0, centroids=None, nCentroid=None, cMethod='win')
+                                 centThresh=2010.0, avBack=1795.0, centroids=None, nCentroid=None, cMethod='win',
+                                 detector=dict(name='MCS cam#1', gain=GAIN))
 
 
 class FindSpotsTestCase(unittest.TestCase):
@@ -53,7 +54,7 @@ class FindSpotsTestCase(unittest.TestCase):
         McsCmd.McsCmd.findSpots(owner, cmd, CENT_PARMS)
 
         self.assertEqual(cmd.failed(), [])
-        np.testing.assert_array_equal(owner.centroids, spotMeasurement.measureSpots(image, CENT_PARMS)[0])
+        np.testing.assert_array_equal(owner.centroids, spotMeasurement.measureSpots(image, CENT_PARMS, GAIN)[0])
         self.assertEqual(owner.nCentroid, len(positions))
         self.assertEqual((owner.findThresh, owner.centThresh, owner.avBack), (2010.0, 2010.0, 1795.0))
 

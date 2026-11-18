@@ -9,6 +9,7 @@ import datetime
 import io
 import pathlib
 import queue
+import re
 import threading
 import sep
 
@@ -22,7 +23,6 @@ import opscore.protocols.types as types
 
 from pfs.utils.database import opdb
 
-from ics.utils import versions
 from ics.utils.fits import mhs as fitsUtils
 from ics.utils.fits import timecards
 
@@ -42,6 +42,7 @@ import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
 import multiprocessing
 
 from pfs.utils import butler
+from pfs.utils.versions import getVersion
 
 C_METHODS = ('win', 'spotFinder')
 """Methods measuring the spots that switchCMethod and the actor config can name: the windowed centroid, and
@@ -62,6 +63,51 @@ def configuredCMethod(actorConfig):
     return cMethod
 
 
+CENTROID_KEYS = ('fwhmx', 'fwhmy', 'boxFind', 'boxCent', 'nmin', 'maxIt', 'centSigma', 'findSigma')
+"""Centroid parameters setCentroidParams can override."""
+
+APERTURE_KEYS = {'aperture': 'aperture', 'innerRad': 'innerAnn', 'outerRad': 'outerAnn'}
+"""setApertureParams keywords, and the centroid parameters they override."""
+
+RELEASE = re.compile(r'(w\.)?\d+(\.\d+)+')
+"""A release tag, as git describe prints it on the tagged commit of a clean tree and as EUPS names it."""
+
+
+def configuredDetector(actorConfig):
+    """Name and gain (e-/ADU) of the detector, from the detector section of an actor config.
+
+    Raises
+    ------
+    ValueError
+        The config has no detector section with a name and a numeric gain.
+    """
+    try:
+        detector = actorConfig['detector']
+        return dict(name=str(detector['name']), gain=float(detector['gain']))
+    except (KeyError, TypeError, ValueError) as e:
+        raise ValueError(f'the actor config needs a detector section with a name and a gain: {e!r}') from None
+
+
+def softwareVersion(productName):
+    """Version of an EUPS product, as `pfs.utils.versions.getVersion` gives it; None when it cannot be read."""
+    try:
+        return getVersion(productName)
+    except Exception:
+        logging.getLogger('mcscmd').exception(f'failed to read the version of {productName}')
+        return None
+
+
+def unreleasedVersions(softwareVersions):
+    """The entries of softwareVersions that are not release tags (see `RELEASE`), None included."""
+    return {name: version for name, version in softwareVersions.items()
+            if version is None or not RELEASE.fullmatch(version)}
+
+
+def centroidParameters(configured, overrides):
+    """The configured centroid parameters, with the overrides replacing them."""
+    return {**configured, **overrides}
+
+
 class McsCmd(object):
 
     def __init__(self, actor):
@@ -72,22 +118,20 @@ class McsCmd(object):
         self.newTable = None
         self._db = None
 
-        self.centParms = self.actor.actorConfig['centroidParams']
+        self.centOverrides = dict()
+        self.centParms = centroidParameters(self.actor.actorConfig['centroidParams'], self.centOverrides)
+        self.detector = configuredDetector(self.actor.actorConfig)
         self.dbOverride = None
         self.findThresh = None
         self.centThresh = None
         self.cMethod = configuredCMethod(self.actor.actorConfig)
         self.fMethod = 'target'
 
-        # Written to mcs_exposure as the version_* keywords report them: git describe of a live
-        # checkout, EUPS version otherwise; NULL when they cannot be read.
-        try:
-            self.softwareVersions = dict(version_actor=self.actor.versionString(self.actor.bcast),
-                                         version_instdata=versions.version('pfs_instdata'),
-                                         version_pfs_utils=versions.version('pfs_utils'))
-        except Exception:
-            logging.getLogger('mcscmd').exception('failed to read the software versions')
-            self.softwareVersions = dict(version_actor=None, version_instdata=None, version_pfs_utils=None)
+        # Written to mcs_exposure: git describe of a live checkout, EUPS version otherwise; NULL when they
+        # cannot be read.
+        self.softwareVersions = dict(version_actor=softwareVersion('ics_mcsActor'),
+                                     version_instdata=softwareVersion('pfs_instdata'),
+                                     version_pfs_utils=softwareVersion('pfs_utils'))
 
         # self.setCentroidParams(None)
         self.adjacentCobras = None
@@ -127,6 +171,7 @@ class McsCmd(object):
             ('resetThreshold', '', self.resetThreshold),
             ('setCentroidParams', '[<fwhmx>] [<fwhmy>] [<boxFind>] [<boxCent>] [<nmin>] [<maxIt>] [<centSigma>] [<findSigma>]',
              self.setCentroidParams),
+            ('setCentroidParams', '@reset', self.resetCentroidParams),
             ('setApertureParams', '[<aperture>] [<innerRad>] [<outerRad>]', self.setApertureParams),
             ('calcThresh', '[<threshSigma>] [<threshFact>]', self.calcThresh),
             ('switchCMethod', '<cMethod>', self.switchCMethod),
@@ -393,9 +438,35 @@ class McsCmd(object):
 
         return pycards
 
-    def _constructHeader(self, cmd, filename, expType, expTime, expStart, frameId):
+    def _ledCards(self, cmd):
+        """ FITS cards of the fiducial LEDs: duty cycle and period of their output, as peb last reported them. """
 
-        """ construct the header """
+        cards = []
+        for name, key, unit, comment in (('W_FIDDTY', 'dutycycle', '%', 'fiducial LED duty cycle'),
+                                         ('W_FIDPER', 'ledperiod', 'us', 'fiducial LED period')):
+            try:
+                value = self.actor.models['peb'].keyVarDict[key].valueList[0]
+                value = float(value) if value is not None else None
+            except Exception as e:
+                cmd.warn(f'text="FAILED to read peb {key}: {e}"')
+                value = None
+            if value is None:
+                value = -9999.0
+            cards.append((name, value, f'[{unit}] {comment}'))
+        return cards
+
+    def _exposureCards(self, cmd):
+        """ FITS cards of the other actors and of the fiducial LEDs, None when they cannot be gathered. """
+
+        try:
+            return self._getInstHeader(cmd) + self._ledCards(cmd)
+        except Exception as e:
+            cmd.warn(f'text="FAILED to gather instrument cards: {e}"')
+            return None
+
+    def _constructHeader(self, cmd, filename, expType, expTime, expStart, frameId, exposureCards):
+
+        """ construct the header; exposureCards are gathered while the exposure is lit (see _exposureCards) """
         
         if expType == 'bias':
             expTime = 0.0
@@ -408,23 +479,14 @@ class McsCmd(object):
             cmd.warn('text="FAILED to fetch MEB cards: %s"' % (e))
             detectorTemp = str(np.nan)
 
-        try:
-            config = pfsConfig.getConfigDict('mcs')
-            detectorId = config['serial']
-            gain = config['gain']
-        except Exception as e:
-            cmd.warn('text="FAILED to fetch config cards: %s"' % (e))
-            detectorId = 'MCS cam#1'
-            gain = 2.24
-
         visit = frameId // 100
         hdr.append(('DATA-TYP', expType.upper(), 'Type / Characteristics of this data'))
         hdr.append(('FRAMEID', f'PFSC{frameId:08d}', 'Sequence number in archive'))
         hdr.append(('EXP-ID', f'PFSE{visit:08d}', 'PFS exposure visit number'))
         hdr.append(('FILTER01', 'BP635-58', 'Filter name'))
         
-        hdr.append(('DETECTOR', detectorId, 'Name of the detector/CCD'))
-        hdr.append(('GAIN', gain, '[e-/ADU] AD conversion factor'))
+        hdr.append(('DETECTOR', self.detector['name'], 'Name of the detector/CCD'))
+        hdr.append(('GAIN', self.detector['gain'], '[e-/ADU] AD conversion factor'))
         hdr.append(('DET-TMP', detectorTemp, '[degC] Detector temperature'))
 
         try:
@@ -441,12 +503,9 @@ class McsCmd(object):
         except Exception as e:
             cmd.warn(f'text="FAILED to gather time cards: {e}"')
 
-        try:
-            instCards = self._getInstHeader(cmd)
+        if exposureCards is not None:
             hdr.add_comment('Subaru Device Dependent Header Block for PFS-MCS')
-            hdr.extend(instCards, bottom=True)
-        except Exception as e:
-            cmd.warn(f'text="FAILED to gather instrument cards: {e}"')
+            hdr.extend(exposureCards, bottom=True)
 
         # Stray fixups from the default SPS-oriented headers, per INSTRM-1351
         # Basically, the MCS is an imager at Cass, not a spectrograph at Prime.
@@ -561,7 +620,8 @@ class McsCmd(object):
             try:
                 ok, details = q.get(timeout=15)
             except queue.Empty:
-                cmd.warn(f'text="probably failed to write {fileIds["filename"]}: {details}"')
+                cmd.warn(f'text="probably failed to write {fileIds["filename"]}: '
+                         f'no answer from the writing process in 15 s"')
                 return
             
             t1 = time.time()
@@ -600,6 +660,8 @@ class McsCmd(object):
             # bia on, only returns when the cobras are actually illuminated, raise otherwise.
             biaControl.switchOn(cmd, expType)
             image = self.actor.camera.expose(cmd, expTime, expType, filename, doCopy=False)
+            # while the bia is still on, so that its cards are those of the exposure.
+            exposureCards = self._exposureCards(cmd)
         finally:
             # camera is done integrating, note that the camera shutter is closed way before that.
             biaControl.switchOff(cmd, expType)
@@ -623,11 +685,19 @@ class McsCmd(object):
             os.makedirs(pathdir, 0o755, exist_ok=True)
         cmd.inform(f'text="newpath={filename}"')
 
-        hdr = self._constructHeader(cmd, filename, expType, expTime, expStart, frameId)
+        hdr = self._constructHeader(cmd, filename, expType, expTime, expStart, frameId, exposureCards)
         cmd.diag(f'text="hdr done: {len(hdr)}"')
 
 
         return fileIds, hdr, image
+
+    def warnUnreleased(self, cmd):
+        """ Warn when the actor, pfs_instdata or pfs_utils is not a release (see unreleasedVersions). """
+
+        unreleased = unreleasedVersions(self.softwareVersions)
+        if unreleased:
+            versionList = ', '.join(f'{name}={version}' for name, version in unreleased.items())
+            cmd.warn(f'text={qstr(f"not a released version: {versionList}")}')
 
     def resetThreshold(self, cmd):
         """reset the thresholds"""
@@ -683,6 +753,8 @@ class McsCmd(object):
 
 
         cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID} doPhot = {self.doPhot}')
+
+        self.warnUnreleased(cmd)
 
         # fibre identification matches the centroids of this frame, which noCentroid skips.
         if doFibreID and not doCentroid:
@@ -751,7 +823,7 @@ class McsCmd(object):
         # if the centroid flag is set
         if doCentroid:
             cmd.inform('text="Setting centroid parameters." ')
-            self.setCentroidParams(cmd)
+            self.centParms = centroidParameters(self.actor.actorConfig['centroidParams'], self.centOverrides)
 
             # spotFinder takes its threshold from each frame.
             if self.cMethod != 'spotFinder':
@@ -861,19 +933,13 @@ class McsCmd(object):
         cmd.finish('switchCMethod=done')
 
     def setApertureParams(self, cmd):
-        """ tweak aperture parameters for photometry """
+        """ Override the photometry aperture and annulus radii until the actor restarts or setCentroidParams reset. """
 
         cmdKeys = cmd.cmd.keywords
-
-        if('aperture' in cmdKeys):
-            self.centParms['aperture'] = cmdKeys['aperture'].values[0]
-        if('innerRad' in cmdKeys):
-            self.centParms['innerRad'] = cmdKeys['innerRad'].values[0]
-        if('outerRad' in cmdKeys):
-            self.centParms['outerRad'] = cmdKeys['outerRad'].values[0]
-
-        cmd.inform(f'text="setting aperture parameters to  = {self.centParms["aperture"]},  {self.centParms["innerRad"]},  {self.centParms["outerRad"]}"')
-        cmd.finish('setApertureParams=done')
+        for keyword, name in APERTURE_KEYS.items():
+            if keyword in cmdKeys:
+                self.centOverrides[name] = cmdKeys[keyword].values[0]
+        self._finishCentroidParams(cmd)
 
     def resetGeometry(self):
         """
@@ -1218,14 +1284,27 @@ class McsCmd(object):
         cmd.inform(f'text="threshSigma={a1} findSigma={a2} centSigma={a3}"')
 
     def setCentroidParams(self, cmd):
-        """
-        top level routine for setting centroid parameters. Reads the defaults from the config fi,e
-        then changes any specified in the keywords argument. 
+        """ Override the centroid parameters given until the actor restarts or setCentroidParams reset. """
 
-        """
+        cmdKeys = cmd.cmd.keywords
+        for name in CENTROID_KEYS:
+            if name in cmdKeys:
+                self.centOverrides[name] = cmdKeys[name].values[0]
+        self._finishCentroidParams(cmd)
 
-        self.centParms = mcsTools.getCentroidParams(cmd, self.actor.actorConfig['centroidParams'])
+    def resetCentroidParams(self, cmd):
+        """ Drop the overrides of setCentroidParams and setApertureParams: the configured parameters apply. """
+
+        self.centOverrides.clear()
+        self._finishCentroidParams(cmd)
+
+    def _finishCentroidParams(self, cmd):
+        """ Apply the overrides to the configured parameters, and finish cmd with the overrides in force. """
+
+        self.centParms = centroidParameters(self.actor.actorConfig['centroidParams'], self.centOverrides)
         self.logger.info(f'centParms: {self.centParms}')
+        overrides = ', '.join(f'{name}={value}' for name, value in self.centOverrides.items()) or 'none'
+        cmd.finish(f'text={qstr(f"centroid parameters overridden: {overrides}")}')
     
 
     def runCentroidSEP(self, cmd):
@@ -1370,7 +1449,7 @@ class McsCmd(object):
         cmd.inform(f'state="measuring cached image: {image.shape}"')
 
         try:
-            points, levels = spotMeasurement.measureSpots(image, centParms)
+            points, levels = spotMeasurement.measureSpots(image, centParms, self.detector['gain'])
         except (TypeError, ValueError, RuntimeError, MemoryError) as e:
             cmd.fail(f'text={qstr(f"no spots measured: {e}")}')
             return

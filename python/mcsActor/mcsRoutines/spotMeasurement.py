@@ -3,14 +3,11 @@ import numpy as np
 
 import mcsActor.spotFinder.spotFinder as spotFinder
 
-GAIN = 2.24
-"""e-/ADU of the Canon camera."""
-
 SPOT_COLUMNS = ('spotId', 'x', 'y', 'x2', 'y2', 'xy', 'background', 'peak', 'flux', 'fluxerr')
 """Columns of the array of spots, in order."""
 
 
-def measureSpots(image, centParms):
+def measureSpots(image, centParms, gain):
     """Spots of a frame, one row each, with the columns `SPOT_COLUMNS`.
 
     Parameters
@@ -19,6 +16,8 @@ def measureSpots(image, centParms):
         Frame as read from the camera; left untouched.
     centParms : `dict`
         findSigma, nmin, boxFind, boxCent, fwhmx, fwhmy, maxIt, aperture: see `spotFinder.findSpots`.
+    gain : `float`
+        e-/ADU of the detector, for the photon noise of the flux errors.
 
     Returns
     -------
@@ -36,7 +35,7 @@ def measureSpots(image, centParms):
     spots, levels = spotFinder.findSpots(image, findSigma=centParms['findSigma'], nmin=centParms['nmin'],
                                          boxFind=centParms['boxFind'], boxCent=centParms['boxCent'],
                                          fwhmx=centParms['fwhmx'], fwhmy=centParms['fwhmy'], maxIt=centParms['maxIt'],
-                                         aperture=centParms['aperture'], gain=GAIN)
+                                         aperture=centParms['aperture'], gain=gain)
 
     points = np.column_stack([np.arange(len(spots)) + 1, spots['x'], spots['y'], spots['x2'], spots['y2'], spots['xy'],
                               spots['background'], spots['peak'], spots['flux'], spots['fluxerr']])
