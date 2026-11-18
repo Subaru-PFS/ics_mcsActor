@@ -9,6 +9,12 @@
 
 /* Fraction of a Gaussian below one standard deviation under its mean. */
 #define LOWER_FRACTION 0.15865525393145707
+/* Side, in pixels, of the blocks whose medians make the smooth background of a frame. */
+#define MESH_SIZE 256
+/* Step, in rows, of the pixels of a block whose median is taken: every column, every 4th row, about 16000
+   pixels, the median good to 0.1 ADU at the noise of a frame. Every column is kept, so that each block
+   holds the same mixture of column levels. */
+#define MESH_STEP 4
 
 /* Lowest detection threshold, ADU: a frame without noise is not searched at zero. */
 #define MIN_THRESHOLD 1.0
@@ -337,6 +343,201 @@ int columnLevels(const int *image, int n_x, int n_y, int nThreads, double *level
 
 /*------------------------------------------------------------------------------------------*/
 
+static int selectKth(int *values, long n, long k)
+{
+  /* the k-th smallest of values (0 based), which are reordered */
+  long low = 0, high = n - 1;
+
+  while(high > low)
+    {
+      const int pivot = values[low + (high - low) / 2];
+      long i = low, j = high;
+      while(i <= j)
+	{
+	  while(values[i] < pivot)
+	    {
+	      i++;
+	    }
+	  while(values[j] > pivot)
+	    {
+	      j--;
+	    }
+	  if(i <= j)
+	    {
+	      const int t = values[i];
+	      values[i++] = values[j];
+	      values[j--] = t;
+	    }
+	}
+      if(k <= j)
+	{
+	  high = j;
+	}
+      else if(k >= i)
+	{
+	  low = i;
+	}
+      else
+	{
+	  break;
+	}
+    }
+  return values[k];
+}
+
+typedef struct meshContext
+{
+  int *image;
+  int n_x;
+  int n_y;
+  int nBlocksX;
+  int nBlocksY;
+  double *mesh;           /* nBlocksY rows of nBlocksX block medians */
+  double level;           /* median of the block medians */
+  const int *columnBlock; /* per column: the block on the left of the column, for the interpolation */
+  const double *columnWeight;  /* per column: weight of the block on its right */
+  const int *rowBlock;
+  const double *rowWeight;
+} meshContext;
+
+static int blockStart(int block, int nBlocks, int n)
+{
+  return (int)((long)block * n / nBlocks);
+}
+
+static void meshMedians(void *context, int first, int last)
+{
+  /* the medians of the blocks of block rows first..last-1, of every MESH_STEP-th row; NAN when memory is
+     short */
+  const meshContext *c = (const meshContext *)context;
+  const int width = c->n_x / c->nBlocksX + 1, height = c->n_y / c->nBlocksY / MESH_STEP + 2;
+  int *values = malloc(sizeof(int) * (size_t)width * height);
+  int i, j, x, y;
+
+  for(j = first; j < last; j++)
+    {
+      const int y0 = blockStart(j, c->nBlocksY, c->n_y), y1 = blockStart(j + 1, c->nBlocksY, c->n_y);
+      for(i = 0; i < c->nBlocksX; i++)
+	{
+	  const int x0 = blockStart(i, c->nBlocksX, c->n_x), x1 = blockStart(i + 1, c->nBlocksX, c->n_x);
+	  long n = 0;
+	  int lowerMiddle, upperMiddle;
+	  if(values == NULL)
+	    {
+	      c->mesh[j * c->nBlocksX + i] = NAN;
+	      continue;
+	    }
+	  for(y = y0; y < y1; y += MESH_STEP)
+	    {
+	      const int *row = c->image + (long)y * c->n_x;
+	      for(x = x0; x < x1; x++)
+		{
+		  values[n++] = row[x];
+		}
+	    }
+	  /* as numpy.median: the mean of the two middle values of an even number */
+	  upperMiddle = selectKth(values, n, n / 2);
+	  lowerMiddle = upperMiddle;
+	  if(n % 2 == 0)
+	    {
+	      long k;
+	      lowerMiddle = values[0];
+	      for(k = 1; k < n / 2; k++)
+		{
+		  if(values[k] > lowerMiddle)
+		    {
+		      lowerMiddle = values[k];
+		    }
+		}
+	    }
+	  c->mesh[j * c->nBlocksX + i] = 0.5 * ((double)lowerMiddle + upperMiddle);
+	}
+    }
+  free(values);
+}
+
+static void interpolationAxis(int n, int nBlocks, int *block, double *weight)
+{
+  /* for each pixel of an axis of n pixels in nBlocks blocks: the block whose centre is at or before it
+     (the first one before the first centre, the one before last after the last), and the weight of the next
+     block, extrapolated linearly beyond the first and last centres */
+  int pixel, b = 0;
+
+  for(pixel = 0; pixel < n; pixel++)
+    {
+      double centre, next;
+      while(b < nBlocks - 2 && 0.5 * (blockStart(b + 1, nBlocks, n) + blockStart(b + 2, nBlocks, n) - 1) <= pixel)
+	{
+	  b++;
+	}
+      if(nBlocks == 1)
+	{
+	  block[pixel] = 0;
+	  weight[pixel] = 0.;
+	  continue;
+	}
+      centre = 0.5 * (blockStart(b, nBlocks, n) + blockStart(b + 1, nBlocks, n) - 1);
+      next = 0.5 * (blockStart(b + 1, nBlocks, n) + blockStart(b + 2, nBlocks, n) - 1);
+      block[pixel] = b;
+      weight[pixel] = (pixel - centre) / (next - centre);
+    }
+}
+
+static double meshValue(const meshContext *c, int x, int y)
+{
+  /* the smooth background at a pixel, interpolated bilinearly between block centres */
+  const int i = c->columnBlock[x], j = c->rowBlock[y];
+  const int i1 = c->nBlocksX > 1 ? i + 1 : i, j1 = c->nBlocksY > 1 ? j + 1 : j;
+  const double wx = c->columnWeight[x], wy = c->rowWeight[y];
+  const double *m = c->mesh;
+  return (1. - wy) * ((1. - wx) * m[j * c->nBlocksX + i] + wx * m[j * c->nBlocksX + i1])
+    + wy * ((1. - wx) * m[j1 * c->nBlocksX + i] + wx * m[j1 * c->nBlocksX + i1]);
+}
+
+static int meshDeviation(const meshContext *c, int x, int y)
+{
+  /* the smooth background at a pixel less the median of the blocks, rounded: 0 wherever the background is
+     flat to half an ADU, so that a flat frame is left as it is */
+  return (int)floor(meshValue(c, x, y) - c->level + 0.5);
+}
+
+static void subtractMesh(void *context, int first, int last)
+{
+  /* subtract the deviation of the smooth background from rows first..last-1, as meshDeviation gives it,
+     interpolating each row between the block rows once */
+  const meshContext *c = (const meshContext *)context;
+  double *along = malloc(sizeof(double) * c->nBlocksX);
+  int i, x, y;
+
+  for(y = first; y < last; y++)
+    {
+      int *row = c->image + (long)y * c->n_x;
+      const int j = c->rowBlock[y], j1 = c->nBlocksY > 1 ? j + 1 : j;
+      const double wy = c->rowWeight[y];
+      if(along == NULL)
+	{
+	  for(x = 0; x < c->n_x; x++)
+	    {
+	      row[x] -= meshDeviation(c, x, y);
+	    }
+	  continue;
+	}
+      for(i = 0; i < c->nBlocksX; i++)
+	{
+	  along[i] = (1. - wy) * c->mesh[j * c->nBlocksX + i] + wy * c->mesh[j1 * c->nBlocksX + i];
+	}
+      for(x = 0; x < c->n_x; x++)
+	{
+	  const int b = c->columnBlock[x], b1 = c->nBlocksX > 1 ? b + 1 : b;
+	  const double wx = c->columnWeight[x];
+	  row[x] -= (int)floor((1. - wx) * along[b] + wx * along[b1] - c->level + 0.5);
+	}
+    }
+  free(along);
+}
+
+/*------------------------------------------------------------------------------------------*/
+
 double apertureSum(const int *image, int n_x, int n_y, double x, double y, double radius, int *nPixels)
 {
   /*
@@ -658,7 +859,14 @@ spot *findSpots(int *image, int n_x, int n_y, const spotParams *params, frameLev
   /*
     The spots of a frame.
 
-    The level of each column, its median, is subtracted from the image, in place. A spot is a set of
+    The background of the frame is subtracted from the image, in place, in two steps: a smooth background,
+    interpolated bilinearly between the medians of blocks of about MESH_SIZE pixels a side (of every
+    MESH_STEP-th row), by its deviation
+    from the median of the blocks rounded to an integer (see meshDeviation), then the level of each column,
+    the median of what is left. The noise is that of what is left after the smooth background (see
+    columnLevels): structure the background cannot follow, such as front-lit hardware, raises it, and the
+    threshold with it.
+    A spot is a set of
     pixels connected side to side, at or above the threshold and one of them above it, nmin pixels at
     least, whose centroid lies further than three times the larger of boxFind and boxCent from the edges
     of the image. The threshold is findSigma times the noise (see columnLevels), MIN_THRESHOLD at least,
@@ -666,7 +874,7 @@ spot *findSpots(int *image, int n_x, int n_y, const spotParams *params, frameLev
     with the highest peak is kept.
 
     input
-      image: frame, n_y rows of n_x pixels, of values within +-2^30; left with the column levels subtracted
+      image: frame, n_y rows of n_x pixels, of values within +-2^30; left with the background subtracted
       params: see spotParams
     output
       levels: background, noise and threshold of the frame
@@ -688,6 +896,7 @@ spot *findSpots(int *image, int n_x, int n_y, const spotParams *params, frameLev
   region *regions = NULL;
   spot *spots = NULL;
   centroidContext context;
+  meshContext mesh;
   long nBright = 0, capacity = 4096, k;
   int nRegions = 0, nKept = 0;
   int status, threshold, x, y, a, b;
@@ -698,6 +907,16 @@ spot *findSpots(int *image, int n_x, int n_y, const spotParams *params, frameLev
       *nSpots = SPOTS_BAD_IMAGE;
       return NULL;
     }
+  mesh.image = image;
+  mesh.n_x = n_x;
+  mesh.n_y = n_y;
+  mesh.nBlocksX = (n_x + MESH_SIZE / 2) / MESH_SIZE > 0 ? (n_x + MESH_SIZE / 2) / MESH_SIZE : 1;
+  mesh.nBlocksY = (n_y + MESH_SIZE / 2) / MESH_SIZE > 0 ? (n_y + MESH_SIZE / 2) / MESH_SIZE : 1;
+  mesh.mesh = malloc(sizeof(double) * mesh.nBlocksX * mesh.nBlocksY);
+  mesh.columnBlock = malloc(sizeof(int) * n_x);
+  mesh.columnWeight = malloc(sizeof(double) * n_x);
+  mesh.rowBlock = malloc(sizeof(int) * n_y);
+  mesh.rowWeight = malloc(sizeof(double) * n_y);
 
   columns = malloc(sizeof(double) * n_x);
   rounded = malloc(sizeof(int) * n_x);
@@ -705,11 +924,38 @@ spot *findSpots(int *image, int n_x, int n_y, const spotParams *params, frameLev
   mask = calloc(nPixels, sizeof(unsigned char));
   stack = malloc(sizeof(long) * capacity);
   regions = malloc(sizeof(region) * (MAX_SPOTS + 1));
-  if(columns == NULL || rounded == NULL || bright == NULL || mask == NULL || stack == NULL || regions == NULL)
+  if(columns == NULL || rounded == NULL || bright == NULL || mask == NULL || stack == NULL || regions == NULL
+     || mesh.mesh == NULL || mesh.columnBlock == NULL || mesh.columnWeight == NULL || mesh.rowBlock == NULL
+     || mesh.rowWeight == NULL)
     {
       goto done;
     }
 
+  /* the smooth background, then the level of each column and the noise in what is left */
+  overRanges(meshMedians, &mesh, mesh.nBlocksY, params->nThreads);
+  for(k = 0; k < (long)mesh.nBlocksX * mesh.nBlocksY; k++)
+    {
+      if(isnan(mesh.mesh[k]))
+	{
+	  goto done;
+	}
+    }
+  mesh.level = median(mesh.mesh, mesh.nBlocksX * mesh.nBlocksY);
+  if(isnan(mesh.level))
+    {
+      goto done;
+    }
+  interpolationAxis(n_x, mesh.nBlocksX, (int *)mesh.columnBlock, (double *)mesh.columnWeight);
+  interpolationAxis(n_y, mesh.nBlocksY, (int *)mesh.rowBlock, (double *)mesh.rowWeight);
+  /* an interpolation between blocks within half an ADU of their median rounds to 0 everywhere */
+  for(k = 0; k < (long)mesh.nBlocksX * mesh.nBlocksY; k++)
+    {
+      if(fabs(mesh.mesh[k] - mesh.level) >= 0.5)
+	{
+	  overRanges(subtractMesh, &mesh, n_y, params->nThreads);
+	  break;
+	}
+    }
   status = columnLevels(image, n_x, n_y, params->nThreads, columns, &levels->noise);
   if(status < 0)
     {
@@ -859,7 +1105,8 @@ spot *findSpots(int *image, int n_x, int n_y, const spotParams *params, frameLev
 	  out->y2 = regions[a].y2;
 	  out->xy = regions[a].xy;
 	  out->peak = regions[a].peak;
-	  out->background = rounded[columnOf(out->x, n_x)];
+	  out->background = rounded[columnOf(out->x, n_x)]
+	    + meshDeviation(&mesh, columnOf(out->x, n_x), columnOf(out->y, n_y));
 	  out->flux = NAN;
 	  out->fluxerr = NAN;
 	  if(params->aperture > 0)
@@ -877,6 +1124,11 @@ spot *findSpots(int *image, int n_x, int n_y, const spotParams *params, frameLev
   *nSpots = nKept;
 
  done:
+  free(mesh.mesh);
+  free((int *)mesh.columnBlock);
+  free((double *)mesh.columnWeight);
+  free((int *)mesh.rowBlock);
+  free((double *)mesh.rowWeight);
   free(columns);
   free(rounded);
   free(bright);

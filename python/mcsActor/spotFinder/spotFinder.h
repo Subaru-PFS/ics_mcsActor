@@ -31,12 +31,12 @@ typedef struct spot
   double peak;     /* highest pixel, ADU above the level of its column */
   double flux;     /* sum within the aperture, ADU above the column levels */
   double fluxerr;  /* statistical error of the flux, ADU */
-  double background;  /* level subtracted from the column of the centroid, ADU */
+  double background;  /* background subtracted at the centroid: column level and deviation of the smooth background, ADU */
 } spot;
 
 typedef struct frameLevels
 {
-  double background;  /* median of the column levels, ADU */
+  double background;  /* median of the column levels, the smooth background's median included, ADU */
   double noise;       /* standard deviation of a pixel, ADU */
   double threshold;   /* detection threshold applied, ADU above the column levels */
 } frameLevels;

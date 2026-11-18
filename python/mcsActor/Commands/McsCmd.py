@@ -74,19 +74,37 @@ RELEASE = re.compile(r'(w\.)?\d+(\.\d+)+')
 """A release tag, as git describe prints it on the tagged commit of a clean tree and as EUPS names it."""
 
 
+DEFAULT_DETECTOR = dict(name='MCS cam#1', gain=2.24)
+"""Detector of the Canon camera, used when the actor config has no usable detector section."""
+
+
 def configuredDetector(actorConfig):
     """Name and gain (e-/ADU) of the detector, from the detector section of an actor config.
 
-    Raises
-    ------
-    ValueError
-        The config has no detector section with a name and a numeric gain.
+    Returns
+    -------
+    detector : `dict`
+        name, gain; `DEFAULT_DETECTOR` when the section is missing or has no name and numeric gain.
+    problem : `str`
+        Why the default is used, else empty.
     """
     try:
         detector = actorConfig['detector']
-        return dict(name=str(detector['name']), gain=float(detector['gain']))
+        return dict(name=str(detector['name']), gain=float(detector['gain'])), ''
     except (KeyError, TypeError, ValueError) as e:
-        raise ValueError(f'the actor config needs a detector section with a name and a gain: {e!r}') from None
+        return dict(DEFAULT_DETECTOR), f'no usable detector section in the actor config ({e!r}): using {DEFAULT_DETECTOR}'
+
+
+def spotMeasurementModule():
+    """The spotMeasurement module, which needs the compiled spotFinder extension.
+
+    Raises
+    ------
+    ImportError
+        The extension is not built.
+    """
+    import mcsActor.mcsRoutines.spotMeasurement as spotMeasurement
+    return spotMeasurement
 
 
 def softwareVersion(productName):
@@ -121,11 +139,16 @@ class McsCmd(object):
 
         self.centOverrides = dict()
         self.centParms = centroidParameters(self.actor.actorConfig['centroidParams'], self.centOverrides)
-        self.detector = configuredDetector(self.actor.actorConfig)
+        self.detector, self.detectorProblem = configuredDetector(self.actor.actorConfig)
+        if self.detectorProblem:
+            logging.getLogger('mcscmd').warning(self.detectorProblem)
         self.dbOverride = None
         self.findThresh = None
         self.centThresh = None
         self.cMethod = configuredCMethod(self.actor.actorConfig)
+        if self.cMethod == 'spotFinder':
+            # a missing extension stops the actor here rather than failing every exposure.
+            spotMeasurementModule()
         self.fMethod = 'target'
 
         # Written to mcs_exposure: git describe of a live checkout, EUPS version otherwise; NULL when they
@@ -492,6 +515,7 @@ class McsCmd(object):
         hdr.append(('DETECTOR', self.detector['name'], 'Name of the detector/CCD'))
         hdr.append(('GAIN', self.detector['gain'], '[e-/ADU] AD conversion factor'))
         hdr.append(('DET-TMP', detectorTemp, '[degC] Detector temperature'))
+        hdr.append(('CENTOVR', self.overrideText(), 'centroid parameters overridden by command'))
 
         try:
             expTimeSeconds = expTime / 1000.0
@@ -513,8 +537,8 @@ class McsCmd(object):
 
         # Stray fixups from the default SPS-oriented headers, per INSTRM-1351
         # Basically, the MCS is an imager at Cass, not a spectrograph at Prime.
-        obsmode = hdr['OBS-MOD']
-        hdr['OBS-MOD'] =  obsmode.replace('SPEC', 'IMAG')
+        if 'OBS-MOD' in hdr:
+            hdr['OBS-MOD'] = hdr['OBS-MOD'].replace('SPEC', 'IMAG')
         hdr['TELFOCUS'] = 'CS_OPT'
         hdr['FOC-POS'] = 'Cassegrain'
         hdr['FOC-VAL'] = 0.0
@@ -568,9 +592,9 @@ class McsCmd(object):
             counts = np.full(len(centroids), -1, dtype=np.int32)
             flags = saturation.spotFlags(counts, None)
 
-        spots = [pyfits.Column(name='x', format='E', unit='mm', 
+        spots = [pyfits.Column(name='x', format='E', unit='pix',
                                array=centroids[:nspots, 1]),
-                 pyfits.Column(name='y', format='E', unit='mm', 
+                 pyfits.Column(name='y', format='E', unit='pix',
                                array=centroids[:nspots, 2]),
                  pyfits.Column(name='flags', format='J', array=flags[:nspots]),
                  pyfits.Column(name='nSatPix', format='J', array=counts[:nspots])]
@@ -652,7 +676,7 @@ class McsCmd(object):
             
         def write_to_disk(filename, hduList, writerQueue=writerQueue):
             details = 'ok'
-            # the mask is built in the writing process, where its compression does not delay the
+            # the mask is built and compressed in the writing process, where it does not delay the
             # command; the image is written even when the mask cannot be.
             try:
                 hduList.append(saturation.maskHdu(image.shape, saturated))
@@ -662,8 +686,16 @@ class McsCmd(object):
             try:
                 hduList.writeto(filename, checksum=True, overwrite=True)
             except Exception as e:
-                writerQueue.put((False, f'failed to write {filename}: {e}'))
-                return
+                if 'MASK' not in hduList:
+                    writerQueue.put((False, f'failed to write {filename}: {e}'))
+                    return
+                del hduList['MASK']
+                details = f'no MASK HDU in {filename}: {e}'
+                try:
+                    hduList.writeto(filename, checksum=True, overwrite=True)
+                except Exception as e:
+                    writerQueue.put((False, f'failed to write {filename}: {e}'))
+                    return
             writerQueue.put((True, details))
             
         reportThread = threading.Thread(target=reportFinishedFile, daemon=True)
@@ -784,6 +816,7 @@ class McsCmd(object):
         cmd.inform(f'text="doCentroid= {doCentroid} doFibreID = {doFibreID} doPhot = {self.doPhot}')
 
         self.warnUnreleased(cmd)
+        self.warnOverrides(cmd)
 
         # fibre identification matches the centroids of this frame, which noCentroid skips.
         if doFibreID and not doCentroid:
@@ -843,8 +876,27 @@ class McsCmd(object):
 
         saturated = self.measureSaturation(cmd, frameId, image, exposureSeconds)
         self.saturated = saturated
+        # nothing of an earlier frame is written with this one.
+        self.centroids = np.empty((0, 10))
         self.spotFlags = self.spotSaturated = None
 
+        # the image is saved whatever happens to its analysis; a failure then fails the command.
+        try:
+            self._analyseFrame(cmd, frameId, doCentroid, doFibreID, expTime, saturated)
+        finally:
+            cmd.inform(f'frameId={frameId}; filename={filename}')
+            if rerunFrameId is None:
+                self.writeFITS(fileIds, hdr, image, cmd, saturated)
+
+        if not cmd.isAlive():
+            return
+        cmd.finish('text="expose command finished"')
+
+    def _analyseFrame(self, cmd, frameId, doCentroid, doFibreID, expTime, saturated):
+        """Centroid the frame in actor.image, write its spots to the database and identify its fibres.
+
+        Returns early, the command failed, when the centroids cannot be measured.
+        """
         # load telescope values from the DB
         cmd.inform(f'text="loading telescope parameters for frame={frameId}"')
         db = self.connectToDB(cmd)
@@ -854,7 +906,7 @@ class McsCmd(object):
         # get the geometry if it hasn't been loaded yet
         cmd.inform('text="loading geometry"')
         self.getGeometry(cmd)
-       
+
         # if the centroid flag is set
         if doCentroid:
             cmd.inform('text="Setting centroid parameters." ')
@@ -881,7 +933,6 @@ class McsCmd(object):
 
             if not cmd.isAlive(): # command might have failed in runCentroid, so do not proceed further.
                 self.logger.warning('Centroiding failed; writing FITS file for inspection')
-                self.writeFITS(fileIds, hdr, image, cmd, saturated)
                 return
 
             t2 = time.time()
@@ -891,20 +942,11 @@ class McsCmd(object):
 
             # dumpCentroidtoDB
             self.dumpCentroidtoDB(cmd, frameId, self.spotFlags)
-        
-            cmd.inform('text="Sending centroid data to database" ')
-                
-        # the image is saved whether or not fibre identification succeeds; its failure
-        # then fails the command.
-        try:
-            if doFibreID:
-                self.identifyFibres(cmd, frameId, zenithAngle, insRot)
-        finally:
-            cmd.inform(f'frameId={frameId}; filename={filename}')
-            if rerunFrameId is None:
-                self.writeFITS(fileIds, hdr, image, cmd, saturated)
 
-        cmd.finish('text="expose command finished"')
+            cmd.inform('text="Sending centroid data to database" ')
+
+        if doFibreID:
+            self.identifyFibres(cmd, frameId, zenithAngle, insRot)
 
     def identifyFibres(self, cmd, frameId, zenithAngle, insRot):
         """Establish the MCS-to-PFI transform and match the frame's spots to cobras.
@@ -1047,6 +1089,13 @@ class McsCmd(object):
         if cMethod not in C_METHODS:
             cmd.fail(f'text="cMethod {cMethod} is not one of {", ".join(C_METHODS)}"')
             return
+
+        if cMethod == 'spotFinder':
+            try:
+                spotMeasurementModule()
+            except ImportError as e:
+                cmd.fail(f'text={qstr(f"cMethod spotFinder is not available: {e}")}')
+                return
 
         # the thresholds of 'win' are those of the last frame it measured.
         if cMethod != self.cMethod:
@@ -1427,13 +1476,26 @@ class McsCmd(object):
         self.centOverrides.clear()
         self._finishCentroidParams(cmd)
 
+    def overrideText(self):
+        """ The overrides of setCentroidParams and setApertureParams, as name=value, or 'none'. """
+
+        return ','.join(f'{name}={value}' for name, value in self.centOverrides.items()) or 'none'
+
+    def warnOverrides(self, cmd):
+        """ Warn when centroid parameters are overridden, and once when the detector is not configured. """
+
+        if self.centOverrides:
+            cmd.warn(f'text={qstr(f"centroid parameters overridden: {self.overrideText()}")}')
+        if self.detectorProblem:
+            cmd.warn(f'text={qstr(self.detectorProblem)}')
+            self.detectorProblem = ''
+
     def _finishCentroidParams(self, cmd):
         """ Apply the overrides to the configured parameters, and finish cmd with the overrides in force. """
 
         self.centParms = centroidParameters(self.actor.actorConfig['centroidParams'], self.centOverrides)
         self.logger.info(f'centParms: {self.centParms}')
-        overrides = ', '.join(f'{name}={value}' for name, value in self.centOverrides.items()) or 'none'
-        cmd.finish(f'text={qstr(f"centroid parameters overridden: {overrides}")}')
+        cmd.finish(f'text={qstr(f"centroid parameters overridden: {self.overrideText()}")}')
     
 
     def runCentroidSEP(self, cmd):
@@ -1570,16 +1632,17 @@ class McsCmd(object):
     def findSpots(self, cmd, centParms):
         """ Find and measure the spots of the last acquired image with the spotFinder library. """
 
-        # imported here: the other methods run on a host where spotFinder is not built.
-        import mcsActor.mcsRoutines.spotMeasurement as spotMeasurement
-
         image = self.actor.image
 
         cmd.inform(f'state="measuring cached image: {image.shape}"')
 
         try:
+            # imported here: the other methods run on a host where spotFinder is not built.
+            spotMeasurement = spotMeasurementModule()
             points, levels = spotMeasurement.measureSpots(image, centParms, self.detector['gain'])
-        except (TypeError, ValueError, RuntimeError, MemoryError) as e:
+        except Exception as e:
+            if not isinstance(e, (TypeError, ValueError, RuntimeError, MemoryError)):
+                self.logger.exception('spotFinder failed')
             cmd.fail(f'text={qstr(f"no spots measured: {e}")}')
             return
 

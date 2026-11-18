@@ -71,9 +71,11 @@ def findSpots(image, *, double findSigma, int nmin, int boxFind, int boxCent, do
               double aperture, double gain, int nThreads=8):
     """Spots of a frame, found and measured above the level of each of its columns.
 
-    The level of a column is its median. The noise of the frame is the root mean square, over the columns,
-    of the median minus the 15.87th percentile of the column: the standard deviation of the pixels,
-    whatever light is on them. A spot is a set of connected pixels above findSigma times the noise.
+    A smooth background, from the medians of blocks of about 256 pixels a side, is subtracted first, then
+    the level of each column, its median. The noise of the frame is the root mean square, over the columns,
+    of the median minus the 15.87th percentile of what is left of the column: the standard deviation of the
+    pixels, with whatever light the smooth background does not account for. A spot is a set of connected
+    pixels above findSigma times the noise.
 
     Parameters
     ----------
@@ -105,12 +107,12 @@ def findSpots(image, *, double findSigma, int nmin, int boxFind, int boxCent, do
     spots : `numpy.ndarray`
         Record array, one row per spot, in the order their first pixel comes in the frame: x, y (windowed
         centroid, pix, a pixel being centred on its indices), x2, y2, xy (second moments of the pixels above
-        the threshold, pix^2), peak (highest pixel, ADU above the level of its column), flux (sum within the
-        aperture, ADU above the column levels), fluxerr (its statistical error: the noise of the pixels
-        summed and the photon noise of the flux) and background (level subtracted from the column of the
-        centroid, ADU: the median of the column, rounded to an integer).
+        the threshold, pix^2), peak (highest pixel, ADU above the background), flux (sum within the
+        aperture, ADU above the background), fluxerr (its statistical error: the noise of the pixels summed
+        and the photon noise of the flux) and background (subtracted at the centroid, ADU: the level of its
+        column plus the deviation of the smooth background, both rounded to integers).
     levels : `dict`
-        background (median of the column levels), noise, threshold (as applied, above the column levels); ADU.
+        background (median of the column levels), noise, threshold (as applied, above the background); ADU.
 
     Raises
     ------

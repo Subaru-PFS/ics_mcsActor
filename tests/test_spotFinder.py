@@ -23,9 +23,38 @@ def expectedNoise(image):
     return np.sqrt(np.mean(lower ** 2))
 
 
+def meshDeviation(image, size=256):
+    """The smooth background of an image less the median of its blocks (of every fourth row), rounded, as
+    spotFinder subtracts it."""
+    image = np.asarray(image, dtype=np.int64)
+    ny, nx = image.shape
+    nBlocks = [max(1, (n + size // 2) // size) for n in (ny, nx)]
+    starts = [[b * n // nb for b in range(nb + 1)] for n, nb in zip((ny, nx), nBlocks)]
+    mesh = np.array([[np.median(image[starts[0][j]:starts[0][j + 1]:4, starts[1][i]:starts[1][i + 1]])
+                      for i in range(nBlocks[1])] for j in range(nBlocks[0])])
+    axes = []
+    for n, nb, start in zip((ny, nx), nBlocks, starts):
+        centres = np.array([0.5 * (start[b] + start[b + 1] - 1) for b in range(nb)])
+        pixels = np.arange(n)
+        if nb == 1:
+            axes.append((np.zeros(n, dtype=int), np.zeros(n)))
+            continue
+        block = np.clip(np.searchsorted(centres, pixels, side='right') - 1, 0, nb - 2)
+        weight = (pixels - centres[block]) / (centres[block + 1] - centres[block])
+        axes.append((block, weight))
+    (bj, wy), (bi, wx) = axes
+    bj1 = np.minimum(bj + 1, nBlocks[0] - 1)
+    bi1 = np.minimum(bi + 1, nBlocks[1] - 1)
+    wy, wx = wy[:, None], wx[None, :]
+    value = ((1 - wy) * ((1 - wx) * mesh[bj][:, bi] + wx * mesh[bj][:, bi1])
+             + wy * ((1 - wx) * mesh[bj1][:, bi] + wx * mesh[bj1][:, bi1]))
+    return np.floor(value - np.median(mesh) + 0.5).astype(np.int64)
+
+
 def subtracted(image):
-    """The image less floor(level + 0.5) of each column, with numpy."""
-    return image.astype('<i4') - np.floor(np.median(image, axis=0) + 0.5).astype('<i4')
+    """The image less its smooth background deviation, then less floor(level + 0.5) of each column, with numpy."""
+    flat = image.astype(np.int64) - meshDeviation(image)
+    return (flat - np.floor(np.median(flat, axis=0) + 0.5).astype(np.int64)).astype('<i4')
 
 
 def addSpots(image, positions, *, amplitude=5000.0, sigma=2.0, lobe=0.0, lobeOffset=(0.0, -4.0)):
@@ -316,6 +345,38 @@ class FindSpotsTestCase(unittest.TestCase):
 
             np.testing.assert_array_equal(image, original)
             self.assertEqual(len(spots), len(positions))
+
+    def testSmoothBackgroundIsRemoved(self):
+        """A blob or a ramp of light under the spots leaves them found, within 0.03 pixel of where they were (a
+        blob about one block wide is followed only roughly), with nothing more. A ramp leaves the noise; the
+        part of a blob the background does not follow raises it."""
+        positions = gridPositions(seed=20)
+        image = cameraFrame(positions, seed=20).astype('<i4')
+        reference, referenceLevels = find(image)
+        rows, cols = np.mgrid[:SHAPE[0], :SHAPE[1]]
+        for background, noiseRatio in ((1000.0 * np.exp(-((rows - 700) ** 2 + (cols - 1000) ** 2) / (2 * 300.0 ** 2)), None),
+                                       (400.0 * rows / SHAPE[0] + 200.0 * cols / SHAPE[1], 1.0)):
+            spots, levels = find(image + np.rint(background).astype('<i4'))
+
+            self.assertEqual(len(spots), len(positions))
+            if noiseRatio is not None:
+                self.assertAlmostEqual(levels['noise'] / referenceLevels['noise'], noiseRatio, delta=0.02)
+            nearest = np.hypot(spots['x'][:, None] - reference['x'][None, :],
+                               spots['y'][:, None] - reference['y'][None, :]).argmin(axis=1)
+            np.testing.assert_allclose(spots['x'], reference['x'][nearest], rtol=0, atol=0.03)
+            np.testing.assert_allclose(spots['y'], reference['y'][nearest], rtol=0, atol=0.03)
+            self.assertEqual(len(set(nearest)), len(nearest))
+
+    def testFlatFrameIsLeftAsItIs(self):
+        """On a frame whose background is flat to half an ADU, the smooth background subtracts nothing, and
+        the spots are those of the frame less its column levels."""
+        rng = np.random.default_rng(21)
+        image = np.rint(1800 + rng.normal(0, 5.0, size=SHAPE)).astype('<i4')
+        addSpots(image, gridPositions(seed=21), amplitude=4000.0)
+        self.assertFalse(meshDeviation(image).any())
+        spots, _ = find(image, aperture=10)
+        flat = image - np.floor(np.median(image, axis=0) + 0.5).astype('<i4')
+        np.testing.assert_array_equal(spots['flux'], spotFinder.apertureFlux(flat, spots['x'], spots['y'], 10))
 
     def testFluxIsApertureSum(self):
         """The flux is the sum, within the aperture of the centroid, of the frame less its column levels."""

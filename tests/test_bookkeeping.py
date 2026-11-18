@@ -36,7 +36,7 @@ def commandSet(**models):
     owner.actor = types.SimpleNamespace(actorConfig=CONFIG, models=models)
     owner.centOverrides = dict()
     owner.centParms = McsCmd.centroidParameters(CONFIG['centroidParams'], owner.centOverrides)
-    owner.detector = McsCmd.configuredDetector(CONFIG)
+    owner.detector, owner.detectorProblem = McsCmd.configuredDetector(CONFIG)
     owner.logger = logging.getLogger('test')
     return owner
 
@@ -48,12 +48,23 @@ def finished(cmd):
 class DetectorTestCase(unittest.TestCase):
 
     def testConfiguredDetector(self):
-        """Name and gain come from the detector section; without a name or a numeric gain the config is refused."""
-        self.assertEqual(McsCmd.configuredDetector(CONFIG), dict(name='MCS cam#1', gain=2.24))
+        """Name and gain come from the detector section; without a name or a numeric gain the default is used."""
+        config = dict(detector=dict(name='other cam', gain=3.1))
+        self.assertEqual(McsCmd.configuredDetector(config), (dict(name='other cam', gain=3.1), ''))
         for config in ({}, dict(detector=None), dict(detector=dict(name='MCS cam#1')),
                        dict(detector=dict(gain=2.24)), dict(detector=dict(name='MCS cam#1', gain='high'))):
-            with self.assertRaises(ValueError, msg=config):
-                McsCmd.configuredDetector(config)
+            detector, problem = McsCmd.configuredDetector(config)
+            self.assertEqual(detector, McsCmd.DEFAULT_DETECTOR, msg=config)
+            self.assertIn('no usable detector section', problem)
+
+    def testDetectorProblemWarnedOnce(self):
+        """A missing detector section is warned on the first exposure only."""
+        owner = commandSet()
+        owner.detectorProblem = 'no usable detector section'
+        cmd = FakeCmd()
+        McsCmd.McsCmd.warnOverrides(owner, cmd)
+        McsCmd.McsCmd.warnOverrides(owner, cmd)
+        self.assertEqual(cmd.replies, [('warn', 'text="no usable detector section"')])
 
     def testHeaderDetector(self):
         """DETECTOR and GAIN are those of the config, and the cards of the exposure follow the others."""
@@ -64,8 +75,16 @@ class DetectorTestCase(unittest.TestCase):
                                              exposureCards)
 
         self.assertEqual((hdr['DETECTOR'], hdr['GAIN']), ('MCS cam#1', 2.24))
+        self.assertEqual(hdr['OBS-MOD'], 'IMAG_IMAG')
         self.assertEqual((hdr['W_BIAPOW'], hdr['W_FIDDTY']), (40, 6.9))
         self.assertLess(list(hdr.keys()).index('GAIN'), list(hdr.keys()).index('W_BIAPOW'))
+
+
+    def testHeaderWithoutExposureCards(self):
+        """Without the cards of the other actors the header is still built, without OBS-MOD."""
+        hdr = McsCmd.McsCmd._constructHeader(commandSet(), FakeCmd(), 'file', 'object', 4800.0, 1.7e9, 15503500, None)
+        self.assertNotIn('OBS-MOD', hdr)
+        self.assertEqual(hdr['TELFOCUS'], 'CS_OPT')
 
 
 class LedCardsTestCase(unittest.TestCase):
@@ -216,6 +235,21 @@ class CentroidParamsTestCase(unittest.TestCase):
         self.assertEqual(self.exposure(owner), CONFIG['centroidParams'])
         self.assertEqual(owner.centParms, CONFIG['centroidParams'])
         self.assertIn('none', finished(cmd)[0])
+
+    def testOverridesRecordedAndWarned(self):
+        """Active overrides are in the CENTOVR card and warned on every exposure until reset."""
+        owner = commandSet()
+        McsCmd.McsCmd.setCentroidParams(owner, FakeCmd(fwhmx=12.0))
+        hdr = McsCmd.McsCmd._constructHeader(owner, FakeCmd(), 'file', 'object', 4800.0, 1.7e9, 15503500, None)
+        self.assertEqual(hdr['CENTOVR'], 'fwhmx=12.0')
+        for _ in range(2):
+            cmd = FakeCmd()
+            McsCmd.McsCmd.warnOverrides(owner, cmd)
+            self.assertEqual(cmd.replies, [('warn', 'text="centroid parameters overridden: fwhmx=12.0"')])
+        McsCmd.McsCmd.resetCentroidParams(owner, FakeCmd())
+        cmd = FakeCmd()
+        McsCmd.McsCmd.warnOverrides(owner, cmd)
+        self.assertEqual(cmd.replies, [])
 
     def testOtherKeywordsIgnored(self):
         """Keywords that are not centroid parameters override nothing."""

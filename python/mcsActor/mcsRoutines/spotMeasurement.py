@@ -22,8 +22,8 @@ def measureSpots(image, centParms, gain):
     Returns
     -------
     points : `numpy.ndarray`, shape (n, 10)
-        spotId counts from 1. x, y, x2, y2, xy are in pixels; background is the level subtracted from the
-        column of the spot; peak, flux and fluxerr are ADU above the column levels.
+        spotId counts from 1. x, y, x2, y2, xy are in pixels; background is the level subtracted at the
+        spot; peak, flux and fluxerr are ADU above the background.
     levels : `dict`
         background, noise, threshold of the frame (ADU; the threshold is above the background).
 

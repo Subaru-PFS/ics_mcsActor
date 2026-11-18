@@ -42,7 +42,7 @@ aperture) of its centroid. Three thresholds on that count set the bits of
 |---|---|---|---|---|---|
 | 0 | 1 | `NO_SAT_CHECK` | — | the saturation of the frame was not measured; the other bits are unset and say nothing | treat as unknown, not as clean |
 | 1 | 2 | `BAD_PHOTOMETRY` | 2 | flux low by more than ~0.5% | do not use the flux; `fluxerr` carries the bias |
-| 2 | 4 | `BAD_CENTROID` | 5 | centroid biased by more than ~1 µm | usable: the bias is stable at a fixed flux, the scatter grows modestly |
+| 2 | 4 | `BAD_CENTROID` | 5 | centroid biased by more than ~1 µm | usable: the mean bias is constant at a fixed flux; the frame-to-frame scatter is 1.5 times that of an unsaturated spot (~3 µm added) |
 | 3 | 8 | `SATURATED` | 10 | frame-to-frame scatter of the centroid at least twice that of an unsaturated spot | the position is not stable |
 
 A spot below `BAD_PHOTOMETRY` (one saturated pixel) loses 0.2% of its flux in median, which is within
@@ -56,7 +56,9 @@ with `fluxErrorPerPixel` = 0.008, the flux lost per saturated pixel over one to 
 
 ### Where the flags are
 
-- **opdb**: `mcs_data.flags`, one value per spot. The `spot_id = -1` row has 0.
+- **opdb**: `mcs_data.flags`, one value per spot. The `spot_id = -1` row has 0. Rows written before the
+  flags also hold 0: a frame was flagged only if its `mcs_exposure.version_actor` is the release that
+  introduced them or a later one.
 - **PFSC file**: the `SPOTS` table has `flags` and `nSatPix` (the count itself, -1 when unknown), so
   another threshold can be applied without re-running anything. Its header defines the bits and gives
   the thresholds the frame was flagged with:
@@ -131,6 +133,23 @@ of the light its most exposed read holds depends on the frame. Above 10 pixels t
 of the centroid, about 5 µm added in quadrature.
 
 ### Limits
+
+**The count does not weigh the same on every row.** The threshold of a row is the coadd value at which
+its pixels have clipped for the worst phase a frame can have, and the light later rows collect is shared
+more evenly between reads, so on high rows the mask also holds pixels that did not clip in that frame.
+Flux lost per masked pixel, spots with 1 to 12 masked pixels:
+
+| rows | flux lost per masked pixel | y shift per masked pixel (pix) |
+|---|---|---|
+| 0-1500 | 1.25% | -0.025 |
+| 1500-3000 | 0.80% | -0.012 |
+| 3000-4500 | 0.56% | -0.006 |
+| 4500-5778 | 0.13% | -0.001 |
+
+The flags are therefore conservative on high rows. On low rows a single masked pixel already costs
+about 1.2% of the flux, so the 0.5% of `BAD_PHOTOMETRY` holds there only in median; unflagged spots lose
+at most 1.2-1.6% (95th percentile) in every band of rows. Weighting the count by row needs the phase of
+the frame, which is not recorded.
 
 One night, one focus, fiducials only. The number of saturated pixels depends on the size of the
 spots: a sharper focus puts the same flux on fewer pixels. Cobras were not in the calibration; their
