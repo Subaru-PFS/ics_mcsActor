@@ -39,6 +39,7 @@ import mcsActor.windowedCentroid.centroid as centroid
 import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 import mcsActor.mcsRoutines.fiducials as fiducials
 import mcsActor.mcsRoutines.dbRoutinesMCS as dbTools
+import mcsActor.mcsRoutines.saturation as saturation
 import multiprocessing
 
 from pfs.utils import butler
@@ -142,6 +143,9 @@ class McsCmd(object):
         self.fidsGood = None
         self.fidsOuterRing = None
         self.prevPos = None
+        self.spotFlags = None
+        self.spotSaturated = None
+        self.saturated = saturation.Saturation(None, 'not measured yet')
         self.centThresh = None
 
         
@@ -547,7 +551,10 @@ class McsCmd(object):
         return hdr
 
     def _makeSpotHDU(self, cmd):
-        """ Create a binary table HDU with spot positions. """
+        """ Create a binary table HDU with spot positions, their saturation flags and saturated pixels.
+
+        The header names the flag bits and gives the thresholds of the frame (saturation.spotCards).
+        """
 
         try:
             centroids = self.centroids
@@ -555,13 +562,23 @@ class McsCmd(object):
             centroids = np.empty((0,3), dtype='f4')
         nspots = min(4000, len(centroids))
 
+        # spots whose saturation was not judged are marked unknown.
+        flags, counts = self.spotFlags, self.spotSaturated
+        if flags is None or counts is None or len(flags) != len(centroids) or len(counts) != len(centroids):
+            counts = np.full(len(centroids), -1, dtype=np.int32)
+            flags = saturation.spotFlags(counts, None)
+
         spots = [pyfits.Column(name='x', format='E', unit='mm', 
                                array=centroids[:nspots, 1]),
                  pyfits.Column(name='y', format='E', unit='mm', 
-                               array=centroids[:nspots, 2])]
-        return pyfits.BinTableHDU.from_columns(spots, name='SPOTS')
+                               array=centroids[:nspots, 2]),
+                 pyfits.Column(name='flags', format='J', array=flags[:nspots]),
+                 pyfits.Column(name='nSatPix', format='J', array=counts[:nspots])]
+        hdu = pyfits.BinTableHDU.from_columns(spots, name='SPOTS')
+        hdu.header.extend(saturation.spotCards(self.saturated.spots))
+        return hdu
 
-    def writeFITS(self, fileIds, hdr, image, cmd):
+    def writeFITS(self, fileIds, hdr, image, cmd, saturated):
         """Arrange to create and save PFSC file in the background.
 
         Args
@@ -574,6 +591,8 @@ class McsCmd(object):
           The image data. This is what takes long to write
         cmd : MHS command
           The command to report to.
+        saturated : saturation.Saturation
+          The saturated pixels of the image, written as a MASK HDU after the spots.
         """
         filename = fileIds['filename']
         
@@ -625,17 +644,27 @@ class McsCmd(object):
                 return
             
             t1 = time.time()
+            if details != 'ok':
+                cmd.warn(f'text={qstr(details)}')
             cmd.inform(f'mcsFileIds={fileIds["pfsDay"]},{fileIds["visit"]},{fileIds["frame"]}; '
                        f'frameId={fileIds["frameId"]}; filename={fileIds["filename"]}')
             cmd.inform(f'text="writing {fileIds["filename"]} took {t1-t0:0.3f}s"')
             
         def write_to_disk(filename, hduList, writerQueue=writerQueue):
+            details = 'ok'
+            # the mask is built in the writing process, where its compression does not delay the
+            # command; the image is written even when the mask cannot be.
+            try:
+                hduList.append(saturation.maskHdu(image.shape, saturated))
+            except Exception as e:
+                details = f'no MASK HDU in {filename}: {e}'
+
             try:
                 hduList.writeto(filename, checksum=True, overwrite=True)
             except Exception as e:
                 writerQueue.put((False, f'failed to write {filename}: {e}'))
                 return
-            writerQueue.put((True, 'ok'))
+            writerQueue.put((True, details))
             
         reportThread = threading.Thread(target=reportFinishedFile, daemon=True)
         reportThread.start()
@@ -767,6 +796,7 @@ class McsCmd(object):
                 return 
             rerunFrameId = frameId = cmdKeys['rerunFrameId'].values[0]
             fileIds, hdr, image, expTime = self._loadExistingFrame(cmd, frameId)
+            exposureSeconds = float(expTime)
             filename = fileIds['filename']
         else:
             rerunFrameId = None
@@ -790,6 +820,7 @@ class McsCmd(object):
                 
             # Put exposure time to class attribute.
             self.expTime = expTime
+            exposureSeconds = expTime / 1000.0
             
             cmd.inform('text="Exposure time now is %d ms." ' % (expTime))
             try:
@@ -809,6 +840,10 @@ class McsCmd(object):
         # set visitID
         self.visitId = frameId // 100
         self.actor.image = image
+
+        saturated = self.measureSaturation(cmd, frameId, image, exposureSeconds)
+        self.saturated = saturated
+        self.spotFlags = self.spotSaturated = None
 
         # load telescope values from the DB
         cmd.inform(f'text="loading telescope parameters for frame={frameId}"')
@@ -846,14 +881,16 @@ class McsCmd(object):
 
             if not cmd.isAlive(): # command might have failed in runCentroid, so do not proceed further.
                 self.logger.warning('Centroiding failed; writing FITS file for inspection')
-                self.writeFITS(fileIds, hdr, image, cmd)
+                self.writeFITS(fileIds, hdr, image, cmd, saturated)
                 return
 
             t2 = time.time()
             cmd.inform(f'text="Centroids done in {t2-t1} second" ')
 
+            self.flagSaturatedSpots(cmd, frameId, saturated)
+
             # dumpCentroidtoDB
-            self.dumpCentroidtoDB(cmd, frameId)
+            self.dumpCentroidtoDB(cmd, frameId, self.spotFlags)
         
             cmd.inform('text="Sending centroid data to database" ')
                 
@@ -865,7 +902,7 @@ class McsCmd(object):
         finally:
             cmd.inform(f'frameId={frameId}; filename={filename}')
             if rerunFrameId is None:
-                self.writeFITS(fileIds, hdr, image, cmd)
+                self.writeFITS(fileIds, hdr, image, cmd, saturated)
 
         cmd.finish('text="expose command finished"')
 
@@ -890,8 +927,95 @@ class McsCmd(object):
 
         self.fibreID(cmd, frameId, zenithAngle, insRot)
 
-    def dumpCentroidtoDB(self, cmd, frameId):
-        """Connect to database and return json string to an attribute."""
+    def measureSaturation(self, cmd, frameId, image, exptime):
+        """Find the saturated pixels of a frame.
+
+        Parameters
+        ----------
+        cmd : `actorcore.Command`
+        frameId : `int`
+        image : `numpy.ndarray`
+            Raw image of the frame.
+        exptime : `float`
+            Exposure time, seconds.
+
+        Returns
+        -------
+        `saturation.Saturation`
+            Without a mask when the saturation could not be measured, which is reported.
+        """
+        saturated = saturation.measureConfigured(self.actor.actorConfig.get('saturation'), image, exptime)
+        if saturated.reason:
+            # only a Canon coadd is modelled: any other image is expected not to be measured.
+            report = cmd.warn if image.shape == saturation.CANON_SHAPE else cmd.inform
+            report(f'text={qstr(f"saturation of frame {frameId} not measured: {saturated.reason}")}')
+
+        return saturated
+
+    def flagSaturatedSpots(self, cmd, frameId, saturated):
+        """Flag the frame's spots from the saturated pixels near them, add the saturation to their flux
+        errors and report how many there are.
+
+        Sets spotSaturated (saturated pixels within the radius of each centroid, -1 when unknown) and
+        spotFlags (MCSSpotFlags bits), one per centroid, and updates the fluxerr column of centroids.
+
+        Parameters
+        ----------
+        cmd : `actorcore.Command`
+        frameId : `int`
+        saturated : `saturation.Saturation`
+            Saturated pixels of the frame; without a mask when they could not be measured.
+        """
+        x, y = self.centroids[:, 1], self.centroids[:, 2]
+        # a failure here must not cost the exposure: its spots are then marked unknown.
+        try:
+            thresholds = saturated.spots if saturated.mask is not None else None
+            radius = thresholds.radius if thresholds is not None else 0.0
+            counts = saturation.pixelsNearSpots(saturated.mask if thresholds is not None else None, x, y, radius)
+            flags = saturation.spotFlags(counts, thresholds)
+            self.centroids[:, 9] = saturation.fluxErrors(self.centroids[:, 8], self.centroids[:, 9], counts,
+                                                         thresholds)
+        except Exception as e:
+            self.logger.exception('failed to flag the saturated spots')
+            cmd.warn(f'text={qstr(f"failed to flag the saturated spots of frame {frameId}: {e}")}')
+            counts = np.full(len(x), -1, dtype=np.int32)
+            flags = saturation.spotFlags(counts, None)
+
+        self.spotSaturated, self.spotFlags = counts, flags
+        cmd.inform(saturation.countKeyword('saturatedSpots', frameId, flags))
+
+    def reportSaturated(self, cmd, what, frameId, spotIds, limitName=None):
+        """Report how many of the frame's spots matched to fiducials, or to cobras, carry each saturation flag.
+
+        Parameters
+        ----------
+        cmd : `actorcore.Command`
+        what : `str`
+            What the spots are matched to, 'fiducials' or 'cobras': the keyword is saturatedFiducials
+            or saturatedCobras.
+        frameId : `int`
+        spotIds : `numpy.ndarray`
+            spot_id of the matched spots; a value that is not positive stands for no spot.
+        limitName : `str`, optional
+            Setting of the saturation configuration giving the fraction of SATURATED spots past
+            which a warning is issued.
+        """
+        # a failure here must not fail the command that matched the spots.
+        try:
+            flags = saturation.flagsOfSpots(self.spotFlags, self.centroids[:, 0], spotIds)
+            cmd.inform(saturation.countKeyword(f'saturated{what.capitalize()}', frameId, flags))
+
+            config = self.actor.actorConfig.get('saturation') or {}
+            limit = None if limitName is None else config.get(limitName)
+            if saturation.exceedsFraction(flags, limit):
+                nSaturated = saturation.countFlags(flags)[-1]
+                cmd.warn(f'text="{nSaturated} of the {len(flags)} matched {what} are SATURATED"')
+        except Exception as e:
+            self.logger.exception(f'failed to report the saturated {what}')
+            cmd.warn(f'text={qstr(f"failed to report the saturated {what} of frame {frameId}: {e}")}')
+
+    def dumpCentroidtoDB(self, cmd, frameId, spotFlags):
+        """Write the frame's centroids, with their MCSSpotFlags bits, to the database."""
 
         conn = self.connectToDB(cmd)
         cmd.diag(f'text="dumping centroids to db {conn}"')
@@ -904,7 +1028,7 @@ class McsCmd(object):
             #self._makeTables(conn, doDrop=False)
             cmd.inform('text="Attaching centroid to exsiting table. "')
 
-        buf = self._writeCentroids(self.centroids, frameId, 1, conn)
+        buf = self._writeCentroids(self.centroids, spotFlags, frameId, 1, conn=conn)
 
         cmd.inform('text="Centroids of exposure ID %08d dumped."' % (frameId))
 
@@ -1127,6 +1251,9 @@ class McsCmd(object):
         db = self.connectToDB(cmd)
         dbTools.writeFidToDB(db, fidSpot, mcsData, frameID, self.fids)
         cmd.inform(f'text="wrote matched FF to opdb."')
+
+        self.reportSaturated(cmd, 'fiducials', frameID, mcsData['spot_id'].to_numpy()[fidSpot[fidSpot >= 0]],
+                             limitName='maxFiducialFraction')
         
         # save pfiTransform to class attribute
         self.pfiTrans = pfiTransform
@@ -1207,6 +1334,8 @@ class McsCmd(object):
 
         dbTools.writeMatchesToDB(db, cobraMatch, int(frameId))
         cmd.inform(f'text="wrote matched cobras to database"')
+
+        self.reportSaturated(cmd, 'cobras', frameId, cobraMatch[:, 1])
 
         # save the values to the previous position
         self.prevPos = cobraMatch[:, [0, 2, 3]]
@@ -1551,8 +1680,8 @@ class McsCmd(object):
         except Exception as e:
             self.logger.warn(f"failed to write with {sql}: {e}")
 
-    def _writeCentroids(self, centArr, frameId, moveId, conn=None):
-        """ Write all measurements for a given (frameId, moveId) """
+    def _writeCentroids(self, centArr, flags, frameId, moveId, conn=None):
+        """ Write all measurements for a given (frameId, moveId); flags holds one value per row of centArr. """
 
         # if too many centroids have been returned, only save the first 4000
 
@@ -1570,7 +1699,7 @@ class McsCmd(object):
                                mcs_second_moment_xy_pix=centArr[:,5],
                                bgvalue=centArr[:,6],
                                peakvalue=centArr[:,7],
-                               flags=np.zeros(shape=(nItems), dtype='i4'),
+                               flags=np.asarray(flags, dtype='i4'),
                                flux=centArr[:,8],
                                fluxerr=centArr[:,9]))
 
